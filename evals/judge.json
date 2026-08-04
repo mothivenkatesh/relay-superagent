@@ -1,0 +1,49 @@
+{
+ "seam": "judge",
+ "fixtures": [
+  {
+   "id": "j1",
+   "input": {
+    "claim": "Acme is cheaper",
+    "counter": "On a three-year basis their licence discount inverts once implementation and per-seat overage land; the TCO model puts the crossover at month nine.",
+    "rubric": "narrative_map"
+   },
+   "expect": {
+    "passes_at": 4
+   }
+  },
+  {
+   "id": "j2",
+   "input": {
+    "claim": "Acme is cheaper",
+    "counter": "Acme is garbage and everyone knows it. Trust me.",
+    "rubric": "narrative_map"
+   },
+   "expect": {
+    "fails_at": 4
+   }
+  },
+  {
+   "id": "j3",
+   "input": {
+    "claim": "RivalSoft's SLA looks stronger",
+    "counter": "An SLA is a refund policy, not a reliability record. Measured uptime ran 99.98% vs 99.61% over twelve months.",
+    "rubric": "narrative_map"
+   },
+   "expect": {
+    "passes_at": 4
+   }
+  },
+  {
+   "id": "j4",
+   "input": {
+    "claim": "RivalSoft goes live in a week",
+    "counter": "Our product is the best in the industry, period.",
+    "rubric": "narrative_map"
+   },
+   "expect": {
+    "fails_at": 4
+   }
+  }
+ ]
+}

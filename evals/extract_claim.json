@@ -1,0 +1,67 @@
+{
+ "seam": "extract_claim",
+ "fixtures": [
+  {
+   "id": "ec1",
+   "input": {
+    "text": "We're also looking at Acme, honestly they are cheaper.",
+    "competitor_id": "acme"
+   },
+   "expect_contains": [
+    "cheap"
+   ]
+  },
+  {
+   "id": "ec2",
+   "input": {
+    "text": "RivalSoft say they can go live in a week.",
+    "competitor_id": "rivalsoft"
+   },
+   "expect_contains": [
+    "week"
+   ]
+  },
+  {
+   "id": "ec3",
+   "input": {
+    "text": "Acme is telling us your migration takes six months.",
+    "competitor_id": "acme"
+   },
+   "expect_contains": [
+    "migration"
+   ]
+  },
+  {
+   "id": "ec4",
+   "input": {
+    "text": "Acme bundles support for free, you charge for it.",
+    "competitor_id": "acme"
+   },
+   "expect_contains": [
+    "support"
+   ]
+  },
+  {
+   "id": "ec5",
+   "input": {
+    "text": "The CFO liked RivalSoft's shorter contract terms.",
+    "competitor_id": "rivalsoft"
+   },
+   "expect_contains": [
+    "contract"
+   ]
+  },
+  {
+   "id": "ec6",
+   "input": {
+    "text": "Acme quoted us thirty percent under you.",
+    "competitor_id": "acme"
+   },
+   "expect_contains": [
+    "percent",
+    "30"
+   ],
+   "any": true
+  }
+ ]
+}

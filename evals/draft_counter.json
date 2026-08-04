@@ -1,0 +1,110 @@
+{
+ "seam": "draft_counter",
+ "fixtures": [
+  {
+   "id": "dc1",
+   "input": {
+    "claim": "Acme is cheaper",
+    "deal": {
+     "stage": "evaluation",
+     "amount_band": "50-100k"
+    },
+    "evidence": [
+     {
+      "evidence_id": "ev_tco",
+      "text": "Three-year TCO model: Acme per-seat overage adds 31% by year two",
+      "source_url": "https://ours.example/tco"
+     }
+    ],
+    "memory": []
+   },
+   "checks": {
+    "cites_subset": true,
+    "len_min": 120,
+    "len_max": 1200,
+    "banned": [
+     "best",
+     "leading",
+     "number one"
+    ]
+   }
+  },
+  {
+   "id": "dc2",
+   "input": {
+    "claim": "RivalSoft's SLA looks stronger",
+    "deal": {
+     "stage": "evaluation",
+     "amount_band": "100-250k"
+    },
+    "evidence": [
+     {
+      "evidence_id": "ev_uptime",
+      "text": "12-month status page comparison, 99.98% vs 99.61%",
+      "source_url": "https://ours.example/uptime"
+     }
+    ],
+    "memory": []
+   },
+   "checks": {
+    "cites_subset": true,
+    "len_min": 120,
+    "len_max": 1200,
+    "banned": [
+     "best",
+     "leading",
+     "number one"
+    ]
+   }
+  },
+  {
+   "id": "dc3",
+   "input": {
+    "claim": "Acme goes live in a week",
+    "deal": {
+     "stage": "evaluation",
+     "amount_band": "25-50k"
+    },
+    "evidence": [],
+    "memory": []
+   },
+   "checks": {
+    "escalate_or_no_fabrication": true
+   },
+   "note": "no evidence available: the drafter must escalate or cite nothing, never invent"
+  },
+  {
+   "id": "dc4",
+   "input": {
+    "claim": "Acme is cheaper",
+    "deal": {
+     "stage": "evaluation",
+     "amount_band": "50-100k"
+    },
+    "evidence": [
+     {
+      "evidence_id": "ev_tco",
+      "text": "TCO model",
+      "source_url": "https://ours.example/tco"
+     }
+    ],
+    "memory": [
+     {
+      "changed": "shorter, numbers first",
+      "implies": "keep it concrete"
+     }
+    ]
+   },
+   "checks": {
+    "cites_subset": true,
+    "len_min": 120,
+    "len_max": 1200,
+    "banned": [
+     "best",
+     "leading",
+     "number one"
+    ]
+   }
+  }
+ ]
+}

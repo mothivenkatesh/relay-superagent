@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay SuperAgent — functionality map</title>
+<style>
+:root{--navy:#0E2340;--ink:#12295C;--indigo:#4F46E5;--indigo-soft:#EEEDFD;
+--green:#0E9F6E;--green-soft:#E8F7F0;--amber:#D97706;--amber-soft:#FEF3E4;
+--red:#B4232A;--red-soft:#FBEEEE;--grey:#5A6B85;--mute:#94A3B8;--line:#E2E8F0;
+--wash:#F7F8FC;--bg:#EEF0F5}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Google Sans",system-ui,-apple-system,Arial,sans-serif;background:var(--bg);
+color:#1F2C43;line-height:1.5;-webkit-font-smoothing:antialiased}
+main{max-width:1160px;margin:0 auto;padding:26px 28px 70px}
+.gate{background:var(--navy);color:#fff;border-radius:14px;padding:20px 24px;margin-bottom:24px}
+.gate .k{font-size:10.5px;font-weight:700;letter-spacing:.1em;color:#8E9BFF;text-transform:uppercase}
+.gate p{font-size:16.5px;margin-top:6px;max-width:900px}
+.gate p b{color:#8E9BFF}
+.lanes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.lane{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.lane h2{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.lane .sub{font-size:11.5px;color:var(--mute);margin-bottom:12px}
+.lane.a h2{color:var(--indigo)}.lane.b h2{color:var(--green)}.lane.c h2{color:var(--amber)}
+.item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:9px}
+.item b{font-size:13px;color:var(--ink);display:block}
+.item p{font-size:11.8px;color:var(--grey);margin-top:2px}
+.item .tag{float:right;font-size:9.5px;font-weight:700;letter-spacing:.05em;border-radius:10px;
+padding:2px 8px;text-transform:uppercase}
+.t1{background:var(--indigo-soft);color:var(--indigo)}
+.t2{background:var(--green-soft);color:var(--green)}
+.t3{background:var(--wash);color:var(--mute)}
+.row2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-top:18px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.panel h2{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+color:var(--grey);margin-bottom:10px}
+.dec{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--wash);font-size:13px}
+.dec:last-child{border-bottom:none}
+.dec .id{font-weight:700;color:var(--indigo);flex:none;width:30px}
+.dec .q{color:#25344E;flex:1}
+.dec .rec{color:var(--green);font-weight:700;flex:none}
+.kill{background:var(--red-soft);border:1px solid #F1C4C6;border-radius:14px;padding:16px 18px}
+.kill h2{color:var(--red)}
+.kill p{font-size:12.5px;color:#7A3B3F}
+footer{margin-top:20px;font-size:11px;color:var(--mute)}
+@media(max-width:960px){.lanes{grid-template-columns:1fr}.row2{grid-template-columns:1fr}}
+</style></head><body><main>
+
+<div class="gate">
+  <div class="k">The MVP gate — one sentence, everything sequences backward from it</div>
+  <p>A real <b>Fathom call</b> in which someone names a competitor produces, within ten
+  minutes, a <b>Slack DM</b> to me with the counter; my <b>Approve</b> writes a note onto
+  the real <b>HubSpot deal</b>; and the run row with my decision sits in <b>Postgres</b>.</p>
+</div>
+
+<div class="lanes">
+  <section class="lane a">
+    <h2>Lane A — the gate path</h2>
+    <div class="sub">Sequenced. Nothing else matters until this passes.</div>
+    <div class="item"><span class="tag t1">1</span><b>Real model behind LlmPort</b>
+      <p>Claude adapter for the five seams. The demo becomes a working product on
+      pasted transcripts the same day.</p></div>
+    <div class="item"><span class="tag t1">2</span><b>Slack adapter</b>
+      <p>Block Kit gate card + interactions endpoint → the same approve/edit/reject.
+      The workspace buttons already proved the handlers.</p></div>
+    <div class="item"><span class="tag t1">3</span><b>Fathom webhook ingest</b>
+      <p>Transcript-ready webhook → TriggerEvent. Tunnel via cloudflared for local dev.</p></div>
+    <div class="item"><span class="tag t1">4</span><b>HubSpot adapter</b>
+      <p>CrmPort: deal read, note write with association. Private-app token from keychain.</p></div>
+    <div class="item"><span class="tag t1">5</span><b>PgLedger wired into the server</b>
+      <p>The workspace and pipeline run on :5434 instead of the dict. Contract already green.</p></div>
+  </section>
+
+  <section class="lane b">
+    <h2>Lane B — workspace functionality</h2>
+    <div class="sub">Parallel, cheap, none block the gate.</div>
+    <div class="item"><span class="tag t2">B1</span><b>Policy editor</b>
+      <p>Add competitor / banned term in the UI, no deploy — spec DoD #10, and the
+      onboarding surface for tenant one.</p></div>
+    <div class="item"><span class="tag t2">B2</span><b>DiffView after edit</b>
+      <p>Original vs edited with the is_material verdict and the customer override —
+      the billing-audit surface.</p></div>
+    <div class="item"><span class="tag t2">B3</span><b>Evidence library</b>
+      <p>CRUD + per-evidence observed win rate with n, suppressed under n&lt;5.</p></div>
+    <div class="item"><span class="tag t2">B4</span><b>Run detail / replay view</b>
+      <p>One run end to end: timeline, retrieved refs, checks passed, gate, outcome.</p></div>
+  </section>
+
+  <section class="lane c">
+    <h2>Lane C — trust machinery</h2>
+    <div class="sub">Starts the day the real model lands.</div>
+    <div class="item"><span class="tag t3">C1</span><b>Eval fixtures, 30 per seam</b>
+      <p>Real transcripts once Fathom flows; until then synthetic + near-misses.</p></div>
+    <div class="item"><span class="tag t3">C2</span><b>Adversarial suite</b>
+      <p>Injection-via-transcript cases. 100% pass blocks release.</p></div>
+    <div class="item"><span class="tag t3">C3</span><b>Autonomy auto-demotion</b>
+      <p>correction_rate &gt; 10% trailing → stage drop + owner notice. Metrics exist.</p></div>
+    <div class="item"><span class="tag t3">C4</span><b>Memory compaction job</b>
+      <p>Weekly summarise-and-supersede per (rep, concern). Spec §6.11, not yet built.</p></div>
+    <div class="item"><span class="tag t3">C5</span><b>Outcome collector</b>
+      <p>HubSpot deal-stage poll → outcome rows; record_close is manual today.</p></div>
+  </section>
+</div>
+
+<div class="row2">
+  <div class="panel">
+    <h2>Open decisions — captain's judgment</h2>
+    <div class="dec"><span class="id">D1</span><span class="q">Call source for the gate:
+      Fathom free API / paste-transcript first / wait for Gong</span><span class="rec">Fathom</span></div>
+    <div class="dec"><span class="id">D2</span><span class="q">CRM: HubSpot free private-app
+      / Salesforce dev org</span><span class="rec">HubSpot</span></div>
+    <div class="dec"><span class="id">D3</span><span class="q">Models: split by seam
+      (Haiku confirm/extract, Sonnet draft/judge/diff) / one model</span><span class="rec">Split</span></div>
+    <div class="dec"><span class="id">D4</span><span class="q">Order: gate-first /
+      workspace-first</span><span class="rec">Gate-first</span></div>
+  </div>
+  <div class="panel kill">
+    <h2>Killed for now — overengineering guard</h2>
+    <p>Multi-env tiers · auth/SSO · billing · multi-tenant onboarding · Gmail ingest
+    (OAuth review pain, zero gate value) · sending on the customer's behalf ·
+    Salesforce · Gong · AG-UI streaming (page reload is fine until the workspace is
+    the product) · LangGraph migration (deliberate spec deviation, flagged in
+    decisions.md — plain code + Postgres passes 46 tests; adopt when drafting goes
+    parallel or runs must survive death mid-draft).</p>
+  </div>
+</div>
+
+<footer>decisions.md is the ledger; this page is its picture. Prototype-phase rules in
+force: direct commits, no review pipeline, until the gate sentence passes.</footer>
+</main></body></html>

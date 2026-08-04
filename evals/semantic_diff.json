@@ -1,0 +1,66 @@
+{
+ "seam": "semantic_diff",
+ "fixtures": [
+  {
+   "id": "sd1",
+   "input": {
+    "original": "The three-year TCO crosses at month nine.",
+    "edited": "The 3-year TCO crosses at month 9."
+   },
+   "expect": {
+    "is_material": false
+   }
+  },
+  {
+   "id": "sd2",
+   "input": {
+    "original": "The three-year TCO crosses at month nine.",
+    "edited": "The three-year TCO crosses at month eighteen."
+   },
+   "expect": {
+    "is_material": true
+   }
+  },
+  {
+   "id": "sd3",
+   "input": {
+    "original": "Measured uptime ran 99.98% against 99.61%.",
+    "edited": "Measured uptime ran 99.98% against 99.61%, and admins on G2 describe failover pain."
+   },
+   "expect": {
+    "is_material": true
+   }
+  },
+  {
+   "id": "sd4",
+   "input": {
+    "original": "Happy to walk through the model on a call.",
+    "edited": "Glad to walk you through the model whenever suits."
+   },
+   "expect": {
+    "is_material": false
+   }
+  },
+  {
+   "id": "sd5",
+   "input": {
+    "original": "Their bundled tier is community-SLA support.",
+    "edited": "Their bundled tier is enterprise-grade support."
+   },
+   "expect": {
+    "is_material": true
+   },
+   "note": "billing-critical: meaning flipped"
+  },
+  {
+   "id": "sd6",
+   "input": {
+    "original": "The crossover lands near month nine for a team this size.",
+    "edited": "For a team this size, the crossover lands near month nine."
+   },
+   "expect": {
+    "is_material": false
+   }
+  }
+ ]
+}

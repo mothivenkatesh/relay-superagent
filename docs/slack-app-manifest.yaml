@@ -1,0 +1,28 @@
+# Relay SuperAgent Slack app — paste at https://api.slack.com/apps → Create New App
+# → "From a manifest". Then, under Install App, install to your workspace and:
+#
+#   security add-generic-password -U -s relay_superagent -a slack-bot     -w 'xoxb-…'
+#   security add-generic-password -U -s relay_superagent -a slack-signing -w '<signing secret>'
+#
+# Interactivity needs a public URL in front of localhost:8787 — that lands
+# with the Fathom ingest step (one cloudflared tunnel serves both webhooks).
+# Outbound DMs (the smoke test) work with just the two keychain entries.
+display_information:
+  name: Relay SuperAgent
+  description: The competitive counter, gated by you.
+  background_color: "#21232E"
+features:
+  bot_user:
+    display_name: relay_superagent
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write        # post the gate card and escalations
+      - im:write          # open DMs with reps
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://REPLACE-WITH-TUNNEL.trycloudflare.com/slack/interactions
+  org_deploy_enabled: false
+  socket_mode_enabled: false
