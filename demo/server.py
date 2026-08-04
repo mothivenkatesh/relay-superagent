@@ -4105,11 +4105,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         thread = "".join(f'<div class="{m["who"]}">{m["html"]}</div>' for m in c["msgs"])
         title, cid = esc(c["title"]), c["id"]
     greet, brief, chips = _briefing(tid, persona)
-    pills = "".join(
-        f'<a class="{"on" if persona == k else ""}" href="/?as={k}">{t}</a>'
-        for k, t in (("owner", "Owner"), ("ops", "Ops lead"),
-                     ("finance", "Finance lead"), ("builder", "Builder")))
-    role_html = f'<div class="rolepills"><span>View as</span>{pills}</div>' 
+    role_html = ""
     name = (CONVS and "") or ""
     chips_html = "".join(
         f'<span class="hint" onclick="send(this.textContent)">{c}</span>' for c in chips)
