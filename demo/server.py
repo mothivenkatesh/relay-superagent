@@ -1,6 +1,6 @@
 """The workspace, first design pass — run `uv run python demo/server.py`.
 
-Serves the operator/PMM view on http://localhost:8787 with the REAL pipeline
+Serves the merchant operator view on http://localhost:8790 with the REAL pipeline
 running on fakes underneath: every card is a genuine ledger row produced by
 `Pipeline.handle_event`, and the buttons call the same `approve` / `edit` /
 `reject` the Slack webhook will call. No JS framework, no external assets;
@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from relay_superagent.domain.models import (  # noqa: E402
-    Competitor, EvidenceItem, GateAction, Policy, RunState, TriggerEvent,
+    AgentType, DisputeReason, EvidenceItem, GateAction, Policy, RunState, TriggerEvent,
 )
 from relay_superagent.ledger import Ledger  # noqa: E402
 from relay_superagent.metrics import (  # noqa: E402
@@ -39,7 +39,20 @@ from relay_superagent.tenants import (  # noqa: E402
     TenantContext, TenantRegistry, UnknownTenant, default_policy,
 )
 
-PORT = 8787
+PORT = 8790
+
+# The six merchants on this Relay workspace. Defined here (ahead of
+# build_world) since the seed data and the Team/roster pages both need the
+# same canonical ids — a merchant is a merchant everywhere in this demo.
+MERCHANTS = [
+    ("m_loomcraft",  "Loomcraft Textiles",   "D2C apparel"),
+    ("m_kavali",     "Kavali Kitchens",      "QSR"),
+    ("m_verve",      "Verve Wellness",       "D2C skincare"),
+    ("m_bumblebee",  "Bumblebee Mobility",   "D2C EV accessories"),
+    ("m_sundar",     "Sundar Studio Prints", "Print-on-demand"),
+    ("m_northgate",  "Northgate Fresh Mart", "Grocery"),
+]
+MERCHANT_IDS = [m[0] for m in MERCHANTS]
 
 
 def _make_ledger():
@@ -62,46 +75,60 @@ def build_world() -> Pipeline:
     clock = FakeClock(datetime(2026, 8, 3, 9, 0))
     policy = Policy(
         policy_version="pol_7", tenant_id="t1",
-        competitors=[
-            Competitor(id="acme", names=["Acme", "Acme Corp"]),
-            Competitor(id="rivalsoft", names=["RivalSoft"]),
+        dispute_reasons=[
+            DisputeReason(id="goods_not_received", code="RG",
+                         label="Goods/services not received"),
+            DisputeReason(id="not_as_described", code="RN",
+                         label="Product not as described"),
+            DisputeReason(id="duplicate_charge", code="RD",
+                         label="Duplicate charge"),
+            DisputeReason(id="fraud_claim", code="RF",
+                         label="Unauthorized/fraud claim"),
+            DisputeReason(id="subscription_cancelled", code="RC",
+                         label="Subscription already cancelled"),
         ],
         banned_terms=["best", "leading", "number one"], holdout_pct=0)
     crm = FakeCrm(opportunities={
-        f"opp_{i}": {"stage": "evaluation", "amount_band": b}
+        f"order_{i}": {"stage": "evaluation", "amount_band": b}
         for i, b in enumerate(
-            ["50-100k", "100-250k", "25-50k", "50-100k", "100-250k",
-             "250k+", "50-100k", "25-50k", "100-250k", "50-100k",
-             "250k+", "25-50k", "100-250k", "50-100k", "100-250k",
-             "50-100k", "100-250k", "50-100k", "25-50k", "50-100k"], 1)})
+            ["under-1k", "1k-3k", "3k-10k", "under-1k", "1k-3k",
+             "10k+", "1k-3k", "3k-10k", "1k-3k", "under-1k",
+             "10k+", "3k-10k", "1k-3k", "under-1k", "1k-3k",
+             "3k-10k", "1k-3k", "under-1k", "3k-10k", "1k-3k"], 1)})
     evidence = [
-        EvidenceItem("ev_tco", "t1", "acme", "pricing",
-                     "Three-year TCO model: Acme's per-seat overage adds 31% by year two",
-                     "https://ours.example/tco"),
-        EvidenceItem("ev_forrester", "t1", "acme", "pricing",
-                     "Forrester TEI note on hidden implementation cost",
-                     "https://ours.example/forrester"),
-        EvidenceItem("ev_uptime", "t1", "rivalsoft", "reliability",
-                     "12-month status-page comparison, 99.98% vs 99.61%",
-                     "https://ours.example/uptime"),
-        EvidenceItem("ev_g2", "t1", "rivalsoft", "reliability",
-                     "G2 admin reviews on failover behaviour",
-                     "https://ours.example/g2"),
+        EvidenceItem("ev_pod", "t1", "RG", "delivery_proof",
+                     "Courier proof-of-delivery, signed and GPS-stamped at the doorstep",
+                     "https://ours.example/pod"),
+        EvidenceItem("ev_wa", "t1", "RG", "communication_log",
+                     "WhatsApp delivery-confirmation thread with the buyer",
+                     "https://ours.example/whatsapp-log"),
+        EvidenceItem("ev_inv", "t1", "RD", "invoice",
+                     "Original invoice matched to a single gateway transaction id",
+                     "https://ours.example/invoice"),
+        EvidenceItem("ev_bank", "t1", "RD", "communication_log",
+                     "Bank settlement excerpt showing one debit, not two",
+                     "https://ours.example/bank-note"),
+        EvidenceItem("ev_listing", "t1", "RN", "invoice",
+                     "Product listing snapshot matching the SKU that shipped",
+                     "https://ours.example/listing"),
+        EvidenceItem("ev_returnphotos", "t1", "RN", "communication_log",
+                     "Buyer's own return-request photos matching the listed product",
+                     "https://ours.example/return-photos"),
     ]
     deps = Deps(clock=clock, llm=ScriptedLlm(), crm=crm, slack=FakeSlack(),
                 url_checker=FakeUrlChecker(), ledger=_make_ledger(), policy=policy,
-                evidence=evidence, enrolled_reps={"rep_priya", "rep_dan", "rep_maya", "rep_alex",
-                               "rep_jordan", "rep_nina", "rep_sam", "rep_ravi"})
+                evidence=evidence, enrolled_merchants=set(MERCHANT_IDS))
     p = Pipeline(deps)
 
-    def fire(ref, opp, acct, rep, text, claim, counter, cites, when=None):
+    def fire(ref, order, merchant, reason, text, claim, counter, cites):
         deps.llm.mention = {"is_competitive": True, "claim_text": claim, "confidence": .9}
         deps.llm.claim = {"claim_text": claim, "speaker_role": "buyer", "confidence": .9}
         deps.llm.draft = {"counter_text": counter, "cited_evidence_ids": cites,
                           "confidence": .82, "escalate": False}
         return p.handle_event(TriggerEvent(
-            tenant_id="t1", source="gong", source_ref=ref, occurred_at=clock.now(),
-            opportunity_id=opp, account_id=acct, rep_user_id=rep, text=text))
+            tenant_id="t1", source="bank_webhook", source_ref=ref, occurred_at=clock.now(),
+            order_id=order, merchant_id=merchant, dispute_id=f"dp_{ref}",
+            reason_code=reason, text=text))
 
     # already seeded (hydrated from Postgres)? Rebuild pointers and move on.
     if any(r.tenant_id == "t1" for r in deps.ledger.runs.values()):
@@ -109,11 +136,11 @@ def build_world() -> Pipeline:
                   for r in deps.ledger.runs.values() if r.tenant_id == "t1"}
         for stage, ref in [("review", "m_lifecycle_1"), ("edited", "lc_edit"),
                            ("lost", "lc_lost"), ("qa_blocked", "lc_qa"),
-                           ("not_competitive", "lc_noise"),
-                           ("rep_not_enrolled", "lc_unenrolled"),
-                           ("no_opportunity", "lc_noopp"),
+                           ("not_actionable", "lc_noise"),
+                           ("merchant_not_enrolled", "lc_unenrolled"),
+                           ("no_order", "lc_noopp"),
                            ("recently_countered", "lc_recent"),
-                           ("holdout", "lc_holdout"), ("won", "c_won"),
+                           ("won", "c_won"),
                            ("timed_out", "c_old"), ("approved", "q1")]:
             if ref in by_ref:
                 EXEMPLARS[stage] = by_ref[ref]
@@ -123,379 +150,273 @@ def build_world() -> Pipeline:
         return p
 
     # 1) a run that will time out and escalate
-    fire("c_old", "opp_6", "acct_stale", "rep_dan",
-         "Honestly RivalSoft has been in our shortlist longer.",
-         "RivalSoft has been on the shortlist longer",
-         "Length of tenure on a shortlist is not a reliability record. Over the last "
-         "twelve months our measured uptime ran 99.98% against their 99.61%, and the "
-         "failover behaviour admins describe on G2 is the gap that matters in week one.",
-         ["ev_uptime", "ev_g2"])
+    fire("c_old", "order_6", "m_northgate",  "RD",
+         "Same order billed twice on our card, please refund one.",
+         "Buyer says the order was charged twice",
+         "The gateway settlement shows a single successful debit for this order id; "
+         "the invoice and the bank settlement excerpt both tie to one transaction, "
+         "and the second attempt shown to the buyer never captured.",
+         ["ev_inv", "ev_bank"])
     clock.advance(hours=25)
     Supervisor(deps.ledger, clock, deps.slack, policy).sweep()
 
-    # 2) resolved win — approved 6 weeks ago, deal closed won
-    r = fire("c_won", "opp_1", "acct_meridian", "rep_priya",
-             "We are also looking at Acme, and honestly they are cheaper.",
-             "Acme is cheaper",
-             "On a three-year basis Acme's total cost runs higher once implementation "
-             "and per-seat overage are included; the TCO model and the Forrester note "
-             "put the crossover at month nine for a team this size.",
-             ["ev_tco", "ev_forrester"])
+    # 2) resolved win — approved 6 weeks ago, dispute won
+    r = fire("c_won", "order_1", "m_loomcraft", "RG",
+             "Buyer says the order never arrived.",
+             "Buyer says the order never arrived",
+             "Courier proof-of-delivery shows this order signed for and GPS-stamped "
+             "at the delivery address on the date claimed; the WhatsApp thread with "
+             "the buyer confirms receipt the same evening.",
+             ["ev_pod", "ev_wa"])
     clock.advance(minutes=4)
-    p.approve(r, "rep_priya")
+    p.approve(r, "m_loomcraft")
     clock.advance(days=40)
-    p.record_close(r, won=True, amount=84_000)
+    p.record_resolution(r, won=True, amount_paise=840_000)
 
     # 3) an edit (non-material) that landed and is still open
-    r = fire("c_edit", "opp_2", "acct_northwind", "rep_maya",
-             "Acme quoted us something like forty percent less.",
-             "Acme quoted ~40% less",
-             "A forty percent gap on licence price inverts once implementation and "
-             "per-seat overage land; the three-year TCO model shows the crossover, "
-             "and the Forrester note prices the services line they quote separately.",
-             ["ev_tco", "ev_forrester"])
+    r = fire("c_edit", "order_2", "m_kavali", "RD",
+             "Buyer's bank shows two debits for one order.",
+             "Buyer says they were charged twice",
+             "The invoice and the payment gateway both show one transaction id for "
+             "this order; the bank settlement excerpt confirms only one debit "
+             "cleared, the second was an authorization that was never captured.",
+             ["ev_inv", "ev_bank"])
     clock.advance(minutes=11)
-    p.edit(r, "rep_maya",
-           "That gap is licence-only. Add implementation and per-seat overage and the "
-           "three-year TCO crosses at month nine — model attached, Forrester prices "
-           "the services line they quote separately.")
+    p.edit(r, "m_kavali",
+           "Only one debit settled for this order — the gateway transaction id and "
+           "the bank settlement excerpt both confirm it. The second attempt shown "
+           "on the buyer's statement was an authorization hold that was never "
+           "captured and will drop off within a few days.")
 
     # 4) rejected
-    r = fire("c_rej", "opp_3", "acct_zeta", "rep_dan",
-             "RivalSoft say they can go live in a week.",
-             "RivalSoft goes live in a week",
-             "A one-week go-live claim usually excludes SSO and data migration; our "
-             "measured uptime comparison and admin reviews cover what week two looks "
-             "like when those are rushed.",
-             ["ev_uptime", "ev_g2"])
+    r = fire("c_rej", "order_3", "m_verve", "RN",
+             "Buyer says the cream isn't the one they ordered.",
+             "Buyer says the product doesn't match the listing",
+             "The listing snapshot from the order date matches the SKU that "
+             "shipped exactly; the buyer's own return-request photos show the "
+             "same packaging and batch code as the listing.",
+             ["ev_listing", "ev_returnphotos"])
     clock.advance(minutes=27)
-    p.reject(r, "rep_dan")
+    p.reject(r, "m_verve")
 
-    # 5) suppressed — same account, same claim again
-    fire("c_dup", "opp_2", "acct_northwind", "rep_maya",
-         "Acme again — they quoted us forty percent less.",
-         "Acme quoted ~40% less", "unused", ["ev_tco"])
+    # 5) suppressed — same order, same reason again inside the window
+    fire("c_dup", "order_2", "m_kavali", "RD",
+         "Buyer reopened the case — still says they were double charged.",
+         "Buyer says they were charged twice", "unused", ["ev_inv"])
 
     # 6–8) three live cards awaiting review
-    fire("c_live1", "opp_4", "acct_helios", "rep_priya",
-         "Acme is telling us your migration takes six months.",
-         "Your migration takes six months",
-         "Median migration in this segment ran eleven weeks over the last year, and "
-         "the three-year TCO model includes exactly that services line; the six-month "
-         "figure is their own enterprise tier, not ours.",
-         ["ev_tco"])
+    fire("c_live1", "order_4", "m_bumblebee", "RG",
+         "Buyer says the scooter charger never showed up.",
+         "Buyer says the order never arrived",
+         "Courier proof-of-delivery shows the package signed for at the registered "
+         "address two days before the dispute was filed; the WhatsApp thread has "
+         "the buyer's own delivery-day confirmation message.",
+         ["ev_pod"])
     clock.advance(minutes=9)
-    fire("c_live2", "opp_5", "acct_vantage", "rep_dan",
-         "RivalSoft's uptime SLA looks stronger on paper.",
-         "RivalSoft's SLA looks stronger",
-         "An SLA is a refund policy, not a reliability record. Measured uptime over "
-         "twelve months ran 99.98% against 99.61%, and the failover reviews on G2 "
-         "describe the difference in practice.",
-         ["ev_uptime", "ev_g2"])
+    fire("c_live2", "order_5", "m_sundar", "RD",
+         "Buyer's statement shows the print order billed twice.",
+         "Buyer says they were charged twice",
+         "One transaction id, one settlement — the invoice and the bank excerpt "
+         "for this order agree, and the duplicate line on the buyer's statement "
+         "is a pending authorization that will reverse on its own.",
+         ["ev_inv", "ev_bank"])
     clock.advance(minutes=6)
-    fire("c_live3", "opp_7", "acct_koda", "rep_maya",
-         "Acme bundles support for free, you charge for it.",
-         "Acme bundles support free",
-         "Their bundled tier is community-SLA support; the paid comparison is in the "
-         "TCO model, and the Forrester note shows where unbundled support lands for "
-         "teams under fifty seats.",
-         ["ev_tco", "ev_forrester"])
-    # a quarter of activity across the AE team (claims and counters cite the
-    # same evidence bank; every row passes the same checks as the live path)
-    A_TCO = ("On a three-year basis their licence discount inverts once "
-             "implementation and per-seat overage are included; the TCO model "
-             "puts the crossover near month nine for a team this size, and the "
-             "Forrester note prices the services line they quote separately.")
-    R_UPT = ("An SLA is a refund policy, not a reliability record. Measured "
-             "uptime over the last twelve months ran 99.98% against 99.61%, "
-             "and the failover behaviour admins describe on G2 is the gap "
-             "that shows up in week one.")
+    fire("c_live3", "order_7", "m_northgate", "RN",
+         "Buyer says the grocery box had substitutes they didn't approve.",
+         "Buyer says the order doesn't match what was listed",
+         "The listing snapshot and the packed-order photo the buyer sent back "
+         "both show the same items; two SKUs were out of stock and substituted "
+         "per the standing substitution policy on file for this account.",
+         ["ev_listing", "ev_returnphotos"])
+    # a quarter of activity across the merchant roster (claims and responses
+    # cite the same evidence bank; every row passes the same checks as the
+    # live path)
+    RG_RESPONSE = ("Courier proof-of-delivery shows this order signed for at the "
+                   "registered address, and the WhatsApp thread has the buyer's "
+                   "own delivery-day confirmation — both attached.")
+    RD_RESPONSE = ("The invoice and the payment gateway agree on one transaction "
+                   "id for this order; the bank settlement excerpt confirms a "
+                   "single debit, and the second line on the buyer's statement "
+                   "is an authorization hold, not a charge.")
     QUARTER = [
-        # ref, opp, account, rep, claim, competitor-args, action, won_amount
-        ("q1", "opp_9",  "acct_solara",    "rep_alex",  "Acme's discount made our CFO's shortlist", "acme", "approve", 120_000),
-        ("q2", "opp_10", "acct_brightline","rep_jordan","RivalSoft claims five-nines uptime",       "rival", "approve", 65_000),
-        ("q3", "opp_11", "acct_nexcore",   "rep_nina",  "Acme says migration off them is painful",  "acme", "approve", None),
-        ("q4", "opp_12", "acct_quill",     "rep_sam",   "RivalSoft's partner said you don't scale", "rival", "edit",    45_000),
-        ("q5", "opp_13", "acct_harbor",    "rep_ravi",  "Acme bundles onboarding at no cost",       "acme", "edit",    None),
-        ("q6", "opp_14", "acct_atlaspay",  "rep_alex",  "Acme's roadmap looked deeper to the team", "acme", "reject",  None),
-        ("q7", "opp_15", "acct_fernwood",  "rep_jordan","RivalSoft offered a shorter contract",     "rival", "approve", None),
-        ("q8", "opp_16", "acct_osprey",    "rep_nina",  "Acme quoted us 30 percent under you",      "acme", "wait",    None),
-        ("q9", "opp_9",  "acct_solara",    "rep_sam",   "RivalSoft demoed a faster setup",          "rival", "wait",    None),
-        ("q10","opp_11", "acct_nexcore",   "rep_ravi",  "Acme's team said support here is slow",    "acme", "wait",    None),
+        # ref, order, merchant, claim, reason, action, won_amount_paise
+        ("q1",  "order_9",  "m_loomcraft", "Buyer says a second parcel never arrived",       "RG", "approve", 1_200_00),
+        ("q2",  "order_10", "m_kavali",    "Buyer's card statement shows a duplicate line",  "RD", "approve",   650_00),
+        ("q3",  "order_11", "m_verve",     "Buyer says the refill order was never delivered","RG", "approve",    None),
+        ("q4",  "order_12", "m_bumblebee", "Buyer's bank flagged a repeat charge",           "RD", "edit",      450_00),
+        ("q5",  "order_13", "m_sundar",    "Buyer says the print run never showed up",       "RG", "edit",       None),
+        ("q6",  "order_14", "m_northgate", "Buyer says the delivery slot was a no-show",     "RG", "reject",     None),
+        ("q7",  "order_15", "m_loomcraft", "Buyer's statement lists the order twice",        "RD", "approve",    None),
+        ("q8",  "order_16", "m_kavali",    "Buyer says the order never left the kitchen",    "RG", "wait",       None),
+        ("q9",  "order_9",  "m_loomcraft", "Buyer reopened — still says it's missing",       "RG", "wait",       None),
+        ("q10", "order_11", "m_verve",     "Buyer's bank disputes the refill charge",        "RD", "wait",       None),
     ]
-    for ref, opp, acct, rep, claim, comp, action, won in QUARTER:
+    for ref, order, merchant, claim, reason, action, won in QUARTER:
         clock.advance(hours=13)
-        counter = A_TCO if comp == "acme" else R_UPT
-        cites = ["ev_tco", "ev_forrester"] if comp == "acme" else ["ev_uptime", "ev_g2"]
-        r = fire(ref, opp, acct, rep, claim + ".", claim, counter, cites)
+        counter = RG_RESPONSE if reason == "RG" else RD_RESPONSE
+        cites = ["ev_pod", "ev_wa"] if reason == "RG" else ["ev_inv", "ev_bank"]
+        r = fire(ref, order, merchant, reason, claim + ".", claim, counter, cites)
         clock.advance(minutes=18)
         if action == "approve":
-            p.approve(r, rep)
+            p.approve(r, merchant)
         elif action == "edit":
             deps.llm.diff = {"changed": "tightened the numbers", "is_material": False,
                              "implies": "keep it concrete"}
-            p.edit(r, rep, counter + " Happy to walk through the model on a call.")
+            p.edit(r, merchant, counter + " Happy to share the raw settlement export too.")
         elif action == "reject":
-            p.reject(r, rep)
+            p.reject(r, merchant)
         if won:
             clock.advance(days=21)
-            p.record_close(r, won=True, amount=won)
+            p.record_resolution(r, won=True, amount_paise=won)
 
     # -- lifecycle exemplars: one run living at every stage, so the product
     # story is legible from the UI. EXEMPLARS maps stage -> run_id for the
     # Plays-page storyboard.
-    from relay_superagent.domain.models import assign_arm as _arm, Arm as _Arm
-
     def mark(stage, run):
         if run is not None:
             EXEMPLARS[stage] = run.run_id
         return run
 
-    # signal heard + gated (an email trigger this time)
+    # signal heard + gated (a merchant forwarding a chargeback email this time)
     clock.advance(hours=3)
     deps.llm.mention = {"is_competitive": True,
-                        "claim_text": "Acme's importer moves everything overnight",
+                        "claim_text": "Buyer says the order never arrived",
                         "confidence": .9}
-    deps.llm.claim = {"claim_text": "Acme's importer moves everything overnight",
+    deps.llm.claim = {"claim_text": "Buyer says the order never arrived",
                       "speaker_role": "buyer", "confidence": .9}
     deps.llm.draft = {"counter_text":
-        "Overnight applies to their starter templates; at Airtable's row count "
-        "the import runs through their services team on a quoted timeline. The "
-        "TCO model prices that line, and the Forrester note shows where "
-        "migration effort actually lands for teams this size.",
-        "cited_evidence_ids": ["ev_tco", "ev_forrester"], "confidence": .8,
+        "The delivery address on file matches the courier's proof-of-delivery scan, "
+        "signed the same afternoon the buyer filed; the WhatsApp confirmation "
+        "thread from that day is attached, and neither shows any return request "
+        "on record before the dispute.",
+        "cited_evidence_ids": ["ev_pod", "ev_wa"], "confidence": .8,
         "escalate": False}
     r = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="gmail", source_ref="m_lifecycle_1",
-        occurred_at=clock.now(), opportunity_id="opp_17",
-        account_id="acct_northwind", rep_user_id="rep_jordan",
-        text="Acme's importer moves everything overnight, their AE says."))
+        tenant_id="t1", source="email_forward", source_ref="m_lifecycle_1",
+        occurred_at=clock.now(), order_id="order_17",
+        merchant_id="m_bumblebee", dispute_id="dp_m_lifecycle_1", reason_code="RG",
+        text="Forwarding the chargeback notice — buyer says the order never arrived."))
     mark("review", r)
 
     # a material edit, then filed
     clock.advance(hours=1)
-    r2 = fire("lc_edit", "opp_18", "acct_koda", "rep_nina",
-              "Acme said our data would be locked in with you.",
-              "Your data locks customers in",
-              "Every table exports to CSV and the API is unmetered on export; "
-              "the TCO model includes a worked exit scenario, and the Forrester "
-              "note prices switching cost both directions for this segment.",
-              ["ev_tco", "ev_forrester"])
+    r2 = fire("lc_edit", "order_18", "m_kavali", "RD",
+              "Buyer says two separate charges hit their card for one order.",
+              "Buyer says two separate charges hit their card",
+              "The invoice and the gateway transaction id agree on one charge for "
+              "this order; the bank settlement excerpt confirms a single debit, "
+              "and the duplicate line will drop off the buyer's statement.",
+              ["ev_inv", "ev_bank"])
     clock.advance(minutes=25)
-    deps.llm.diff = {"changed": "replaced the exit-scenario framing with the "
-                     "customer's own security language", "is_material": True,
-                     "implies": "lead with export guarantees"}
-    p.edit(r2, "rep_nina",
-           "There is no lock-in: every table exports to CSV, the API is "
-           "unmetered on export, and we contractually guarantee a full export "
-           "within 24 hours of any termination notice. Happy to put that in "
-           "the order form.")
+    deps.llm.diff = {"changed": "replaced the generic settlement language with the "
+                     "buyer's own bank reference number", "is_material": True,
+                     "implies": "quote the buyer's own reference number back"}
+    p.edit(r2, "m_kavali",
+           "Only one debit settled for this order — reference the gateway "
+           "transaction id and the buyer's own bank reference number, both "
+           "attached. The second line is an authorization hold, not a charge, "
+           "and reverses automatically within 3-5 business days.")
     mark("edited", r2)
 
     # a loss, honestly recorded
     clock.advance(hours=2)
-    r3 = fire("lc_lost", "opp_19", "acct_zeta", "rep_sam",
-              "RivalSoft threw in two years at half price.",
-              "RivalSoft offered 50% off for two years",
-              "A half-price year usually returns at renewal; measured uptime "
-              "ran 99.98% against 99.61% over twelve months, and the G2 "
-              "failover reviews describe what the discount buys in practice.",
-              ["ev_uptime", "ev_g2"])
+    r3 = fire("lc_lost", "order_19", "m_verve", "RN",
+              "Buyer says the serum shipped is a different shade than ordered.",
+              "Buyer says the product doesn't match the listing",
+              "The listing snapshot and the batch code on the shipped unit "
+              "match; the buyer's return photos show unopened packaging, which "
+              "the shade-mismatch policy on file still credits in full.",
+              ["ev_listing", "ev_returnphotos"])
     clock.advance(minutes=12)
-    p.approve(r3, "rep_sam")
+    p.approve(r3, "m_verve")
     clock.advance(days=14)
-    p.record_close(r3, won=False)
+    p.record_resolution(r3, won=False)
     mark("lost", r3)
 
     # QA blocks a draft that breaks the rules (banned superlative)
     clock.advance(hours=1)
-    r4 = fire("lc_qa", "opp_20", "acct_harbor", "rep_ravi",
-              "Acme called your uptime numbers made up.",
-              "Your uptime numbers are fabricated",
-              "Our uptime is simply the best in the industry and everyone "
-              "knows it; numbers speak for themselves and theirs are the "
-              "worst. Nobody serious disputes this comparison anywhere.",
-              ["ev_uptime"])
+    r4 = fire("lc_qa", "order_20", "m_sundar", "RG",
+              "Buyer says the whole print order is missing.",
+              "Buyer says the order never arrived",
+              "Our delivery record is simply the best in the industry and "
+              "everyone knows it; the numbers speak for themselves and the "
+              "buyer is clearly wrong about the whole thing.",
+              ["ev_pod"])
     mark("qa_blocked", r4)
 
     # triage suppressions, one per reason
     clock.advance(hours=1)
     deps.llm.mention = {"is_competitive": False, "claim_text": "", "confidence": .9}
     r5 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="gong", source_ref="lc_noise",
-        occurred_at=clock.now(), opportunity_id="opp_4",
-        account_id="acct_helios", rep_user_id="rep_priya",
-        text="We drove past the Acme hardware store on the way in, ha."))
-    mark("not_competitive", r5)
+        tenant_id="t1", source="bank_webhook", source_ref="lc_noise",
+        occurred_at=clock.now(), order_id="order_4",
+        merchant_id="m_bumblebee", dispute_id="dp_lc_noise", reason_code="RG",
+        text="Duplicate redelivery of a webhook already actioned — no new claim."))
+    mark("not_actionable", r5)
 
-    deps.llm.mention = {"is_competitive": True, "claim_text": "Acme is faster",
+    deps.llm.mention = {"is_competitive": True, "claim_text": "Buyer says the order never arrived",
                         "confidence": .9}
     r6 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="gong", source_ref="lc_unenrolled",
-        occurred_at=clock.now(), opportunity_id="opp_5",
-        account_id="acct_vantage", rep_user_id="sdr_kofi",
-        text="Acme is faster, the prospect's engineer claimed."))
-    mark("rep_not_enrolled", r6)
+        tenant_id="t1", source="bank_webhook", source_ref="lc_unenrolled",
+        occurred_at=clock.now(), order_id="order_5",
+        merchant_id="m_unlisted", dispute_id="dp_lc_unenrolled", reason_code="RG",
+        text="Buyer says the order never arrived."))
+    mark("merchant_not_enrolled", r6)
 
     r7 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="gong", source_ref="lc_noopp",
-        occurred_at=clock.now(), opportunity_id="opp_missing",
-        account_id="acct_fernwood", rep_user_id="rep_dan",
-        text="RivalSoft came up again on the intro call."))
-    mark("no_opportunity", r7)
+        tenant_id="t1", source="bank_webhook", source_ref="lc_noopp",
+        occurred_at=clock.now(), order_id="order_missing",
+        merchant_id="m_northgate", dispute_id="dp_lc_noopp", reason_code="RD",
+        text="Buyer's bank flagged a duplicate charge on an order we can't find."))
+    mark("no_order", r7)
 
     r8 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="gong", source_ref="lc_recent",
-        occurred_at=clock.now(), opportunity_id="opp_18",
-        account_id="acct_koda", rep_user_id="rep_nina",
-        text="Acme again claimed our data gets locked in with you."))
+        tenant_id="t1", source="bank_webhook", source_ref="lc_recent",
+        occurred_at=clock.now(), order_id="order_18",
+        merchant_id="m_kavali", dispute_id="dp_lc_recent", reason_code="RD",
+        text="Buyer reopened the same duplicate-charge claim again."))
     mark("recently_countered", r8)
 
-    # holdout: measurement group, counted but untreated
-    policy.holdout_pct = 20
-    hold_acct = next(a for a in (f"acct_h{i}" for i in range(200))
-                     if _arm(a, 20) is _Arm.HOLDOUT)
-    r9 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="gong", source_ref="lc_holdout",
-        occurred_at=clock.now(), opportunity_id="opp_16",
-        account_id=hold_acct, rep_user_id="rep_alex",
-        text="Acme quoted them aggressively, per the champion."))
-    policy.holdout_pct = 0
-    mark("holdout", r9)
-
-    # the Notion saga: a multi-week defense with several cascades
+    # two shorter merchant sagas, for texture beyond the single-run exemplars
     clock.advance(days=2)
-    r10 = fire("nt_2", "opp_1", "acct_meridian", "rep_dan",
-               "Acme told Notion's ops lead our SSO tier is an upsell trap.",
-               "Your SSO tier is an upsell trap",
-               "SSO ships in the plan they are already evaluating; the TCO "
-               "model lines it up against Acme's security add-on pricing, and "
-               "the Forrester note prices both paths at renewal for this size.",
-               ["ev_tco", "ev_forrester"])
+    r10 = fire("lc_1", "order_1", "m_loomcraft", "RG",
+               "Buyer reopened: still says the replacement order never showed.",
+               "Buyer says the replacement order never arrived",
+               "The courier proof-of-delivery for the replacement shipment is "
+               "signed and dated three days after the original claim; the "
+               "WhatsApp thread has the buyer confirming receipt that evening.",
+               ["ev_pod", "ev_wa"])
     clock.advance(minutes=31)
-    p.reject(r10, "rep_dan")
+    p.reject(r10, "m_loomcraft")
 
     clock.advance(days=9)
-    r11 = fire("nt_3", "opp_1", "acct_meridian", "rep_priya",
-               "Notion heard Acme's migration tool moves workspaces in a day.",
-               "Acme migrates workspaces in a day",
-               "A one-day workspace move covers pages, not permissions or "
-               "integrations; the TCO model carries the services line their "
-               "quote leaves out, and the Forrester note shows where day-one "
-               "migrations land by day thirty.",
-               ["ev_tco", "ev_forrester"])
+    r11 = fire("lc_2", "order_1", "m_loomcraft", "RG",
+               "Buyer's bank escalated: proof of delivery wasn't enough for them.",
+               "Buyer disputes the delivery proof itself",
+               "The courier's GPS stamp places the delivery at the registered "
+               "address, and the buyer's own WhatsApp message thanking the "
+               "rider is timestamped the same afternoon — both attached again "
+               "for the bank's escalation review.",
+               ["ev_pod", "ev_wa"])
     clock.advance(minutes=14)
-    deps.llm.diff = {"changed": "tightened to the buyer's phrasing",
-                     "is_material": False, "implies": "mirror their words"}
-    p.edit(r11, "rep_priya",
-           "A one-day move covers pages, not permissions or integrations. The "
-           "TCO model carries the services line their quote leaves out, and "
-           "Forrester shows where day-one migrations actually land by day 30.")
+    deps.llm.diff = {"changed": "tightened to the bank's escalation format",
+                     "is_material": False, "implies": "mirror the bank's own language"}
+    p.edit(r11, "m_loomcraft",
+           "The courier's GPS-stamped delivery scan places this at the "
+           "registered address, and the buyer's own WhatsApp message thanking "
+           "the rider is timestamped the same afternoon. Both attached for the "
+           "bank's escalation review.")
 
-    clock.advance(days=16)         # past the 7-day suppress window — the
-    r12 = fire("nt_4", "opp_1", "acct_meridian", "rep_priya",
-               "Acme's final push: they offered Notion a signing discount.",
-               "Acme offered a signing discount",
-               "A signing discount moves the licence line only; on the "
-               "three-year TCO the crossover still lands near month nine once "
-               "implementation and per-seat overage are included, and the "
-               "Forrester note prices exactly that path.",
-               ["ev_tco", "ev_forrester"])
+    clock.advance(days=16)         # past the 7-day suppress window
+    r12 = fire("lc_3", "order_1", "m_loomcraft", "RG",
+               "Final round: the bank asked for a signed acknowledgement too.",
+               "Bank requests a signed delivery acknowledgement",
+               "The courier's proof-of-delivery already carries a signature "
+               "captured on the handheld device at drop-off; that signature "
+               "scan is attached alongside the WhatsApp confirmation.",
+               ["ev_pod", "ev_wa"])
     clock.advance(minutes=9)
-    p.approve(r12, "rep_priya")
-
-    # Airtable: migration bake-off (timeout variety comes from c_old already)
-    clock.advance(days=2)
-    r20 = fire("aw_1", "opp_2", "acct_northwind", "rep_alex",
-               "Acme's importer is one-click, their SE demoed it.",
-               "Acme's importer is one-click",
-               "One click covers the starter template path; at Airtable's base "
-               "count the import runs through mapping review, and the TCO "
-               "model carries that services line where their quote does not. "
-               "The Forrester note shows day-30 rework rates for rushed moves.",
-               ["ev_tco", "ev_forrester"])
-    clock.advance(minutes=22)
-    p.approve(r20, "rep_alex")
-    clock.advance(days=9)
-    r21 = fire("aw_2", "opp_2", "acct_northwind", "rep_jordan",
-               "Acme claims it scales to a million rows per base.",
-               "Acme scales to a million rows",
-               "Row ceilings are not the constraint at this size; sync and "
-               "permission fan-out are, and the TCO model prices both paths. "
-               "The Forrester note covers where scale claims land at renewal "
-               "for teams in exactly this segment.",
-               ["ev_tco", "ev_forrester"])
-    clock.advance(minutes=17)
-    deps.llm.diff = {"changed": "led with the sync limits their own docs state",
-                     "is_material": True, "implies": "quote their docs back"}
-    p.edit(r21, "rep_jordan",
-           "Their own docs cap synced tables well below that. What matters at "
-           "this size is sync and permission fan-out; the TCO model prices "
-           "both paths, and Forrester covers where scale claims land at "
-           "renewal for this segment.")
-    clock.advance(days=8)
-    r22 = fire("aw_3", "opp_2", "acct_northwind", "rep_alex",
-               "Final round: Acme threw in free onboarding for the committee.",
-               "Acme added free onboarding",
-               "Free onboarding moves a one-time line; the three-year TCO "
-               "crossover still lands near month nine once per-seat overage "
-               "is included, and the Forrester note prices exactly that "
-               "committee scenario.",
-               ["ev_tco", "ev_forrester"])
-    clock.advance(minutes=11)
-    p.approve(r22, "rep_alex")
-    clock.advance(days=18)
-    p.record_close(r22, won=True, amount=95_000)
-
-    # Retool: pricing war, honestly lost
-    clock.advance(days=1)
-    r23 = fire("kd_1", "opp_7", "acct_koda", "rep_maya",
-               "Acme undercut the Retool renewal by thirty percent.",
-               "Acme undercut renewal by 30%",
-               "A renewal discount that size usually returns at the next "
-               "cycle; the three-year TCO model shows the crossover, and the "
-               "Forrester note prices the services line their quote defers.",
-               ["ev_tco", "ev_forrester"])
-    clock.advance(minutes=40)
-    p.reject(r23, "rep_maya")
-    clock.advance(days=8)
-    r24 = fire("kd_2", "opp_7", "acct_koda", "rep_dan",
-               "Acme now says the discount is forever, in writing.",
-               "Acme's discount is permanent",
-               "A permanent discount reprices their list, not the deployment; "
-               "implementation and per-seat overage still land on the TCO "
-               "line the model carries, and Forrester prices that path for "
-               "this seat count.",
-               ["ev_tco", "ev_forrester"])
-    clock.advance(minutes=15)
-    p.approve(r24, "rep_dan")
-    clock.advance(days=12)
-    p.record_close(r24, won=False)
-
-    # Zapier: loss rescue after RivalSoft
-    clock.advance(days=1)
-    r25 = fire("zt_1", "opp_3", "acct_zeta", "rep_priya",
-               "Post-mortem: RivalSoft won on uptime story, revisit in Q2.",
-               "RivalSoft won on the uptime story",
-               "The uptime story inverts on measured data: 99.98% against "
-               "99.61% over twelve months, and the G2 failover reviews "
-               "describe week-one reality. Worth a Q2 revisit with the "
-               "comparison attached.",
-               ["ev_uptime", "ev_g2"])
-    clock.advance(minutes=19)
-    p.approve(r25, "rep_priya")
-    clock.advance(days=9)
-    r26 = fire("zt_2", "opp_3", "acct_zeta", "rep_priya",
-               "Zapier's ops lead reopened: RivalSoft slipped an SLA credit.",
-               "RivalSoft slipped an SLA credit",
-               "An SLA credit is a refund, not reliability; measured uptime "
-               "and the G2 failover reviews are the record, and the credit "
-               "itself concedes the point worth raising in the revisit.",
-               ["ev_uptime", "ev_g2"])
-    clock.advance(minutes=13)
-    p.approve(r26, "rep_priya")
-    clock.advance(days=11)
-    p.record_close(r26, won=True, amount=61_000)
+    p.approve(r12, "m_loomcraft")
 
     # exemplar pointers for stages already seeded earlier
     for run in deps.ledger.runs.values():
@@ -579,10 +500,6 @@ def _rebase_world() -> None:
 
 _rebase_world()
 
-# recorded_by.email → Slack member id. Tenant config; unknown emails pass
-# through unchanged and the enrolled-rep check suppresses them.
-REP_DIRECTORY: dict[str, str] = {}
-
 # ------------------------------------------------------------- multi-tenant
 # Runs were tenant-scoped rows from day one; this adds the other half.
 # The registry is in-memory: WorkOS is the identity source of truth, and a
@@ -591,7 +508,7 @@ REP_DIRECTORY: dict[str, str] = {}
 TENANTS = TenantRegistry()
 TENANTS.add(TenantContext(
     tenant_id="t1", name="Demo Co", policy=WORLD.d.policy,
-    rep_directory=REP_DIRECTORY, enrolled_reps=WORLD.d.enrolled_reps))
+    enrolled_merchants=WORLD.d.enrolled_merchants))
 PIPELINES: dict[str, Pipeline] = {"t1": WORLD}
 
 
@@ -604,7 +521,7 @@ def pipeline_for(tenant_id: str) -> Pipeline:
         PIPELINES[tenant_id] = Pipeline(Deps(
             clock=d.clock, llm=d.llm, crm=d.crm, slack=d.slack,
             url_checker=d.url_checker, ledger=d.ledger, policy=ctx.policy,
-            evidence=[], enrolled_reps=ctx.enrolled_reps))
+            evidence=[], enrolled_merchants=ctx.enrolled_merchants))
     return PIPELINES[tenant_id]
 
 
@@ -616,62 +533,35 @@ def ensure_tenant(workos_org_id: str, name: str) -> TenantContext:
             policy=default_policy(workos_org_id), workos_org_id=workos_org_id))
     return ctx
 
-COMP = {"acme": "Acme", "rivalsoft": "RivalSoft"}
+# dispute reason code -> plain-English label, for anywhere a run's reason_code
+# needs to render as something a merchant reads, not a bank code.
+COMP = {"RG": "Goods not received", "RN": "Not as described",
+        "RD": "Duplicate charge", "RF": "Unauthorized/fraud",
+        "RC": "Subscription cancelled"}
 
-# 35-member sales & marketing org, shaped by the field notes' Series-B
-# playbook: segmented AE team, SDRs, RevOps/enablement (their "GTM
-# engineering"), marketing ops, DevRel with a pipeline number. AEs are the
-# enrolled reviewers; PMMs own escalations.
-TEAM = [
-    # Sales (22)
-    ("vp_rajesh",   "Rajesh Nair",     "VP Sales",            "Sales", False),
-    ("dir_sarah",   "Sarah Kim",       "Sales Director, ENT", "Sales", False),
-    ("dir_tom",     "Tom Becker",      "Sales Director, MM",  "Sales", False),
-    ("rep_priya",   "Priya Sharma",    "Account Executive",   "Sales", True),
-    ("rep_dan",     "Dan Kowalski",    "Account Executive",   "Sales", True),
-    ("rep_maya",    "Maya Rao",        "Account Executive",   "Sales", True),
-    ("rep_alex",    "Alex Chen",       "Account Executive",   "Sales", True),
-    ("rep_jordan",  "Jordan Lee",      "Account Executive",   "Sales", True),
-    ("rep_nina",    "Nina Petrov",     "Account Executive",   "Sales", True),
-    ("rep_sam",     "Sam Ortiz",       "Account Executive",   "Sales", True),
-    ("rep_ravi",    "Ravi Menon",      "Account Executive",   "Sales", True),
-    ("sdr_lucia",   "Lucia Alvarez",   "SDR",                 "Sales", False),
-    ("sdr_kofi",    "Kofi Mensah",     "SDR",                 "Sales", False),
-    ("sdr_emma",    "Emma Walsh",      "SDR",                 "Sales", False),
-    ("sdr_arjun",   "Arjun Iyer",      "SDR",                 "Sales", False),
-    ("sdr_hana",    "Hana Suzuki",     "SDR",                 "Sales", False),
-    ("sdr_leo",     "Leo Fischer",     "SDR",                 "Sales", False),
-    ("se_grace",    "Grace Osei",      "Sales Engineer",      "Sales", False),
-    ("se_marco",    "Marco Rossi",     "Sales Engineer",      "Sales", False),
-    ("ops_derek",   "Derek Hall",      "Revenue Operations",  "Sales", False),
-    ("en_tara",     "Tara Singh",      "Sales Enablement",    "Sales", False),
-    ("cs_ines",     "Ines Laurent",    "Customer Success",    "Sales", False),
-    # Marketing (13)
-    ("vp_meera",    "Meera Krishnan",  "VP Marketing",          "Marketing", False),
-    ("pmm_mothi",   "Mothi Venkatesh", "Product Marketing",     "Marketing", False),
-    ("pmm_claire",  "Claire Dubois",   "Product Marketing",     "Marketing", False),
-    ("ct_noah",     "Noah Adler",      "Content Marketing",     "Marketing", False),
-    ("ct_zoe",      "Zoe Tanaka",      "Content Marketing",     "Marketing", False),
-    ("dg_ben",      "Ben Carter",      "Demand Generation",     "Marketing", False),
-    ("dg_lila",     "Lila Haddad",     "Demand Generation",     "Marketing", False),
-    ("mo_finn",     "Finn Bergman",    "Marketing Operations",  "Marketing", False),
-    ("dr_ada",      "Ada Okonkwo",     "Developer Relations",   "Marketing", False),
-    ("ds_kai",      "Kai Nakamura",    "Brand Design",          "Marketing", False),
-    ("ev_rosa",     "Rosa Marin",      "Events",                "Marketing", False),
-    ("web_liam",    "Liam Doyle",      "Web & SEO",             "Marketing", False),
-    ("cm_yuki",     "Yuki Sato",       "Community",             "Marketing", False),
-]
+# The six merchants (defined near the top, alongside MERCHANT_IDS) live on
+# this Relay workspace, plus the small Relay-side ops team who own
+# escalations. Merchants are the "enrolled reviewers" here — each merchant's
+# own ops contact is who approves (or edits, or dismisses) the response
+# Dispute Defender drafts on their orders.
+TEAM = (
+    [(mid, name, f"Merchant · {category}", "Merchants", True)
+     for mid, name, category in MERCHANTS]
+    # Relay Ops (3) — own escalations, never see a queue of their own
+    + [("ops_deepa",  "Deepa Krishnan", "Dispute Ops Lead", "Relay Ops", False),
+       ("ops_farhan", "Farhan Sheikh",  "Merchant Success", "Relay Ops", False),
+       ("ops_riya",   "Riya Kapoor",    "Support",          "Relay Ops", False)]
+)
 REP = {tid: name for tid, name, _, _, _ in TEAM}
-AE_IDS = [tid for tid, _, _, _, enrolled in TEAM if enrolled]
 STATE_META = {
     RunState.AWAITING_GATE: ("Awaiting review", "wait"),
-    RunState.ACTED: ("Sent to CRM", "ok"),
-    RunState.RESOLVED: ("Closed won", "ok"),
-    RunState.EDITED: ("Edited & sent", "ok"),
+    RunState.ACTED: ("Filed with the bank", "ok"),
+    RunState.RESOLVED: ("Resolved", "ok"),
+    RunState.EDITED: ("Edited & filed", "ok"),
     RunState.REJECTED: ("Dismissed", "mut"),
-    RunState.TIMED_OUT: ("Escalated to PMM", "warn"),
+    RunState.TIMED_OUT: ("Escalated to ops", "warn"),
     RunState.SUPPRESSED: ("Suppressed", "mut"),
-    RunState.FAILED: ("Escalated to PMM", "warn"),
+    RunState.FAILED: ("Escalated to ops", "warn"),
 }
 STEPS = ["safety", "retrieve", "draft", "check", "gate"]
 
@@ -681,14 +571,14 @@ def auth_page(mode: str, error: str = "") -> str:
     passwords go form → WorkOS over TLS, nothing stored here."""
     signup = mode == "signup"
     company = ('<label>Company<input name="company" required '
-               'placeholder="Meridian Systems"></label>') if signup else ""
+               'placeholder="Loomcraft Textiles"></label>') if signup else ""
     err = f'<div class="err">{esc(error)}</div>' if error else ""
     swap = (('Already have an account? <a href="/login">Log in</a>') if signup
             else ('New here? <a href="/signup">Create a workspace</a>'))
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay SuperAgent — {'Sign up' if signup else 'Log in'}</title>
+<title>Relay — {'Sign up' if signup else 'Log in'}</title>
 <style>
 *{{box-sizing:border-box;margin:0}}
 body{{font-family:'Circular Std',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#FAFAFC;min-height:100vh;
@@ -714,7 +604,7 @@ input:focus{{outline:none;border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,
 .demo{{margin-top:10px;text-align:center}}
 </style></head><body>
 <div class="card">
-  <div class="brand"><span class="logo">C</span>Relay SuperAgent</div>
+  <div class="brand"><span class="logo">C</span>Relay</div>
   <h1>{'Create your workspace' if signup else 'Welcome back'}</h1>
   {err}
   <form method="post" action="/auth/{mode}">
@@ -739,13 +629,13 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay SuperAgent — Verify your email</title>
+<title>Relay — Verify your email</title>
 <style>{style}
 .code input{{font-size:22px;letter-spacing:8px;text-align:center;font-variant-numeric:tabular-nums}}
 .hint{{font-size:12.5px;color:#5a5e6e;margin-bottom:14px}}
 </style></head><body>
 <div class="card">
-  <div class="brand"><span class="logo">C</span>Relay SuperAgent</div>
+  <div class="brand"><span class="logo">C</span>Relay</div>
   <h1>Check your inbox</h1>
   <div class="hint">We sent a 6-digit code to <b>{esc(email)}</b>. Enter it to
   finish signing in.</div>
@@ -833,8 +723,8 @@ ICONS = {
 
 
 def influenced_won(tid: str) -> int:
-    """Closed-won dollars on deals where an approved or lightly-edited
-    counter landed — the marketer's proof-of-impact number."""
+    """Paise won on disputes where an approved or lightly-edited response
+    landed — the operator's proof-of-impact number."""
     led = WORLD.d.ledger
     total = 0
     for r in led.runs.values():
@@ -842,7 +732,7 @@ def influenced_won(tid: str) -> int:
                 and r.gate_action.value in ("approve", "edit")):
             out = led.outcome_for(r.run_id)
             if out and (out.outcome_value or {}).get("won"):
-                total += (out.outcome_value or {}).get("amount") or 0
+                total += (out.outcome_value or {}).get("amount_paise") or 0
     return total
 
 
@@ -853,8 +743,8 @@ def signals_html(tid: str = "t1") -> str:
     if all(v is None for v in raw):
         return ""              # no numbers yet: show nothing, not an excuse
     won = influenced_won(tid)
-    sig = ([("Influenced won", f"${won/1000:.0f}k")] if won else []) + [
-        ("Counters reps used", fmt_pct(raw[1])),
+    sig = ([("Disputes won", f"&#8377;{won/100000:.0f}k")] if won else []) + [
+        ("Responses merchants used", fmt_pct(raw[1])),
         ("Real alerts", fmt_pct(raw[2])),
         ("Response time", _fmt_latency(raw[3])),
         ("Needed edits", fmt_pct(raw[0]))]
@@ -871,15 +761,16 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
         return f'<a class="{cls}" href="{href}">{ICONS[icon]}<span>{label}</span>{extra}</a>'
     return f"""
   <aside class="sidebar">
-    <div class="brand"><span class="logo">C</span><b>Relay SuperAgent</b></div>
+    <div class="brand"><span class="logo">C</span><b>Relay</b></div>
+    <div class="brandline" style="font-size:11px;color:#8a8d9c;padding:0 14px 10px;line-height:1.35">Pre-built agents for payment and compliance ops. You approve before anything sends.</div>
     {nav("/", "home", "Home", key="cmd")}
     {nav("/approvals", "tasks", "Approvals", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
     {nav("/projects", "folder", "Pipeline", key="projects")}
     {nav("/journeys", "bolt", "Journeys", key="journeys")}
     {nav("/impact", "ledger", "Impact", key="activity")}
     <hr class="side">
-    {nav("/knowledge", "book", "Battlecards", key="knowledge")}
-    {nav("/workflows", "flow", "Plays", key="workflows")}
+    {nav("/knowledge", "book", "Evidence", key="knowledge")}
+    {nav("/workflows", "flow", "Playbooks", key="workflows")}
     {nav("/agents", "bot", "Agents", key="agents")}
     {nav("/shadow", "search", "Shadow trial", key="shadow")}
     <hr class="side">
@@ -892,32 +783,16 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
 _LOGO_COLORS = ["#5266EB", "#E8590C", "#0CA678", "#B33AB3", "#E0A800",
                 "#2B8A9E", "#D6336C", "#6741D9"]
 
-# Demo accounts are real, recognizable B2B companies so their actual logos
-# (favicons) render in pipeline and meeting views. Real tenants' accounts
-# come in as domains and get the same treatment automatically.
-ACCOUNTS = {
-    "acct_meridian":   ("Notion",   "notion.so"),
-    "acct_northwind":  ("Airtable", "airtable.com"),
-    "acct_zeta":       ("Zapier",   "zapier.com"),
-    "acct_helios":     ("Linear",   "linear.app"),
-    "acct_vantage":    ("Vercel",   "vercel.com"),
-    "acct_koda":       ("Retool",   "retool.com"),
-    "acct_stale":      ("Calendly", "calendly.com"),
-    "acct_solara":     ("Segment",  "segment.com"),
-    "acct_brightline": ("Intercom", "intercom.com"),
-    "acct_nexcore":    ("Loom",     "loom.com"),
-    "acct_quill":      ("Figma",    "figma.com"),
-    "acct_harbor":     ("Webflow",  "webflow.com"),
-    "acct_atlaspay":   ("Plaid",    "plaid.com"),
-    "acct_fernwood":   ("Gusto",    "gusto.com"),
-    "acct_osprey":     ("Ramp",     "ramp.com"),
-}
-_DOMAIN_BY_NAME = {name: dom for name, dom in ACCOUNTS.values()}
+# These six are fictional demo SMB merchants (not real Cashfree customers) —
+# no real logos or domains, so every merchant renders as a letter-mark
+# avatar. Real tenants' merchants arrive with their own display name from
+# the onboarding flow and get the same letter-mark treatment automatically.
+_DOMAIN_BY_NAME: dict[str, str] = {}
 
 
 def _logo(label: str, size: int = 18) -> str:
-    """Favicon when the account has a domain (demo mapping, or the label IS
-    a domain, as with real CRM accounts); letter-mark fallback otherwise."""
+    """Favicon when the merchant has a real domain on file; letter-mark
+    fallback otherwise (every fictional demo merchant, today)."""
     if not label:
         return ""
     domain = _DOMAIN_BY_NAME.get(label) or (
@@ -932,17 +807,15 @@ def _logo(label: str, size: int = 18) -> str:
 
 
 def _account_label(r) -> str:
-    """Demo account ids map to their real company names; a HubSpot URL or
-    bare domain passes through."""
-    a = r.account_id or ""
-    if a in ACCOUNTS:
-        return ACCOUNTS[a][0]
-    return a.removeprefix("acct_").replace("_", " ").title() if a.startswith("acct_") else a
+    """A run's merchant id maps to its display name; anything unmapped
+    (a raw domain, an unenrolled test id) passes through as-is."""
+    a = r.merchant_id or ""
+    return REP.get(a, a)
 
 
 def task_row(r) -> str:
-    comp = esc(COMP.get(r.competitor_id, r.competitor_id))
-    rep = esc(REP.get(r.rep_user_id, r.rep_user_id))
+    reason = esc(COMP.get(r.reason_code, r.reason_code))
+    merchant = esc(REP.get(r.merchant_id, r.merchant_id))
     when = r.occurred_at.strftime("%b %-d")
     rid = r.run_id
     counter = esc((r.decision or {}).get("counter_text", ""))
@@ -951,8 +824,8 @@ def task_row(r) -> str:
   <div class="trow">
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
-    <span class="tdesc">Approve counter to <b>{comp}</b>&rsquo;s claim
-      <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span> <span class="mut">rep <b>{rep}</b> &middot;
+    <span class="tdesc">Approve response to a <b>{reason}</b> dispute
+      <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span> <span class="mut">merchant <b>{merchant}</b> &middot;
       {_logo(_account_label(r))}{esc(_account_label(r))}</span></span>
     <span class="tacts">
       <form method="post" action="/act"><input type="hidden" name="run" value="{rid}">
@@ -982,16 +855,17 @@ def ledger_row(r) -> str:
     won = ""
     if out:
         v = out.outcome_value
-        won = (f'<span class="st ok">won ${v["amount"]/1000:.0f}k</span>' if v.get("won")
-               else '<span class="st warn">lost</span>')
+        amt = v.get("amount_paise")
+        won = (f'<span class="st ok">won{f" &#8377;{amt/100000:.0f}k" if amt else ""}</span>'
+               if v.get("won") else '<span class="st warn">lost</span>')
     mat = ""
     if r.gate_action is GateAction.EDIT:
         mat = ('<span class="st mut">edit &middot; style</span>' if r.gate_is_material is False
                else '<span class="st warn">edit &middot; material</span>')
     return (f'<a class="trow slim" href="/runs/{r.run_id}"><span class="ico">{ICONS["ledger"]}</span>'
-            f'<span class="tdesc"><b>{esc(COMP.get(r.competitor_id, "&ndash;"))}</b> '
+            f'<span class="tdesc"><b>{esc(COMP.get(r.reason_code, "&ndash;"))}</b> '
             f'<span class="stream">&ldquo;{esc(r.claim_text) if r.claim_text else "&mdash;"}&rdquo;</span> '
-            f'<span class="mut">{esc(REP.get(r.rep_user_id, r.rep_user_id or "&ndash;"))}</span></span>'
+            f'<span class="mut">{esc(REP.get(r.merchant_id, r.merchant_id or "&ndash;"))}</span></span>'
             f'{mat}{won}<span class="st {cls}">{label}{extra}</span>'
             f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>')
 
@@ -999,9 +873,9 @@ def ledger_row(r) -> str:
 
 HOME_CONTENT = """
     <h1 class="page" id="tasks">Approvals</h1>
-    <div class="pagehint">Nothing reaches a prospect without your yes.
+    <div class="pagehint">Nothing gets filed with the bank without your yes.
       <form method="post" action="/api/sample" style="display:inline;margin-left:8px">
-      <button class="btn ghost sm">Simulate a competitor call</button></form></div>
+      <button class="btn ghost sm">Simulate a dispute webhook</button></form></div>
     <div id="bulkbar" class="bulkbar" hidden>
       <b id="bcount"></b>
       <input id="bwhy" class="whyin" style="width:190px" maxlength="200"
@@ -1031,7 +905,7 @@ def render(tid: str = "t1", email: str = "") -> str:
 TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay SuperAgent</title>
+<title>Relay</title>
 <style>
 :root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
 --accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
@@ -1397,7 +1271,7 @@ function jfilter(q){
     if (!r.hidden) n++;
   });
   const c = document.getElementById('jcount');
-  if (c) c.textContent = 'Showing ' + n + ' of ' + rows.length + ' accounts';
+  if (c) c.textContent = 'Showing ' + n + ' of ' + rows.length + ' merchants';
   const m = document.getElementById('jmore');
   if (m) m.hidden = !!q || !!window._jall;
 }
@@ -1537,22 +1411,82 @@ def _card(title: str, sub: str, right: str = "") -> str:
             f'{right}</div>')
 
 
-# Plays are staffed by agents; the same agents work multiple plays.
+# Relay's eight real public agents (the canonical intro-deck lineup, verbatim
+# one-liners). Dispute Defender is the only one wired to a live pipeline in
+# this codebase; the other seven are named here so the console can show the
+# whole fleet honestly, badged as roadmap.
+RELAY_AGENTS = [
+    dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
+        status="live",
+        persona="For the support lead at an online merchant.",
+        desc="Gathers the evidence, builds the case, and files before the "
+             "deadline.",
+        tagline="Never miss a deadline &middot; Evidence auto-gathered (order, "
+                "delivery, comms) &middot; More disputes won."),
+    dict(slug="cod_guard", name="COD Guard", icon="note",
+        status="roadmap",
+        persona="For the ops lead at a COD-heavy D2C brand.",
+        desc="Confirms each COD order before dispatch via WhatsApp or voice, "
+             "offers a prepaid option to flagged orders, and blocks repeat "
+             "bad addresses.",
+        tagline="Fewer returns-to-origin before they cost a courier run."),
+    dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
+        status="roadmap",
+        persona="For the growth lead at a UPI-heavy online store.",
+        desc="Reads the decline reason. Waits 3 minutes for self-retry. If "
+             "still open, places a voice call explaining what failed and "
+             "sends a WhatsApp link to retry.",
+        tagline="Failed payments recovered while the intent is still warm."),
+    dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
+        status="roadmap",
+        persona="For the growth lead at an ad-spending D2C brand.",
+        desc="On a cart drop, calls the buyer in their language within "
+             "minutes, presents the offer, and sends a Cashfree payment link.",
+        tagline="Outcome-based pricing, charged only on recovered orders. "
+                "TRAI-compliant."),
+    dict(slug="settlement_clarity", name="Settlement Clarity", icon="ledger",
+        status="roadmap",
+        persona="For the finance lead at a multi-channel merchant.",
+        desc="Matches each payout to its order against the bank, flags the "
+             "gaps, and posts to your books.",
+        tagline="Bank-verified match &middot; silent failures caught."),
+    dict(slug="refund_shield", name="Refund Shield", icon="moon",
+        status="roadmap",
+        persona="For the risk lead at a high-refund D2C brand.",
+        desc="Scores each claim against fraud signals, holds the risky ones "
+             "before you pay.",
+        tagline="Cross-merchant fraud signals."),
+    dict(slug="loan_recovery", name="Loan Recovery", icon="send",
+        status="roadmap",
+        persona="For the collections lead at an NBFC or lender.",
+        desc="On a bounce, verifies the borrower, states the EMI, captures "
+             "consent, and takes the agreed action.",
+        tagline="Every step on record."),
+    dict(slug="due_diligence", name="Due Diligence", icon="lock",
+        status="roadmap",
+        persona="For the compliance lead at an LSP or lender.",
+        desc="On a new application, verifies on Secure ID, risk-tiers the "
+             "customer, auto-clears the low-risk, and escalates for enhanced "
+             "review.",
+        tagline="Compliance throughput without compliance risk."),
+]
+
+# Dispute Defender's own crew — the seven sub-agents inside the pipeline
+# (§6 of the spec), each behind its own access/memory/playbook/quality tabs.
 PLAY_AGENTS = {
-    "Watcher": ["monitoring-agent", "triage-agent", "drafting-agent",
-                "qa-agent", "crm-agent", "escalation-agent", "reporting-agent"],
-    "Prospector": ["outreach-agent", "triage-agent", "qa-agent", "crm-agent",
-                   "escalation-agent", "reporting-agent"],
+    "Dispute Defender": ["detection-agent", "eligibility-agent", "response-agent",
+                         "compliance-agent", "filing-agent", "escalation-agent",
+                         "reporting-agent"],
 }
 AGENT_PLAYS = {}
 for _play, _members in PLAY_AGENTS.items():
     for _m in _members:
         AGENT_PLAYS.setdefault(_m, []).append(_play)
 
-_AGENT_ICON_BY_SLUG = {"monitoring-agent": "ear", "triage-agent": "funnel",
-                       "drafting-agent": "pen", "qa-agent": "shield",
-                       "crm-agent": "note", "escalation-agent": "moon",
-                       "reporting-agent": "chart", "outreach-agent": "send",
+_AGENT_ICON_BY_SLUG = {"detection-agent": "ear", "eligibility-agent": "funnel",
+                       "response-agent": "pen", "compliance-agent": "shield",
+                       "filing-agent": "note", "escalation-agent": "moon",
+                       "reporting-agent": "chart",
                        "conductor-agent": "baton", "knowledge-agent": "book"}
 
 
@@ -1567,12 +1501,16 @@ def _agent_chips(slugs: list[str]) -> str:
     return f'<span class="agchips">{"".join(chips)}</span>'
 
 
-# Journey scenarios: reference-style goal names per account saga.
+# Journey scenarios: reference-style goal names per merchant saga.
 GOAL_META = {
-    "acct_meridian":  ("Renewal defense", "Defend the Notion renewal against Acme."),
-    "acct_northwind": ("Migration bake-off", "Win the Airtable bake-off against Acme."),
-    "acct_koda":      ("Pricing war", "Hold Retool&rsquo;s pricing line against Acme."),
-    "acct_zeta":      ("Loss rescue", "Re-open Zapier after the RivalSoft loss."),
+    "m_loomcraft": ("Repeat RG defense",
+                    "Hold Loomcraft Textiles&rsquo; goods-not-received win rate through the bank&rsquo;s escalation."),
+    "m_kavali":    ("Duplicate-charge cleanup",
+                    "Clear Kavali Kitchens&rsquo; duplicate-charge disputes before the next settlement cycle."),
+    "m_verve":     ("Not-as-described review",
+                    "Get Verve Wellness&rsquo; not-as-described disputes resolved without a chargeback fee."),
+    "m_bumblebee": ("Delivery proof coverage",
+                    "Make sure Bumblebee Mobility&rsquo;s delivery proof reaches every goods-not-received claim."),
 }
 
 
@@ -1600,29 +1538,29 @@ def workflows_content(tid: str) -> str:
     resolved = sum(1 for r in runs if r.state is RunState.RESOLVED)
     PCOLS = "1.1fr 2.6fr 1.5fr .8fr 1.4fr"
     play_rows = [
-        _trow2(PCOLS, ["<b>Watcher</b>",
-                       '<span class="mut">Competitor named in a call or email '
-                       '&rarr; evidence-cited counter &rarr; your approval '
-                       '&rarr; CRM.</span>',
-                       _agent_chips(PLAY_AGENTS["Watcher"]),
+        _trow2(PCOLS, ["<b>Dispute Defender</b>",
+                       '<span class="mut">Dispute filed &rarr; evidence-cited '
+                       'response &rarr; your approval &rarr; filed with the '
+                       'bank.</span>',
+                       _agent_chips(PLAY_AGENTS["Dispute Defender"]),
                        '<span class="st ok">live</span>',
                        f'<span class="mut">{len(runs)} runs &middot; {waiting} '
                        f'waiting &middot; {resolved} resolved</span>']),
-        _trow2(PCOLS, ["<b>Prospector</b>",
-                       '<span class="mut">Buying signal &rarr; up to 3 '
-                       'role-specific emails, each approved by you, sent from '
-                       'your own Gmail.</span>',
-                       _agent_chips(PLAY_AGENTS["Prospector"]),
-                       '<span class="st wait">next</span>', ""]),
+        _trow2(PCOLS, ["<b>COD Guard, Payment Rescue, Cart Rescue, Settlement "
+                       "Clarity, Refund Shield, Loan Recovery, Due Diligence</b>",
+                       '<span class="mut">Relay&rsquo;s other seven agents &mdash; '
+                       'see the full fleet on the Agents console.</span>',
+                       '<span class="st mut">not yet wired in this demo</span>',
+                       '<span class="st wait">roadmap</span>', ""]),
     ]
-    body = (_tbl(PCOLS, ["Play", "What it does", "Staffed by", "Status",
+    body = (_tbl(PCOLS, ["Playbook", "What it does", "Staffed by", "Status",
                          "Activity"], play_rows)
-            + '<div class="pagehint" style="margin-top:10px">Plays share their '
-              'team &mdash; the same agents staff every line, carrying what '
-              'they&rsquo;ve learned. Sequencing between plays is the '
+            + '<div class="pagehint" style="margin-top:10px">Playbooks share their '
+              'crew &mdash; the same sub-agents staff every run, carrying what '
+              'they&rsquo;ve learned. Sequencing across Relay&rsquo;s agents is the '
               '<b>conductor-agent</b>&rsquo;s job (planned): nothing automates '
-              'before 20 approved manual reps, and underperforming plays '
-              'pause themselves.</div>')
+              'before 20 approved manual responses, and underperforming '
+              'playbooks pause themselves.</div>')
 
     led = WORLD.d.ledger
     truns = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -1635,32 +1573,34 @@ def workflows_content(tid: str) -> str:
     n_acted = sum(1 for r in truns
                   if r.state in (RunState.ACTED, RunState.RESOLVED))
     won = influenced_won(tid)
-    STAGE_AGENT = {"ear": "monitoring-agent", "funnel": "triage-agent",
-                   "pen": "drafting-agent", "tasks": None,
-                   "note": "crm-agent", "chart": "reporting-agent"}
+    STAGE_AGENT = {"ear": "detection-agent", "funnel": "eligibility-agent",
+                   "pen": "response-agent", "tasks": None,
+                   "note": "filing-agent", "chart": "reporting-agent"}
     STAGES = [
-        ("ear", "1 · A signal is heard",
-         "A competitor gets named on a call or in an email. Nobody had to notice.",
+        ("ear", "1 · A dispute is filed",
+         "A bank or processor webhook lands with a reason code already attached. "
+         "Nobody had to notice.",
          f"{n_all} signals so far", "review"),
-        ("funnel", "2 · Triage decides if it matters",
-         "Closed deal, duplicate claim, flooded rep, measurement holdout &mdash; "
-         "each no is a logged row with its reason, not a silent drop.",
+        ("funnel", "2 · Eligibility decides if it matters",
+         "No matching order, duplicate claim, merchant over cap &mdash; each no "
+         "is a logged row with its reason, not a silent drop.",
          f"{n_sup} filtered out", "recently_countered"),
-        ("pen", "3 · A counter is drafted and checked",
-         "Written from your battlecards in the rep&rsquo;s voice, then QA blocks "
-         "anything with dead links, invented facts or hype before a human sees it.",
+        ("pen", "3 · A response is drafted and checked",
+         "Written from your evidence library in the merchant&rsquo;s voice, then "
+         "compliance blocks anything with dead links, invented facts or hype "
+         "before a human sees it.",
          f"{n_drafted} drafted &middot; {n_blocked} blocked or escalated", "qa_blocked"),
         ("tasks", "4 · You decide",
-         "The rep gets the card. Approve, edit or dismiss &mdash; nothing sends "
-         "without a yes. Unanswered cards escalate to the PMM, never auto-send.",
+         "The merchant gets the card. Approve, edit or dismiss &mdash; nothing "
+         "files without a yes. Unanswered cards escalate to ops, never auto-file.",
          f"{n_wait} waiting now", "edited"),
-        ("note", "5 · The decision lands in the CRM",
-         "Approved counters are filed onto the deal exactly once, with the "
+        ("note", "5 · The response is filed with the bank",
+         "Approved responses are filed onto the order exactly once, with the "
          "evidence attached.", f"{n_acted} filed", "approved"),
         ("chart", "6 · The outcome comes back",
-         "Weeks later the deal closes and the result attaches to the same run "
-         "&mdash; wins, losses, and what your edits taught the drafter.",
-         f"${won/1000:.0f}k influenced won", "won"),
+         "Days later the bank settles the dispute and the result attaches to the "
+         "same run &mdash; wins, losses, and what your edits taught the drafter.",
+         f"&#8377;{won/100000:.0f}k won", "won"),
     ]
     SCOLS = "2.6fr 1.2fr 1.1fr"
     def stage_row(icon, title, desc, stat, ex_key):
@@ -1684,11 +1624,11 @@ def workflows_content(tid: str) -> str:
     if not any(r.tenant_id == tid for r in led.runs.values()):
         story += ('<div class="empty">Load sample data from Home to fill every '
                   'stage with example journeys you can open.</div>')
-    return (f'<h1 class="page">Plays</h1>{body}'
+    return (f'<h1 class="page">Playbooks</h1>{body}'
             f'<h2 class="sec">The lifecycle, live</h2>'
-            f'<div class="pagehint">What actually happens to a competitive '
-            f'moment, stage by stage &mdash; every count below is real rows in '
-            f'this workspace, and every example opens a run&rsquo;s journey.</div>'
+            f'<div class="pagehint">What actually happens to a dispute, stage '
+            f'by stage &mdash; every count below is real rows in this '
+            f'workspace, and every example opens a run&rsquo;s journey.</div>'
             f'{story}')
 
 
@@ -1698,7 +1638,7 @@ _AV_COLORS = ["#6E63E8", "#D8598E", "#3D77C9", "#2E9E67", "#C98A2E", "#8E44AD"]
 def _edit_history(entries) -> str:
     """Actor-attributed change timeline. entries: (actor, when, verb, chips)
     where chips is a list of (label, color-class). Reused wherever governed
-    things change: battlecard proof, agent autonomy, playbook rules."""
+    things change: evidence-vault proof, agent autonomy, playbook rules."""
     def av(name):
         c = _AV_COLORS[sum(map(ord, name)) % len(_AV_COLORS)]
         ini = "".join(w[0] for w in name.split()[:2]).upper()
@@ -1722,107 +1662,108 @@ def knowledge_content(tid: str) -> str:
     notes = [m for m in WORLD.d.ledger.memory if m.tenant_id == tid
              and m.superseded_by is None]
     ECOLS = "1fr 1fr 3fr .8fr"
-    ev_rows = _tbl(ECOLS, ["Competitor", "Claim type", "Argument", "Proof"],
+    ev_rows = _tbl(ECOLS, ["Dispute reason", "Evidence type", "What it proves", "Source"],
                    [_trow2(ECOLS, [
-                       f"<b>{esc(COMP.get(e.competitor_id, e.competitor_id))}</b>",
-                       f'<span class="st mut">{esc(e.claim_class)}</span>',
+                       f"<b>{esc(COMP.get(e.reason_code, e.reason_code))}</b>",
+                       f'<span class="st mut">{esc(e.evidence_type)}</span>',
                        f'<span class="mut">{esc(e.text)}</span>',
                        f'<a class="st wait" href="{esc(e.source_url)}">source &rarr;</a>'])
                     for e in ev])
     NCOLS = "1.2fr 3fr"
-    note_rows = _tbl(NCOLS, ["Rep", "What their edits taught the drafter"],
+    note_rows = _tbl(NCOLS, ["Merchant", "What their edits taught the drafter"],
                      [_trow2(NCOLS, [
                          f"<b>{esc(REP.get(m.subject_id, m.subject_id))}</b>",
                          f'<span class="mut">{esc((m.body or {}).get("implies") or (m.body or {}).get("changed") or "style note")}</span>'])
                       for m in notes])
-    return (f'<h1 class="page">Battlecards</h1>'
-            f'<div class="pagehint">Every counter cites from here &mdash; '
-            f'no argument ships that you didn&rsquo;t arm it with.</div>'
-            f'<h2 class="sec" id="knowledge">Arguments &amp; proof</h2>{ev_rows}'
-            f'<h2 class="sec">Your reps&rsquo; voice &mdash; learned from their edits</h2>{note_rows}'
+    return (f'<h1 class="page">Evidence vault</h1>'
+            f'<div class="pagehint">Evidence packs by reason code. Every '
+            f'dispute response cites from here &mdash; no claim ships that '
+            f'you didn&rsquo;t arm it with.</div>'
+            f'<h2 class="sec" id="knowledge">Evidence packs</h2>{ev_rows}'
+            f'<h2 class="sec">Your merchants&rsquo; voice &mdash; learned from their edits</h2>{note_rows}'
             f'<h2 class="sec">Edit history</h2>'
-            f'<div class="pagehint">The proof library is governed: every change '
+            f'<div class="pagehint">The evidence vault is governed: every change '
             f'has an author, a timestamp, and an approval behind it.</div>'
             + _edit_history([(a, w, "Commented", [(t[:64], "ec-blue")])
                              for tn, a, w, t in reversed(EV_NOTES) if tn == tid] + [
-                ("Sana Iyer", "Jul 28, 4:12 PM", "Added",
-                 [("TCO model v3", "ec-purple"), ("Forrester renewal note", "ec-blue")]),
-                ("Autopilot proposal", "Jul 21, 9:05 AM", "Approved by Sana Iyer",
-                 [("Acme pricing table refresh", "ec-green")]),
-                ("Dan Kowalski", "Jul 12, 3:08 PM", "Removed",
-                 [("Old SLA one-pager", "ec-amber")]),
-                ("Sana Iyer", "Jul 12, 3:07 PM", "Added",
-                 [("Uptime data 12mo", "ec-blue"), ("G2 failover reviews", "ec-orange")]),
-                ("Priya Sharma", "Jul 2, 6:24 PM", "Added",
-                 [("Migration services line", "ec-pink")])])
+                ("Deepa Krishnan", "Jul 28, 4:12 PM", "Added",
+                 [("Courier POD feed v2", "ec-purple"), ("GPS-stamp attachment", "ec-blue")]),
+                ("Autopilot proposal", "Jul 21, 9:05 AM", "Approved by Deepa Krishnan",
+                 [("Duplicate-charge bank excerpt refresh", "ec-green")]),
+                ("Farhan Sheikh", "Jul 12, 3:08 PM", "Removed",
+                 [("Expired refund-policy PDF", "ec-amber")]),
+                ("Deepa Krishnan", "Jul 12, 3:07 PM", "Added",
+                 [("WhatsApp comms-log export", "ec-blue"), ("Listing snapshot archive", "ec-orange")]),
+                ("Riya Kapoor", "Jul 2, 6:24 PM", "Added",
+                 [("Invoice-to-transaction matcher", "ec-pink")])])
             + f'<form class="notebar" method="post" action="/api/evnote">'
             f'<input class="jfind notein" name="text" maxlength="200" '
-            f'placeholder="Comment on the proof library &mdash; e.g. a stat that went stale">'
+            f'placeholder="Comment on the evidence vault &mdash; e.g. a proof that went stale">'
             f'<button class="btn primary sm">Comment</button></form>')
 
 
 def projects_content(tid: str) -> str:
-    # Pipeline: the deal-centric view. Groups runs by opportunity so each row
-    # is a deal with its stage, competitive pressure, and defense coverage.
-    # Today it is run-derived; when HubSpot connects live, the full open-deal
-    # pipeline syncs here and uncovered deals get flagged (reads are built).
+    # Pipeline: the order-centric view. Groups runs by order so each row is
+    # an order with its dispute reason coverage. Today it is run-derived;
+    # when a real bank/gateway feed connects, the full open-order pipeline
+    # syncs here and uncovered orders get flagged (reads are built).
     led = WORLD.d.ledger
-    deals: dict[str, list] = {}
+    orders: dict[str, list] = {}
     for r in led.runs.values():
-        if r.tenant_id == tid and r.account_id:
-            deals.setdefault(r.opportunity_id or f"acct:{r.account_id}", []).append(r)
-    if not deals:
+        if r.tenant_id == tid and r.merchant_id:
+            orders.setdefault(r.order_id or f"merchant:{r.merchant_id}", []).append(r)
+    if not orders:
         return ('<h1 class="page">Pipeline</h1>'
-                '<div class="empty">Deals appear here once the first signal '
+                '<div class="empty">Orders appear here once the first dispute '
                 'names one.</div>')
     entries = []
     total_open = total_won = 0
-    for opp, runs in sorted(deals.items(),
+    for oid, runs in sorted(orders.items(),
                             key=lambda kv: -max(r.occurred_at.timestamp()
                                                 for r in kv[1])):
         r0 = runs[0]
         label = _account_label(r0)
-        comps = sorted({COMP.get(r.competitor_id, r.competitor_id)
-                        for r in runs if r.competitor_id})
+        reasons = sorted({COMP.get(r.reason_code, r.reason_code)
+                          for r in runs if r.reason_code})
         waiting = sum(1 for r in runs if r.state is RunState.AWAITING_GATE)
         outs = [led.outcome_for(r.run_id) for r in runs]
         outs = [o for o in outs if o]
-        won_amt = sum((o.outcome_value or {}).get("amount") or 0
+        won_amt = sum((o.outcome_value or {}).get("amount_paise") or 0
                       for o in outs if (o.outcome_value or {}).get("won"))
         lost = any(not (o.outcome_value or {}).get("won") for o in outs)
         if won_amt:
-            stage = '<span class="st ok">closed won</span>'
+            stage = '<span class="st ok">won</span>'
             total_won += won_amt
         elif lost:
-            stage = '<span class="st mut">closed lost</span>'
+            stage = '<span class="st mut">lost</span>'
         elif waiting:
-            stage = f'<span class="st wait">in defense &middot; {waiting} to review</span>'
+            stage = f'<span class="st wait">awaiting review &middot; {waiting}</span>'
             total_open += 1
         else:
-            stage = '<span class="st mut">monitored</span>'
+            stage = '<span class="st mut">resolved</span>'
             total_open += 1
-        value = f"${won_amt:,.0f}" if won_amt else '<span class="mut">&mdash;</span>'
+        value = f"&#8377;{won_amt / 100:,.0f}" if won_amt else '<span class="mut">&mdash;</span>'
         last = max(r.occurred_at for r in runs).strftime("%b %-d")
         entries.append((0 if waiting else (1 if not outs else 2),
                         _trow2(PCOLS, [
             f'{_logo(label)}<b>{esc(label)}</b>',
             stage,
-            f'<span class="mut">{esc(", ".join(comps)) or "&mdash;"}</span>',
-            f'{len(runs)} moment{"s" if len(runs) != 1 else ""} defended',
+            f'<span class="mut">{esc(", ".join(reasons)) or "&mdash;"}</span>',
+            f'{len(runs)} dispute{"s" if len(runs) != 1 else ""} on this order',
             value,
             f'<span class="mut">{last}</span>',
-            f'<a class="st wait" href="/journeys?a={esc(r0.account_id)}">journey &rarr;</a>'])))
+            f'<a class="st wait" href="/journeys?a={esc(r0.merchant_id)}">journey &rarr;</a>'])))
     rows = [h for _, h in sorted(entries, key=lambda t: t[0])]
-    table = _tbl(PCOLS, ["Deal", "Stage", "Pressure from",
-                         "Coverage", "Won value", "Last seen", ""],
+    table = _tbl(PCOLS, ["Order", "Stage", "Dispute reason",
+                         "Coverage", "Won amount", "Last seen", ""],
                  rows)
     return (f'<h1 class="page">Pipeline</h1>'
-            f'<div class="pagehint">Your deals, by defense coverage: '
+            f'<div class="pagehint">Your orders, by dispute coverage: '
             f'<b class="countup" data-n="{total_open}">0</b> open under watch '
-            f'&middot; <b class="countup" data-n="{int(total_won)}" '
-            f'data-pre="$">$0</b> closed-won '
-            f'with defended moments attached. Run-derived today; the live '
-            f'HubSpot sync adds every open deal and flags the uncovered ones.'
+            f'&middot; <b class="countup" data-n="{int(total_won / 100)}" '
+            f'data-pre="&#8377;">&#8377;0</b> won '
+            f'with a filed response attached. Run-derived today; a live bank '
+            f'feed sync adds every open order and flags the uncovered ones.'
             f'</div>' + table)
 
 
@@ -1834,9 +1775,9 @@ def vault_content(tid: str) -> str:
     rails = [("Anthropic (drafting models)", "anthropic"),
              ("Slack (gate cards)", "slack-bot"),
              ("Slack signing (button security)", "slack-signing"),
-             ("Fathom (call recordings)", "fathom-webhook"),
+             ("Fathom (reference trigger, from the fork)", "fathom-webhook"),
              ("Gmail (email trigger)", "gmail-token"),
-             ("HubSpot (deal notes)", "hubspot-token"),
+             ("HubSpot (order notes &mdash; reference)", "hubspot-token"),
              ("WorkOS (sign-in)", "workos-api-key")]
     def rail_status(acct):
         if get_secret(acct):
@@ -1858,50 +1799,50 @@ def vault_content(tid: str) -> str:
 # fields mirror the real architecture; playbook rules quote the seeded
 # field-notes rules. Slug = URL identity.
 AGENT_DEFS = {
-    "monitoring-agent": dict(icon="ear", name="monitoring-agent",
-        charter="Reads every call and inbound email, spots competitor mentions.",
-        reads=["call transcripts (Fathom)", "inbound email (Gmail)"],
-        effects=[], scope="Writes signals; reads nothing personal beyond the transcript.",
-        session=["claim_text", "competitor", "confidence"],
-        profile=["account &rarr; competitor history"],
-        rules=["A mention is competitive only when tied to an open deal.",
-               "Quoted reply history never re-triggers (Gmail)."]),
-    "triage-agent": dict(icon="funnel", name="triage-agent",
+    "detection-agent": dict(icon="ear", name="detection-agent",
+        charter="Reads every inbound dispute webhook, classifies it by reason code.",
+        reads=["bank/processor webhooks", "inbound chargeback email"],
+        effects=[], scope="Writes signals; reads nothing personal beyond the dispute narrative.",
+        session=["claim_text", "reason_code", "confidence"],
+        profile=["merchant &rarr; prior dispute history"],
+        rules=["A dispute is actionable only when its reason code has evidence coverage.",
+               "A duplicate webhook redelivery never re-triggers."]),
+    "eligibility-agent": dict(icon="funnel", name="eligibility-agent",
         charter="Decides what deserves attention. Every no is logged with a reason.",
-        reads=["open deals (CRM)", "prior runs (ledger)", "team enrollment"],
+        reads=["open orders (CRM)", "prior runs (ledger)", "merchant enrollment"],
         effects=[], scope="Reads the ledger; writes suppression reasons only.",
         session=["suppressed_reason"], profile=[],
-        rules=["No open deal &rarr; suppress.", "Same claim recently handled &rarr; suppress.",
-               "Rep over daily cap &rarr; suppress. Caps are hard, not advisory."]),
-    "drafting-agent": dict(icon="pen", name="drafting-agent",
-        charter="Drafts the counter with cited evidence, in each rep&rsquo;s learned voice.",
-        reads=["battlecards (evidence)", "learned voice notes", "deal context"],
-        effects=[], scope="Reads battlecards + voice notes; never sends anything.",
-        session=["counter_text", "cited_evidence"], profile=["rep voice notes (from edits)"],
-        rules=["Every factual claim cites a battlecard entry.",
+        rules=["No matching order &rarr; suppress.", "Same claim recently handled &rarr; suppress.",
+               "Merchant over daily cap &rarr; suppress. Caps are hard, not advisory."]),
+    "response-agent": dict(icon="pen", name="response-agent",
+        charter="Drafts the dispute response with cited evidence, in the merchant&rsquo;s learned voice.",
+        reads=["evidence library", "learned voice notes", "order context"],
+        effects=[], scope="Reads the evidence library + voice notes; never sends anything.",
+        session=["counter_text", "cited_evidence"], profile=["merchant voice notes (from edits)"],
+        rules=["Every factual claim cites an evidence-library entry.",
                "No superlatives (best / leading / number one).",
-               "Uncertain &rarr; escalate to the PMM, never guess."]),
-    "qa-agent": dict(icon="shield", name="qa-agent",
+               "Uncertain &rarr; escalate to ops, never guess."]),
+    "compliance-agent": dict(icon="shield", name="compliance-agent",
         charter="Checks links, claims and quality before a human ever sees a draft.",
-        reads=["drafts", "battlecard sources"], effects=["escalate to PMM"],
+        reads=["drafts", "evidence sources"], effects=["escalate to ops"],
         scope="Reads drafts; its only power is to block them.",
         session=["check_failures", "judge_scores"], profile=[],
         rules=["A dead source link blocks the draft.",
-               "Contact info in a counter blocks the draft.",
-               "Judge below threshold &rarr; PMM, not the rep."]),
-    "crm-agent": dict(icon="note", name="crm-agent",
-        charter="Writes approved counters to the CRM exactly once, attaches the outcome.",
-        reads=["approved runs"], effects=["CRM note (HubSpot)"],
-        scope="The only agent that writes to your CRM &mdash; and only after your yes.",
-        session=["note_ref", "acted_at"], profile=["deal outcome (won/lost, amount)"],
-        rules=["Exactly-once: a crash can never double-post.",
+               "Contact info in a response blocks the draft.",
+               "Judge below threshold &rarr; ops, not the merchant."]),
+    "filing-agent": dict(icon="note", name="filing-agent",
+        charter="Files the approved response exactly once, attaches the outcome.",
+        reads=["approved runs"], effects=["file response (bank/processor)"],
+        scope="The only agent that files with the bank &mdash; and only after your yes.",
+        session=["note_ref", "acted_at"], profile=["dispute outcome (won/lost, amount)"],
+        rules=["Exactly-once: a crash can never double-file.",
                "Acts only on approved or edited runs."]),
     "escalation-agent": dict(icon="moon", name="escalation-agent",
         charter="Escalates stuck work and floods. Never sends anything itself.",
-        reads=["all run states", "queue depths"], effects=["escalate to PMM"],
+        reads=["all run states", "queue depths"], effects=["escalate to ops"],
         scope="Reads everything, sends nothing. Deliberately has no AI in it.",
         session=["timeout / stall reasons"], profile=[],
-        rules=["A card unanswered for 24h escalates &mdash; never auto-sends.",
+        rules=["A card unanswered for 24h escalates &mdash; never auto-files.",
                "A crash-parked run is failed loudly, never silently."]),
     "reporting-agent": dict(icon="chart", name="reporting-agent",
         charter="Keeps the decision ledger and the Signals in the sidebar.",
@@ -1909,7 +1850,7 @@ AGENT_DEFS = {
         scope="Read-only. Every number it shows is recomputable from your own audit log.",
         session=[], profile=[],
         rules=["Metrics are computed from rows, never estimated.",
-               "The correction rate is the bill &mdash; customer-auditable."]),
+               "The correction rate is the bill &mdash; merchant-auditable."]),
 }
 
 
@@ -1937,7 +1878,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<span>&middot;</span><span>{len(runs)} runs</span>'
             f'<span>&middot;</span><span>needed edits {fmt_pct(corr)}</span></div></div>'
             f'<form method="post" action="/api/sample" style="margin-left:auto">'
-            f'<button class="btn ghost">Simulate a call</button></form></div>')
+            f'<button class="btn ghost">Simulate a dispute webhook</button></form></div>')
 
     if tab == "access":
         items = ([("Reads: " + r, "Read access. " + a["scope"], True) for r in a["reads"]]
@@ -1969,9 +1910,9 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     elif tab == "memory":
         panes = [("Per run", "Extracted on every run and stored on the run row — "
                   "the customer-auditable record.", a["session"]),
-                 ("Persists", "Merges into durable memory (battlecards, voice "
-                  "notes, outcomes) with provenance — never overwritten, only "
-                  "superseded.", a["profile"])]
+                 ("Persists", "Merges into durable memory (evidence packs, "
+                  "voice notes, outcomes) with provenance — never overwritten, "
+                  "only superseded.", a["profile"])]
         item = min(item, 1)
         left = "".join(
             f'<a class="pitem {"on" if i == item else ""}" '
@@ -1990,9 +1931,9 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<span class="tdesc">{r} <span class="mut">signed &middot; playbook v1'
             f'</span></span></div>' for r in a["rules"])
         from relay_superagent.llm.claude import SEAM_PROMPTS
-        seams = {"monitoring-agent": ["confirm_mention", "extract_claim"],
-                 "drafting-agent": ["draft_counter"],
-                 "qa-agent": ["judge", "semantic_diff"],
+        seams = {"detection-agent": ["confirm_mention", "extract_claim"],
+                 "response-agent": ["draft_counter"],
+                 "compliance-agent": ["judge", "semantic_diff"],
                  "reporting-agent": ["narrate"]}.get(slug, [])
         under = ""
         if seams:
@@ -2034,9 +1975,9 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     elif tab == "quality":
         import json as _json
         from pathlib import Path as _Path
-        AGENT_SEAMS = {"monitoring-agent": ["confirm_mention", "extract_claim"],
-                       "drafting-agent": ["draft_counter"],
-                       "qa-agent": ["judge", "semantic_diff"],
+        AGENT_SEAMS = {"detection-agent": ["confirm_mention", "extract_claim"],
+                       "response-agent": ["draft_counter"],
+                       "compliance-agent": ["judge", "semantic_diff"],
                        "reporting-agent": ["narrate"]}
         evdir = _Path(__file__).resolve().parents[1] / "evals"
         results = {}
@@ -2069,8 +2010,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     else:
         plays = AGENT_PLAYS.get(slug, [])
         play_html = "".join(
-            f'<span class="st {"ok" if pl == "Watcher" else "wait"}" '
-            f'style="margin-right:6px">{pl}{" &middot; live" if pl == "Watcher" else " &middot; next"}</span>'
+            f'<span class="st ok" style="margin-right:6px">{pl} &middot; live</span>'
             for pl in plays) or '<span class="st mut">supporting role</span>'
         body = (f'<div class="pane-detail" style="max-width:640px"><h3>Charter</h3>'
                 f'<p>{a["charter"]}</p><p style="margin-top:10px" class="mut">'
@@ -2080,6 +2020,23 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     return head + tabbar + body
 
 
+def _relay_agent_card(a: dict) -> str:
+    live = a["status"] == "live"
+    badge = ('<span class="st ok">live in this demo</span>' if live
+             else '<span class="st wait">Coming next &middot; roadmap</span>')
+    inner = (f'<div class="aname" style="margin-bottom:6px">'
+             f'<span class="tile">{ICONS[a["icon"]]}</span>'
+             f'<span class="dot2 {"on" if live else "off"}"></span>'
+             f'<b style="font-size:15px">{a["name"]}</b></div>'
+             f'<div class="mut" style="margin:0 0 6px;font-size:12px">{a["persona"]}</div>'
+             f'<div style="margin:2px 0 8px">&ldquo;{a["desc"]}&rdquo;</div>'
+             f'<div class="mut"><b>{a["tagline"]}</b></div>'
+             f'<div style="margin-top:10px">{badge}</div>')
+    if live:
+        return f'<a class="arow2" style="display:block;padding:16px" href="/agents/detection-agent">{inner}</a>'
+    return f'<div class="arow2" style="display:block;padding:16px;opacity:.75">{inner}</div>'
+
+
 def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -2087,49 +2044,54 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     n_drafted = sum(1 for r in runs if r.decision)
     n_acted = sum(1 for r in runs if r.state in (RunState.ACTED, RunState.RESOLVED))
     n_esc = len(WORLD.d.slack.channel_posts)
-    rows_data = [
-        ("ear", "monitoring-agent", "core", "active", f"{len(runs)} triggers"),
-        ("funnel", "triage-agent", "core", "active", f"{n_sup} filtered"),
-        ("pen", "drafting-agent", "core", "active", f"{n_drafted} drafts"),
-        ("shield", "qa-agent", "core", "active", "every draft"),
-        ("note", "crm-agent", "core", "active", f"{n_acted} filed"),
-        ("moon", "escalation-agent", "core", "active", f"{n_esc} escalations"),
-        ("chart", "reporting-agent", "core", "active", f"{len(runs)} rows"),
-        ("send", "outreach-agent", "play", "planned", "&mdash;"),
-        ("baton", "conductor-agent", "system", "planned", "&mdash;"),
-        ("book", "knowledge-agent", "system", "planned", "&mdash;"),
-    ]
+
+    agents = RELAY_AGENTS
     if f in ("active", "planned"):
-        rows_data = [r for r in rows_data if r[3] == f]
+        want = "live" if f == "active" else "roadmap"
+        agents = [a for a in agents if a["status"] == want]
     if q:
-        rows_data = [r for r in rows_data if q.lower() in r[1]]
-    def row(icon, name, kind, status, stat):
-        dot = "on" if status == "active" else "off"
-        pill = ('<span class="st ok">active</span>' if status == "active"
-                else '<span class="st wait">planned</span>')
+        agents = [a for a in agents if q.lower() in a["name"].lower()]
+    cards = ("".join(_relay_agent_card(a) for a in agents)
+             or '<div class="empty">No agents match.</div>')
+
+    crew_rows = [
+        ("ear", "detection-agent", f"{len(runs)} triggers"),
+        ("funnel", "eligibility-agent", f"{n_sup} filtered"),
+        ("pen", "response-agent", f"{n_drafted} drafts"),
+        ("shield", "compliance-agent", "every draft"),
+        ("note", "filing-agent", f"{n_acted} filed"),
+        ("moon", "escalation-agent", f"{n_esc} escalations"),
+        ("chart", "reporting-agent", f"{len(runs)} rows"),
+    ]
+    def crew_row(icon, name, stat):
         inner = (f'<span class="aname"><span class="tile">{ICONS[icon]}</span>'
-                 f'<span class="dot2 {dot}"></span><b>{name}</b></span>'
-                 f'<span class="st mut" style="justify-self:start">{kind}</span>'
-                 f'<span>{pill}</span>'
+                 f'<span class="dot2 on"></span><b>{name}</b></span>'
+                 f'<span class="st ok">active</span>'
                  f'<span class="mut" style="font-size:12.5px">{stat}</span>'
                  f'<span class="go2">&rsaquo;</span>')
-        if status == "active" and name in AGENT_DEFS:
-            return f'<a class="arow2" href="/agents/{name}">{inner}</a>'
-        return f'<div class="arow2" style="opacity:.65">{inner}</div>'
+        return f'<a class="arow2" href="/agents/{name}">{inner}</a>'
+    crew_table = "".join(crew_row(*r) for r in crew_rows)
+
     seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
                               f'href="/agents?f={key}">{label}</a>')
-    table = "".join(row(*r) for r in rows_data) or '<div class="empty">No agents match.</div>'
     return (f'<h1 class="page">Agents</h1>'
-            f'<div class="pagehint">Manage the team working your pipeline.</div>'
+            f'<div class="pagehint">Pre-built agents for payment and '
+            f'compliance ops. Or build your own. Eight agents, one workspace '
+            f'&mdash; Dispute Defender is wired end-to-end below; the other '
+            f'seven are next. You approve before anything sends.</div>'
             f'<div class="atoolbar">'
             f'<span class="search-in">{ICONS["search"]}'
             f'<input placeholder="Search agents&hellip;" '
             f'oninput="[...document.querySelectorAll(\'.arow2\')].forEach(r=>'
             f'r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?\'\':\'none\')"></span>'
-            f'<span class="seg">{seg("all", "All")}{seg("active", "Active")}{seg("planned", "Planned")}</span></div>'
+            f'<span class="seg">{seg("all", "All")}{seg("active", "Live")}{seg("planned", "Roadmap")}</span></div>'
+            f'<div class="atable" style="grid-template-columns:1fr">{cards}</div>'
+            f'<h2 class="sec">Dispute Defender&rsquo;s crew</h2>'
+            f'<div class="pagehint">The seven sub-agents inside the pipeline &mdash; '
+            f'each with its own access, memory, playbook and quality tabs.</div>'
             f'<div class="atable"><div class="thead"><span>Agent name</span>'
-            f'<span>Kind</span><span>Status</span><span>Activity</span><span></span></div>'
-            f'{table}</div>')
+            f'<span>Status</span><span>Activity</span><span></span></div>'
+            f'{crew_table}</div>')
 
 
 def activity_content(tid: str, f: str = "all") -> str:
@@ -2166,22 +2128,22 @@ def activity_content(tid: str, f: str = "all") -> str:
             f'</div>{banner}{chips}{rows}')
 
 
-_AGENT_ICONS = {"monitoring-agent": "ear", "triage-agent": "funnel",
-                "drafting-agent": "pen", "qa-agent": "shield", "gate": "tasks",
-                "crm-agent": "note", "escalation-agent": "moon",
+_AGENT_ICONS = {"detection-agent": "ear", "eligibility-agent": "funnel",
+                "response-agent": "pen", "compliance-agent": "shield", "gate": "tasks",
+                "filing-agent": "note", "escalation-agent": "moon",
                 "reporting-agent": "chart"}
 
 
 # Lane mapping for the journey view: Takeoff's four altitudes, our events.
 _LANES = ["SIGNAL", "DECISION", "TASK", "INTERACTION"]
 _EVENT_LANE = {
-    ("monitoring-agent", "signal"): 0, ("monitoring-agent", "confirmed"): 0,
-    ("monitoring-agent", "dismissed"): 1, ("reporting-agent", "outcome"): 0,
-    ("triage-agent", "qualified"): 1, ("triage-agent", "suppressed"): 1,
-    ("qa-agent", "passed"): 1, ("qa-agent", "blocked"): 1,
+    ("detection-agent", "signal"): 0, ("detection-agent", "confirmed"): 0,
+    ("detection-agent", "dismissed"): 1, ("reporting-agent", "outcome"): 0,
+    ("eligibility-agent", "qualified"): 1, ("eligibility-agent", "suppressed"): 1,
+    ("compliance-agent", "passed"): 1, ("compliance-agent", "blocked"): 1,
     ("gate", "approved"): 1, ("gate", "edited"): 1, ("gate", "dismissed"): 1,
-    ("drafting-agent", "drafted"): 2,
-    ("gate", "surfaced"): 3, ("crm-agent", "filed"): 3,
+    ("response-agent", "drafted"): 2,
+    ("gate", "surfaced"): 3, ("filing-agent", "filed"): 3,
     ("escalation-agent", "escalated"): 3, ("escalation-agent", "timed out"): 3,
     ("escalation-agent", "stalled"): 3,
 }
@@ -2299,9 +2261,8 @@ def _journey_svg(events: list, run=None) -> str:
 
     if run is not None:
         kv_base = {"source": run.trigger_source,
-                   "account": _account_label(run),
-                   "competitor": COMP.get(run.competitor_id, run.competitor_id),
-                   "rep": REP.get(run.rep_user_id, run.rep_user_id)}
+                   "merchant": _account_label(run),
+                   "reason": COMP.get(run.reason_code, run.reason_code)}
     else:
         kv_base = {}
     payload = _json.dumps([
@@ -2417,13 +2378,13 @@ jshow(0, true);
 def account_journey_content(tid: str, acct_id: str) -> str:
     led = WORLD.d.ledger
     runs = sorted((r for r in led.runs.values()
-                   if r.tenant_id == tid and r.account_id == acct_id),
+                   if r.tenant_id == tid and r.merchant_id == acct_id),
                   key=lambda r: r.occurred_at)
     if not runs:
         return '<h1 class="page">Account not found</h1>'
     label = _account_label(runs[0])
-    comps = sorted({COMP.get(r.competitor_id, r.competitor_id)
-                    for r in runs if r.competitor_id})
+    comps = sorted({COMP.get(r.reason_code, r.reason_code)
+                    for r in runs if r.reason_code})
     merged = []
     for r in runs:
         for e in led.trace_for(r.run_id):
@@ -2432,21 +2393,21 @@ def account_journey_content(tid: str, acct_id: str) -> str:
                 bubble = esc((r.decision or {}).get("counter_text", "")[:280])
             merged.append({**e, "bubble": bubble, "kv": {
                 "claim": r.claim_text or "&mdash;",
-                "competitor": COMP.get(r.competitor_id, r.competitor_id),
-                "rep": REP.get(r.rep_user_id, r.rep_user_id),
+                "reason": COMP.get(r.reason_code, r.reason_code),
+                "merchant": REP.get(r.merchant_id, r.merchant_id),
                 "run": f'<a href="/runs/{r.run_id}">open this run &rarr;</a>'}})
     merged.sort(key=lambda e: e["ts"])
     won = 0
     for r in runs:
         out = led.outcome_for(r.run_id)
         if out and (out.outcome_value or {}).get("won"):
-            won += (out.outcome_value or {}).get("amount") or 0
+            won += (out.outcome_value or {}).get("amount_paise") or 0
     waiting = sum(1 for r in runs if r.state is RunState.AWAITING_GATE)
     goal_line = (GOAL_META[acct_id][1] if acct_id in GOAL_META
-                 else f'Defend {esc(label)} against '
-                      f'{esc(" & ".join(comps) or "competitors")}.')
+                 else f'Keep {esc(label)}&rsquo;s dispute win rate healthy on '
+                      f'{esc(" & ".join(comps) or "open reason codes")}.')
     stats = (f'{len(runs)} moments &middot; {waiting} waiting'
-             + (f' &middot; ${won/1000:.0f}k won' if won else ""))
+             + (f' &middot; &#8377;{won/100000:.0f}k won' if won else ""))
     rows = "\n".join(ledger_row(r) for r in reversed(runs))
     return (
         '<div class="tkscope">'
@@ -2477,21 +2438,21 @@ def journeys_content(tid: str, sel: str = "") -> str:
     led = WORLD.d.ledger
     accts: dict[str, dict] = {}
     for r in led.runs.values():
-        if r.tenant_id != tid or not r.account_id or not led.trace_for(r.run_id):
+        if r.tenant_id != tid or not r.merchant_id or not led.trace_for(r.run_id):
             continue
-        a = accts.setdefault(r.account_id, {
+        a = accts.setdefault(r.merchant_id, {
             "n": 0, "waiting": 0, "won": 0, "lost": False,
             "last": r.occurred_at, "comps": set(), "name": _account_label(r)})
         a["n"] += 1
         a["last"] = max(a["last"], r.occurred_at)
-        if r.competitor_id:
-            a["comps"].add(COMP.get(r.competitor_id, r.competitor_id))
+        if r.reason_code:
+            a["comps"].add(COMP.get(r.reason_code, r.reason_code))
         if r.state is RunState.AWAITING_GATE:
             a["waiting"] += 1
         out = led.outcome_for(r.run_id)
         if out:
             if (out.outcome_value or {}).get("won"):
-                a["won"] += (out.outcome_value or {}).get("amount") or 0
+                a["won"] += (out.outcome_value or {}).get("amount_paise") or 0
             else:
                 a["lost"] = True
     if not accts:
@@ -2511,8 +2472,8 @@ def journeys_content(tid: str, sel: str = "") -> str:
         # titles are escaped at build below.
         if a in GOAL_META:
             return GOAL_META[a][1]
-        comps = ", ".join(sorted(d["comps"])) or "the field"
-        return esc(f"Defend {d['name']} against {comps}.")
+        comps = ", ".join(sorted(d["comps"])) or "open reason codes"
+        return esc(f"Defend {d['name']}'s disputes: {comps}.")
 
     order = sorted(accts, key=lambda a: accts[a]["last"], reverse=True)
     SHOW = 60  # chunked render: everything is in the DOM for search/sort,
@@ -2522,7 +2483,7 @@ def journeys_content(tid: str, sel: str = "") -> str:
         if d["waiting"]:
             chip = f'<span class="st amber">{d["waiting"]} waiting</span>'
         elif d["won"]:
-            chip = f'<span class="st ok">won ${d["won"]:,.0f}</span>'
+            chip = f'<span class="st ok">won &#8377;{d["won"]/100:,.0f}</span>'
         elif d["lost"]:
             chip = '<span class="st mut">lost &middot; recorded</span>'
         else:
@@ -2541,21 +2502,21 @@ def journeys_content(tid: str, sel: str = "") -> str:
             f'<td class="num" data-s="{int(d["last"].timestamp())}">'
             f'{d["last"].strftime("%b %-d")}</td></tr>')
     more_btn = (f'<button class="btn ghost sm gmore" id="jmore" '
-                f'onclick="jshowall(this)">Show all {len(order)} accounts</button>'
+                f'onclick="jshowall(this)">Show all {len(order)} merchants</button>'
                 if len(order) > SHOW else "")
     shown = min(SHOW, len(order))
     return (
         '<h1 class="page">Journeys</h1>'
-        '<div class="pagehint">Every account the team works becomes a '
+        '<div class="pagehint">Every merchant on this workspace becomes a '
         'replayable timeline. Search, sort, open, scrub.</div>'
-        '<input class="jfind" placeholder="Search accounts, goals or competitors&hellip;" '
+        '<input class="jfind" placeholder="Search merchants, goals or dispute reasons&hellip;" '
         'oninput="jfilter(this.value)">'
-        f'<div class="gridcount" id="jcount">Showing {shown} of {len(order)} accounts</div>'
+        f'<div class="gridcount" id="jcount">Showing {shown} of {len(order)} merchants</div>'
         '<div class="dgridwrap"><table class="dgrid" id="jgrid">'
         '<thead><tr>'
-        '<th onclick="dsort(this)">Account</th>'
+        '<th onclick="dsort(this)">Merchant</th>'
         '<th onclick="dsort(this)">Goal</th>'
-        '<th onclick="dsort(this)">Competitors</th>'
+        '<th onclick="dsort(this)">Dispute reasons</th>'
         '<th onclick="dsort(this)" class="num">Moments</th>'
         '<th onclick="dsort(this)">Status</th>'
         '<th onclick="dsort(this)" class="num">Last activity</th>'
@@ -2582,12 +2543,12 @@ def run_trace_content(tid: str, run_id: str) -> str:
         f'<span class="when">{e["ts"].strftime("%b %-d, %H:%M")}</span></div>'
         for e in events) or (
         '<div class="empty">No trace events — this run predates tracing.</div>')
-    comp_name = esc(COMP.get(r.competitor_id, r.competitor_id))
+    comp_name = esc(COMP.get(r.reason_code, r.reason_code))
     return (
         '<div class="tkscope">'
         f'<div class="dhead"><a class="back2" href="/journeys" onclick="if(history.length>1){{history.back();return false}}">&lsaquo;</a>'
-        f'<div><h1><span class="goalk">Goal:</span> Counter {comp_name}&rsquo;s '
-        f'&ldquo;{esc(r.claim_text or "claim")}&rdquo; at {esc(_account_label(r))}.</h1>'
+        f'<div><h1><span class="goalk">Goal:</span> Defend the {comp_name} '
+        f'dispute &mdash; &ldquo;{esc(r.claim_text or "claim")}&rdquo; at {esc(_account_label(r))}.</h1>'
         f'<div class="meta">{_logo(_account_label(r))}{esc(_account_label(r))}'
         f'<span>&middot;</span><span class="st {cls}">{label}</span></div></div>'
         f'<span class="jnav"><button class="btn ghost sm jcirc" onclick="jstep(-1)">&larr;</button>'
@@ -2603,33 +2564,34 @@ def run_trace_content(tid: str, run_id: str) -> str:
         + f'<h2 class="sec">Full log</h2>{rows}')
 
 
+# (days ago, merchant, reason label, buyer claim, verdict, evidence, draft)
 SHADOW_ROWS = [
-    (27, "Notion",   "Acme",      "Acme quoted them 30% under list",         "send", "2 sources",
-     "A discount that size usually returns at renewal; the 3-year cost model shows the crossover."),
-    (25, "Airtable", "Acme",      "Acme's importer is one-click",            "send", "2 sources",
-     "One click covers the starter path; at their base count the import runs through mapping review."),
-    (24, "Loom",     "",          "Asked about invoicing timelines",         "skip", "",
+    (27, "Loomcraft Textiles",   "Goods not received", "Kurta set never arrived",             "send", "2 proofs",
+     "Courier proof-of-delivery is signed and GPS-stamped at the doorstep; the WhatsApp thread confirms receipt the same evening."),
+    (25, "Kavali Kitchens",      "Duplicate charge",   "Two debits for one thali order",      "send", "2 proofs",
+     "One gateway transaction id, one settled debit; the second line is an authorization hold that reverses on its own."),
+    (24, "Verve Wellness",       "",                   "Refund status query, not a dispute",  "skip", "",
      ""),
-    (21, "Zapier",   "RivalSoft", "RivalSoft won the uptime argument",       "send", "2 sources",
-     "Measured uptime inverts the story: 99.98% vs 99.61% over twelve months."),
-    (19, "Figma",    "RivalSoft", "RivalSoft demoed a faster setup",         "send", "1 source",
-     "Setup speed covers the template path; the cost model prices day-30 rework."),
-    (17, "Ramp",     "Acme",      "Acme bundles support for free",           "send", "2 sources",
-     "Free support moves a one-time line; the 3-year crossover still lands near month nine."),
-    (16, "Linear",   "",          "Praised our onboarding docs",             "skip", "",
+    (21, "Bumblebee Mobility",   "Goods not received", "Scooter charger missing",             "send", "2 proofs",
+     "POD shows delivery two days before the dispute was filed; the buyer's own delivery-day message is attached."),
+    (19, "Sundar Studio Prints", "Not as described",   "Print colours don't match listing",   "send", "1 proof",
+     "The listing snapshot from the order date matches the shipped SKU's batch code exactly."),
+    (17, "Northgate Fresh Mart", "Duplicate charge",   "Grocery order billed twice",          "send", "2 proofs",
+     "Invoice and bank settlement excerpt agree on a single debit for this order id."),
+    (16, "Verve Wellness",       "",                   "Buyer praised the delivery speed",    "skip", "",
      ""),
-    (14, "Vercel",   "Acme",      "Acme claims enterprise SSO in base tier", "esc",  "none",
+    (14, "Kavali Kitchens",      "Fraud claim",        "Card owner says order wasn't theirs", "esc",  "none",
      ""),
-    (12, "Segment",  "RivalSoft", "RivalSoft slipped an SLA credit",         "send", "2 sources",
-     "An SLA credit is a refund, not reliability; measured uptime is the record."),
-    (9,  "Gusto",    "Acme",      "Acme's team said support here is slow",   "send", "1 source",
-     "Median first response here is 42 minutes; the SLA sheet is attached, theirs is not published."),
-    (7,  "Plaid",    "",          "Scheduling chatter, no competitor",       "skip", "",
+    (12, "Loomcraft Textiles",   "Duplicate charge",   "Statement lists the saree twice",     "send", "2 proofs",
+     "The gateway and the invoice tie this order to one transaction; the duplicate line never captured."),
+    (9,  "Bumblebee Mobility",   "Goods not received", "Helmet order marked undelivered",     "send", "1 proof",
+     "The courier scan places the parcel at the registered address, signed for on the handheld device."),
+    (7,  "Northgate Fresh Mart", "",                   "Delivery-slot reschedule request",    "skip", "",
      ""),
-    (5,  "Webflow",  "Acme",      "Acme scales to a million rows",           "send", "2 sources",
-     "Their own docs cap synced tables below that; fan-out is what matters at this size."),
-    (2,  "Notion",   "Acme",      "Final push: a signing discount",          "send", "2 sources",
-     "A signing discount reprices the licence line only; the crossover still lands near month nine."),
+    (5,  "Sundar Studio Prints", "Goods not received", "Wedding-card box never showed",       "send", "2 proofs",
+     "POD plus the buyer's WhatsApp confirmation from delivery day; both attach to the filing."),
+    (2,  "Verve Wellness",       "Not as described",   "Serum shade differs from photos",     "send", "2 proofs",
+     "Listing snapshot and the buyer's own return photos show the same packaging and batch code."),
 ]
 
 
@@ -2664,34 +2626,34 @@ def shadow_content(tid: str) -> str:
             f'<span class="mut">{when}</span></td>'
             + cell("listening&hellip;", comp_v)
             + cell("extracting claim&hellip;", claim_v)
-            + cell("checking battlecards&hellip;", proof_v)
-            + cell("drafting counter&hellip;", send_v, "wide")
+            + cell("checking the evidence vault&hellip;", proof_v)
+            + cell("drafting the response&hellip;", send_v, "wide")
             + '<td class="ghost"></td></tr>')
 
     return (
         '<h1 class="page">Shadow trial</h1>'
-        '<div class="pagehint">Run the last 30 days of calls through the defense '
-        'team. Nothing sends, nobody is contacted, and the scan is free &mdash; '
-        'you just see what you missed.</div>'
+        '<div class="pagehint">Run the last 30 days of disputes through '
+        'Dispute Defender. Nothing files, nobody is contacted, and the scan '
+        'is free &mdash; you just see what you missed.</div>'
         '<button class="btn primary" id="shbtn" onclick="shstart()">Scan the last 30 days</button>'
         '<div class="shstats">'
-        '<div class="shstat"><div class="n" id="sh-calls">0</div><div class="l">calls scanned</div></div>'
-        '<div class="shstat"><div class="n" id="sh-moments">0</div><div class="l">competitive moments</div></div>'
-        '<div class="shstat"><div class="n" id="sh-sends">0</div><div class="l">counters it would have sent</div></div>'
+        '<div class="shstat"><div class="n" id="sh-calls">0</div><div class="l">webhooks scanned</div></div>'
+        '<div class="shstat"><div class="n" id="sh-moments">0</div><div class="l">actionable disputes</div></div>'
+        '<div class="shstat"><div class="n" id="sh-sends">0</div><div class="l">responses it would have filed</div></div>'
         '<div class="shstat"><div class="n" id="sh-missed">0</div><div class="l">answered by anyone today</div></div>'
         '</div>'
         '<div class="dgridwrap"><table class="dgrid">'
         '<thead><tr><th class="chk"></th>'
-        '<th onclick="dsort(this)">Call</th>'
-        '<th onclick="dsort(this)">Competitor named?</th>'
+        '<th onclick="dsort(this)">Dispute</th>'
+        '<th onclick="dsort(this)">Reason code covered?</th>'
         '<th onclick="dsort(this)">The claim</th>'
-        '<th onclick="dsort(this)">Proof on file?</th>'
-        '<th class="wide" onclick="dsort(this)">Would it have sent?</th>'
+        '<th onclick="dsort(this)">Evidence on file?</th>'
+        '<th class="wide" onclick="dsort(this)">Would it have filed?</th>'
         '<th class="ghost">+ New question</th></tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table></div>'
         '<div class="shband" id="shband"><span><b>Shadow mode:</b> nothing was '
-        'sent, nobody was contacted, and this scan cost nothing. This is what '
-        'last month looked like without a defense team.</span>'
+        'filed, nobody was contacted, and this scan cost nothing. This is what '
+        'last month looked like without Dispute Defender.</span>'
         '<a class="btn primary sm" href="/settings?s=connectors">Go live &rarr;</a></div>'
         + """<script>
 function shstart(){
@@ -2750,13 +2712,13 @@ def settings_content(tid: str, s: str = "team") -> str:
         for tid_, name, role, dept, enrolled in TEAM:
             by_dept.setdefault(dept, []).append((name, role, enrolled))
         body = ('<div class="pagehint">Who the agents work with. '
-                '&ldquo;Reviews counters&rdquo; means their approvals feed '
+                '&ldquo;Reviews responses&rdquo; means their approvals feed '
                 'the Track Record.</div>')
         for dept, members in by_dept.items():
             rows = "".join(
                 f'<div class="trow slim"><span class="ico">{ICONS["bot" if enrolled else "bm"]}</span>'
                 f'<span class="tdesc"><b>{esc(name)}</b> <span class="mut">{esc(role)}</span></span>'
-                + ('<span class="st ok">reviews counters</span>' if enrolled else '')
+                + ('<span class="st ok">reviews responses</span>' if enrolled else '')
                 + '</div>'
                 for name, role, enrolled in members)
             body += (f'<h2 class="sec">{dept} ({len(members)})</h2>{rows}')
@@ -2772,14 +2734,14 @@ def settings_content(tid: str, s: str = "team") -> str:
             f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
             f'<span class="tdesc"><b>{esc(k)}</b> <span class="mut">{v}</span></span></div>'
             for k, v in [
-                ("Human gate", "nothing outbound without an explicit yes; "
-                 "timeouts escalate, never send"),
-                ("Queue cap", "at most 3 cards per rep &mdash; attention is "
-                 "protected, floods escalate"),
-                ("Repeat suppression", "the same claim on the same deal is "
+                ("Human gate", "nothing files without an explicit yes; "
+                 "timeouts escalate, never auto-file"),
+                ("Queue cap", "at most 3 cards per merchant &mdash; attention "
+                 "is protected, floods escalate"),
+                ("Repeat suppression", "the same claim on the same order is "
                  "not re-worked within 7 days"),
-                ("Scoreboard holdout", "a random slice of accounts is never "
-                 "worked, so lift stays measurable"),
+                ("No holdouts", "every covered dispute is worked &mdash; a "
+                 "missed chargeback deadline is real money, never an A/B arm"),
                 ("Your Track Record", "export is a right &mdash; one click, "
                  "everything, recomputable (arriving with the first live "
                  "workspace)"),
@@ -2824,7 +2786,7 @@ class Handler(BaseHTTPRequestHandler):
             from urllib.parse import parse_qs as _pq, urlparse as _up
             conv = _pq(_up(self.path).query).get("c", [""])[0]
             from urllib.parse import parse_qs as _pq, urlparse as _up
-            _as = _pq(_up(self.path).query).get("as", ["rep"])[0]
+            _as = _pq(_up(self.path).query).get("as", ["owner"])[0]
             self._html(chat_render(sess["tenant_id"], conv,
                                    sess.get("email", ""), _as))
         elif self.path in ("/tasks", "/approvals"):
@@ -2858,9 +2820,9 @@ class Handler(BaseHTTPRequestHandler):
             led = WORLD.d.ledger
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["run_id", "occurred_at", "source", "account",
-                        "competitor", "claim", "state", "gate_action",
-                        "gate_actor", "edit_material", "won", "amount"])
+            w.writerow(["run_id", "occurred_at", "source", "merchant",
+                        "dispute_reason", "claim", "state", "gate_action",
+                        "gate_actor", "edit_material", "won", "amount_paise"])
             for r in sorted((x for x in led.runs.values()
                              if x.tenant_id == sess["tenant_id"]),
                             key=lambda x: x.occurred_at):
@@ -2868,11 +2830,11 @@ class Handler(BaseHTTPRequestHandler):
                 v = (out.outcome_value or {}) if out else {}
                 w.writerow([
                     r.run_id, r.occurred_at.isoformat(), r.trigger_source,
-                    _account_label(r), COMP.get(r.competitor_id, r.competitor_id),
+                    _account_label(r), COMP.get(r.reason_code, r.reason_code),
                     r.claim_text or "", r.state.value,
                     r.gate_action.value if r.gate_action else "",
                     r.gate_actor or "", r.gate_is_material,
-                    v.get("won", ""), v.get("amount", "")])
+                    v.get("won", ""), v.get("amount_paise", "")])
             data = buf.getvalue().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
@@ -2969,7 +2931,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/runs":
             led = WORLD.d.ledger
             body = json.dumps([{ "run_id": r.run_id, "state": r.state.value,
-                                 "competitor": r.competitor_id, "claim": r.claim_text}
+                                 "reason_code": r.reason_code, "claim": r.claim_text}
                                for r in led.runs.values()]).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -3223,7 +3185,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"text": "That one is already resolved."})
         if act["action"] == "approve":
             WORLD.approve(run, act["actor"])
-            return self._json({"text": "Approved — the counter is on the CRM record. ✓"})
+            return self._json({"text": "Approved — the response is filed. ✓"})
         WORLD.reject(run, act["actor"])
         return self._json({"text": "Dismissed and recorded."})
 
@@ -3251,13 +3213,12 @@ class Handler(BaseHTTPRequestHandler):
             self.headers.get("webhook-signature", ""))
         if not ok:
             return self.send_error(401)
-        ev = to_trigger_event(json.loads(raw), tenant_id=tid,
-                              rep_directory=ctx.rep_directory)
+        ev = to_trigger_event(json.loads(raw), tenant_id=tid)
         if ev is None:
             return self._json({"detail": "no transcript"})
         run = pipeline_for(tid).handle_event(ev)
         if run is None:
-            return self._json({"detail": "no competitor mention"})
+            return self._json({"detail": "no covered dispute reason"})
         return self._json({"run_id": run.run_id, "state": run.state.value})
 
     def _json(self, payload):
@@ -3294,8 +3255,8 @@ def _mini_run(r) -> str:
     label, cls = STATE_META.get(r.state, (r.state.value, "mut"))
     counter = esc((r.decision or {}).get("counter_text", ""))
     return (f'<div class="mrun"><div class="mhead">'
-            f'<span class="comp">{esc(COMP.get(r.competitor_id, "–"))}</span>'
-            f'<span class="meta">{esc(REP.get(r.rep_user_id, r.rep_user_id or "–"))}'
+            f'<span class="comp">{esc(COMP.get(r.reason_code, "–"))}</span>'
+            f'<span class="meta">{esc(REP.get(r.merchant_id, r.merchant_id or "–"))}'
             f' · {_logo(_account_label(r))}{esc(_account_label(r) or "–")}</span>'
             f'<span class="st {cls}">{label}</span></div>'
             f'<div class="mclaim">“{esc(r.claim_text)}”</div>'
@@ -3305,19 +3266,19 @@ def _mini_run(r) -> str:
 def _t_shadow(_):
     sends = sum(1 for row in SHADOW_ROWS if row[4] == "send")
     moments = sum(1 for row in SHADOW_ROWS if row[4] != "skip")
-    return (f"Shadow scan over the last 30 days: <b>{moments}</b> competitive "
-            f"moments, <b>{sends}</b> counters ready to send, none answered by "
-            f"anyone. Nothing was sent &mdash; shadow mode never contacts a "
-            f"prospect. <a href='/shadow'><b>Open the scan</b></a> to replay it.",
+    return (f"Shadow scan over the last 30 days: <b>{moments}</b> actionable "
+            f"disputes, <b>{sends}</b> responses ready to file, none answered "
+            f"by anyone. Nothing was filed &mdash; shadow mode never contacts "
+            f"a bank. <a href='/shadow'><b>Open the scan</b></a> to replay it.",
             "")
 
 
 def _t_queue(_):
     runs = [r for r in WORLD.d.ledger.runs.values() if r.state is RunState.AWAITING_GATE]
     if not runs:
-        return "The queue is clear — nothing is waiting on a rep.", ""
-    return (f"{len(runs)} counter{'s' if len(runs) != 1 else ''} awaiting review. "
-            f"Say “approve the &lt;competitor&gt; one” to act on one.",
+        return "The queue is clear — nothing is waiting on you.", ""
+    return (f"{len(runs)} dispute response{'s' if len(runs) != 1 else ''} awaiting review. "
+            f"Say “approve the &lt;dispute reason&gt; one” to act on one.",
             "".join(_mini_run(r) for r in runs))
 
 
@@ -3325,8 +3286,8 @@ def _t_metrics(_):
     led = WORLD.d.ledger
     rows = [
         ("Correction rate", fmt_pct(correction_rate(led, "t1")), "target <5%"),
-        ("Counter usage", fmt_pct(counter_usage_rate(led, "t1")), "approved or lightly edited"),
-        ("Trigger precision", fmt_pct(trigger_precision(led, "t1")), "mentions worth surfacing"),
+        ("Response usage", fmt_pct(counter_usage_rate(led, "t1")), "approved or lightly edited"),
+        ("Trigger precision", fmt_pct(trigger_precision(led, "t1")), "disputes worth surfacing"),
         ("Gate p95", _fmt_latency(gate_latency_p95_ms(led, "t1")), "time to a decision"),
     ]
     html = "".join(f'<div class="mrow"><b>{v}</b><span>{k}</span><i>{h}</i></div>'
@@ -3338,10 +3299,10 @@ def _t_runs(args):
     comp = (args or {}).get("competitor")
     runs = sorted(WORLD.d.ledger.runs.values(), key=lambda r: r.occurred_at, reverse=True)
     if comp:
-        runs = [r for r in runs if r.competitor_id == comp]
+        runs = [r for r in runs if r.reason_code == comp]
     if not runs:
         return f"No runs found{' for ' + COMP.get(comp, comp) if comp else ''}.", ""
-    label = f" against {COMP.get(comp, comp)}" if comp else ""
+    label = f" on {COMP.get(comp, comp)} disputes" if comp else ""
     return f"{len(runs)} run{'s' if len(runs) != 1 else ''}{label}, newest first.", \
            "".join(_mini_run(r) for r in runs[:6])
 
@@ -3376,18 +3337,18 @@ def _t_evidence(_):
 def _t_escalations(_):
     posts = WORLD.d.slack.channel_posts
     if not posts:
-        return "Nothing needs the PMM right now.", ""
+        return "Nothing needs ops right now.", ""
     rows = "".join(f'<div class="mrow"><b class="warn">!</b>'
                    f'<span>{esc(b["reason"])}</span><i>“{esc(b.get("claim") or "—")[:60]}”</i></div>'
                    for _, b in posts)
-    return f"{len(posts)} escalation{'s' if len(posts) != 1 else ''} in the PMM channel.", \
+    return f"{len(posts)} escalation{'s' if len(posts) != 1 else ''} in the review channel.", \
            f'<div class="mcard">{rows}</div>'
 
 
 def _find_awaiting(comp):
     runs = [r for r in WORLD.d.ledger.runs.values() if r.state is RunState.AWAITING_GATE]
     if comp:
-        runs = [r for r in runs if r.competitor_id == comp]
+        runs = [r for r in runs if r.reason_code == comp]
     return sorted(runs, key=lambda r: r.occurred_at)[0] if runs else None
 
 
@@ -3397,30 +3358,32 @@ def _t_action(args, action):
         return "There is no matching counter awaiting review.", "", None
     pid = str(_uuid.uuid4())
     PROPOSALS[pid] = {"run_id": run.run_id, "action": action}
-    verb = "Approve & send to CRM" if action == "approve" else "Dismiss"
+    verb = "Approve & file with the bank" if action == "approve" else "Dismiss"
     card = (f'{_mini_run(run)}'
             f'<div class="proposal" id="prop-{pid}">'
             f'<button class="btn primary" onclick="confirmProposal(\'{pid}\')">{verb}</button>'
             f'<button class="btn ghost" onclick="cancelProposal(\'{pid}\')">Cancel</button></div>')
-    return (f"Here is the {COMP.get(run.competitor_id)} counter. Confirm to "
+    return (f"Here is the {COMP.get(run.reason_code)} response. Confirm to "
             f"{'approve it' if action == 'approve' else 'dismiss it'} — nothing "
             f"happens until you do.", card, pid)
 
 
 HELP = ("I answer from the ledger, never from memory. Try: "
         "<b>what's awaiting review?</b> · <b>how are the metrics?</b> · "
-        "<b>show runs against Acme</b> · <b>which proof points are winning?</b> · "
-        "<b>anything for the PMM?</b> · <b>approve the RivalSoft one</b>")
+        "<b>show goods-not-received runs</b> · <b>which evidence is winning?</b> · "
+        "<b>anything escalated?</b> · <b>approve the duplicate-charge one</b>")
 
 
 def _keyword_route(text: str):
-    t = text.lower()
-    if "shadow" in t or "would have sent" in t or "would have gone" in t:
+    t = text.lower().replace("-", " ")
+    if "shadow" in t or "would have filed" in t or "would have sent" in t or "would have gone" in t:
         return "shadow", {"competitor": None}
-    comp = next((c.id for c in WORLD.d.policy.competitors
-                 if any(n.lower() in t for n in c.names + [c.id])), None)
+    comp = next((dr.code for dr in WORLD.d.policy.dispute_reasons
+                 if dr.label.lower() in t
+                 or dr.id.replace("_", " ") in t
+                 or COMP.get(dr.code, "").lower() in t), None)
     args = {"competitor": comp}
-    if any(w in t for w in ("approve", "send it", "ship it")):
+    if any(w in t for w in ("approve", "send it", "ship it", "file it")):
         return "approve", args
     if any(w in t for w in ("dismiss", "reject")):
         return "dismiss", args
@@ -3429,11 +3392,11 @@ def _keyword_route(text: str):
     if any(w in t for w in ("metric", "correction", "usage", "precision",
                             "latency", "how are we", "how is", "kpi")):
         return "metrics", args
-    if any(w in t for w in ("evidence", "winning", "win rate", "argument")):
+    if any(w in t for w in ("evidence", "winning", "win rate", "argument", "proof")):
         return "evidence", args
-    if any(w in t for w in ("escalat", "pmm", "timeout", "stuck")):
+    if any(w in t for w in ("escalat", "timeout", "stuck", "for ops")):
         return "escalations", args
-    if comp or any(w in t for w in ("run", "ledger", "history", "deal")):
+    if comp or any(w in t for w in ("run", "ledger", "history", "dispute", "order")):
         return "runs", args
     return "help", args
 
@@ -3448,13 +3411,14 @@ def _llm_route(text: str):
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=get_secret("anthropic"))
-        comp_ids = [c.id for c in WORLD.d.policy.competitors]
+        comp_ids = [dr.code for dr in WORLD.d.policy.dispute_reasons]
         resp = client.messages.create(
             model="claude-haiku-4-5", max_tokens=256,
-            system=("Route a GTM operator's chat message to one tool. Tools: "
-                    "queue (what awaits review), metrics, runs (list/history), "
-                    "evidence (which arguments win), escalations (PMM items), "
-                    "approve, dismiss, help. competitor must be one of "
+            system=("Route a merchant operator's chat message to one tool. "
+                    "Tools: queue (what awaits review), metrics, runs "
+                    "(list/history), evidence (which proofs win disputes), "
+                    "escalations (items for ops), approve, dismiss, help. "
+                    "competitor is the dispute reason code, one of "
                     f"{comp_ids} or null."),
             messages=[{"role": "user", "content": text}],
             output_config={"format": {"type": "json_schema", "schema": {
@@ -3499,82 +3463,91 @@ def confirm(pid: str) -> dict:
         return {"reply": "That run is no longer awaiting review.", "cards": ""}
     if prop["action"] == "approve":
         WORLD.approve(run, "ask")
-        return {"reply": "Approved — the counter is on the CRM record and the "
-                         "ledger has the row.", "cards": _mini_run(run)}
+        return {"reply": "Approved — the response is filed with the bank and "
+                         "the ledger has the row.", "cards": _mini_run(run)}
     WORLD.reject(run, "ask")
     return {"reply": "Dismissed and recorded.", "cards": _mini_run(run)}
 
 
 # ------------------------------------------------------------- sample data
-# "Load sample data": seeds an empty tenant with competitors, evidence and a
-# few simulated runs through the REAL pipeline, so the whole loop is
+# "Load sample data": seeds an empty tenant with dispute reasons, evidence and
+# a few simulated runs through the REAL pipeline, so the whole loop is
 # experienceable before any keys exist. Each further call simulates one more
-# competitor call. Everything is labeled sample via trigger_source.
+# dispute webhook. Everything is labeled sample via trigger_source.
 _SAMPLE_SCENARIOS = [
-    ("acct_meridian", "acme", "Acme is cheaper",
-     "We are also looking at Acme, honestly they are cheaper.",
-     "On a three-year basis Acme's total cost runs higher once implementation "
-     "and per-seat overage are included; the TCO model and the Forrester note "
-     "put the crossover at month nine for a team this size."),
-    ("acct_helios", "rivalsoft", "RivalSoft's SLA looks stronger",
-     "RivalSoft's uptime SLA looks stronger on paper.",
-     "An SLA is a refund policy, not a reliability record. Measured uptime "
-     "over twelve months ran 99.98% against 99.61%, and the failover reviews "
-     "on G2 describe the difference in practice."),
-    ("acct_quill", "acme", "Acme bundles support free",
-     "Acme bundles support for free, you charge for it.",
-     "Their bundled tier is community-SLA support; the paid comparison is in "
-     "the TCO model, and the Forrester note shows where unbundled support "
-     "lands for teams under fifty seats."),
-    ("acct_vantage", "rivalsoft", "RivalSoft goes live in a week",
-     "RivalSoft say they can go live in a week.",
-     "A one-week go-live claim usually excludes SSO and data migration; the "
-     "uptime comparison and admin reviews cover what week two looks like "
-     "when those are rushed."),
+    # (merchant, reason_code, claim, dispute narrative, drafted response)
+    ("Anokhi Threads", "RG", "Buyer says the lehenga order never arrived",
+     "Chargeback filed: buyer says the lehenga order never arrived.",
+     "The courier proof-of-delivery is signed and GPS-stamped at the "
+     "registered address two days before this dispute was filed; the "
+     "WhatsApp thread includes the buyer's own delivery-day confirmation. "
+     "Both documents are attached to this filing."),
+    ("Dosa Junction", "RD", "Buyer says one order was charged twice",
+     "Chargeback filed: the buyer's statement shows two debits for one order.",
+     "The invoice and the payment gateway agree on a single transaction id "
+     "for this order, and the bank settlement excerpt confirms one debit "
+     "cleared. The second line on the statement is an authorization hold "
+     "that reverses automatically."),
+    ("Meraki Skincare", "RG", "Buyer says the serum refill never showed up",
+     "Chargeback filed: buyer claims the monthly refill was never delivered.",
+     "Delivery proof for the refill shipment is signed and dated, and the "
+     "communication log shows the buyer acknowledging receipt that evening. "
+     "Both attach to this response."),
+    ("Trailhead Gear", "RD", "Buyer's bank flagged a repeat charge",
+     "Chargeback filed: the issuing bank flagged a duplicate charge on the "
+     "trekking-pole order.",
+     "One gateway transaction id maps to one settled debit for this order; "
+     "the invoice and the bank excerpt agree, and no second capture exists "
+     "in the settlement record."),
 ]
 _sample_counters: dict[str, int] = {}
 
 
 def load_sample(tid: str, email: str) -> str:
-    """Seed (idempotently) and simulate one competitor call for this tenant.
+    """Seed (idempotently) and simulate one dispute webhook for this tenant.
     Returns the created run's id ('' if nothing fired)."""
     ctx = TENANTS.get(tid)
     d = WORLD.d
-    if not ctx.policy.competitors:
+    if not ctx.policy.dispute_reasons:
         ctx.policy = Policy(
             policy_version="pol_sample_1", tenant_id=tid,
-            competitors=[Competitor(id="acme", names=["Acme", "Acme Corp"]),
-                         Competitor(id="rivalsoft", names=["RivalSoft"])],
+            dispute_reasons=[
+                DisputeReason(id="goods_not_received", code="RG",
+                              label="Goods/services not received"),
+                DisputeReason(id="duplicate_charge", code="RD",
+                              label="Duplicate charge"),
+            ],
             banned_terms=["best", "leading", "number one"], holdout_pct=0)
-    ctx.enrolled_reps.add(email)
+    ctx.enrolled_merchants.add(email)
     pipe = pipeline_for(tid)
     pipe.d.policy = ctx.policy
-    pipe.d.enrolled_reps = ctx.enrolled_reps
+    pipe.d.enrolled_merchants = ctx.enrolled_merchants
     if not any(e.tenant_id == tid for e in d.evidence):
         for e in [ev for ev in d.evidence if ev.tenant_id == "t1"]:
             d.evidence.append(EvidenceItem(
-                e.evidence_id + "_" + tid[:8], tid, e.competitor_id,
-                e.claim_class, e.text, e.source_url))
+                e.evidence_id + "_" + tid[:8], tid, e.reason_code,
+                e.evidence_type, e.text, e.source_url))
         pipe.d.evidence = d.evidence
     n = _sample_counters.get(tid)
     if n is None:
         n = sum(1 for r in d.ledger.runs.values()
                 if r.tenant_id == tid and r.trigger_source == "sample")
-    acct, comp, claim, text, counter = _SAMPLE_SCENARIOS[n % len(_SAMPLE_SCENARIOS)]
+    acct, reason_code, claim, text, counter = _SAMPLE_SCENARIOS[n % len(_SAMPLE_SCENARIOS)]
     _sample_counters[tid] = n + 1
-    opp = f"opp_{tid[:6]}_{n}"
-    d.crm.opportunities[opp] = {"stage": "evaluation", "amount_band": "50-100k"}
+    order = f"order_{tid[:6]}_{n}"
+    d.crm.opportunities[order] = {"stage": "evaluation", "amount_band": "1k-3k"}
     d.clock.advance(hours=2)
     d.llm.mention = {"is_competitive": True, "claim_text": claim, "confidence": .9}
     d.llm.claim = {"claim_text": claim, "speaker_role": "buyer", "confidence": .9}
     cites = [e.evidence_id for e in d.evidence
-             if e.tenant_id == tid and e.competitor_id == comp][:2]
+             if e.tenant_id == tid and e.reason_code == reason_code][:2]
     d.llm.draft = {"counter_text": counter, "cited_evidence_ids": cites,
                    "confidence": .82, "escalate": False}
     run = pipe.handle_event(TriggerEvent(
         tenant_id=tid, source="sample", source_ref=f"sample_{tid}_{n}",
-        occurred_at=d.clock.now(), opportunity_id=opp, account_id=acct,
-        rep_user_id=email, text=text))
+        occurred_at=d.clock.now(), order_id=order, merchant_id=email,
+        dispute_id=f"dp_sample_{tid[:6]}_{n}", reason_code=reason_code,
+        text=text))
     return run.run_id if run else ""
 
 
@@ -3634,8 +3607,8 @@ def conv_list_html(tid: str, active: str = "") -> str:
 
 def seed_conversations() -> None:
     """The demo account's chat history: live ledger answers plus exchanges
-    grounded in the GTM field notes (signal hit-rates, benchmarks, channel
-    economics, failure rules) — a believable PMM's week."""
+    grounded in Dispute Defender's operating rules (deadlines, evidence
+    coverage, edit-learning) — a believable merchant week."""
     def live(title, q, pin=False):
         c = _new_conv("t1", title, pin)
         r = ask(q)
@@ -3651,50 +3624,42 @@ def seed_conversations() -> None:
 
     live("My review queue", "What's awaiting review?", pin=True)
     authored(
-        "Which signals actually convert", "Which signals actually convert?",
-        "The two strongest triggers in the library: <b>docs-page visits from an "
-        "account</b> (very high hit-rate vs closed-won, but a 7&ndash;14 day decay "
-        "&mdash; move fast) and an <b>API key generated with low usage</b> "
-        "(3&ndash;7 days, treat as urgent). Job posts for a specific function and "
-        "tech-stack swaps both run high with longer windows. <b>Funding is a "
-        "ranking filter, never a trigger</b> &mdash; 180-day decay, low hit-rate. "
-        "Rule: a trigger is a reason to reach out today; a filter only orders "
-        "the list.", pin=True)
-    live("Evidence that wins deals", "Which evidence is winning?", pin=True)
+        "Why do deadlines matter so much?", "What happens if we miss a dispute deadline?",
+        "A missed deadline is an automatic loss &mdash; the bank rules for the "
+        "buyer and the money is gone, no matter how strong your evidence was. "
+        "That is why <b>disputes are never held out</b>, why an unanswered "
+        "card escalates to ops at 24h instead of expiring silently, and why "
+        "the filing step is exactly-once with the deadline stamped on the "
+        "run.", pin=True)
+    live("Evidence that wins disputes", "Which evidence is winning?", pin=True)
 
     approved = sum(1 for r in WORLD.d.ledger.runs.values()
                    if r.gate_action is not None
                    and r.gate_action.value in ("approve", "edit"))
     authored(
-        "Automate the RivalSoft play?", "Can we automate the RivalSoft counters yet?",
-        f"Not yet. The rule is <b>20&ndash;30 approved manual reps before any play "
-        f"automates</b> &mdash; it exists because a trigger once fired on an event "
-        f"that had not happened and cost an account. You are at "
+        "Automate dispute filing?", "Can we automate the dispute responses yet?",
+        f"Not yet. The rule is <b>20&ndash;30 approved manual responses before "
+        f"anything automates</b> &mdash; it exists so the drafter earns trust "
+        f"on your own dispute history, not a demo. You are at "
         f"<b>{approved} of 20</b> approved runs; the Conductor unlocks "
-        f"auto-drafting when the count clears and your edit rate stays flat.")
+        f"auto-drafting when the count clears and your edit rate stays flat. "
+        f"Filing itself always keeps the approval gate.")
     authored(
-        "Acme's discount pattern", "How often does Acme lead with a discount?",
-        "Price-led in most recent Acme moments &mdash; quoted-under-list, "
-        "bundled support, or a signing discount at the wire. The counter that "
-        "survived every one is the <b>3-year cost model</b>: the crossover "
-        "lands near month nine regardless of the discount size. Reps shipped "
-        "it unedited in all but two cases, both style edits.")
+        "Goods-not-received pattern", "What wins goods-not-received disputes?",
+        "The pair that survives every round: the <b>courier proof-of-delivery "
+        "(signed + GPS-stamped)</b> and the <b>buyer's own WhatsApp "
+        "confirmation</b> from delivery day. Merchants filed that pack "
+        "unedited in all but two cases, both style edits. A POD alone wins "
+        "less often than POD plus the comms log.")
     authored(
-        "Who edits the drafts?", "Which reps edit the drafts most?",
-        "<b>Jordan Lee</b> edits most &mdash; about 1 in 3 drafts, all style "
-        "(tone, greeting). <b>Priya Sharma</b> ships as-is. One <b>material</b> "
-        "edit this quarter: a corrected SLA number, and that correction was "
-        "written back to the battlecard so no later draft repeated it. "
-        "Material edits are the learning signal; style edits are free.")
-    authored(
-        "When does lift read out?", "When does the Scoreboard read out?",
-        "The Scoreboard will not claim causation before it has volume: the "
-        "holdout arm sits out <b>1 in 10</b> competitive moments, and a lift "
-        "read needs roughly <b>30 deals</b> through both arms. Until then the "
-        "number that prices the work is <b>work accepted</b> &mdash; counters "
-        "reps actually used &mdash; and a null result, if that is what lands, "
-        "ships anyway.")
-    live("Runs against Acme", "Show runs against Acme")
+        "Who edits the drafts?", "Which merchants edit the drafts most?",
+        "<b>Kavali Kitchens</b> edits most &mdash; about 1 in 3 drafts, mostly "
+        "style. <b>Loomcraft Textiles</b> files as-is. One <b>material</b> "
+        "edit this quarter: a bank reference number the draft lacked, and "
+        "that correction was written back to the evidence vault so no later "
+        "draft repeated it. Material edits are the learning signal; style "
+        "edits are free.")
+    live("Goods-not-received runs", "Show goods-not-received runs")
     live("Escalations this week", "escalations")
 
 
@@ -3731,7 +3696,7 @@ def _polish_reply(question: str, res: dict) -> dict:
 CHAT_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay SuperAgent — Command</title>
+<title>Relay — Command</title>
 <style>
 :root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
 --accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
@@ -4049,7 +4014,7 @@ function cancelProposal(pid){
 </body></html>"""
 
 
-def _briefing(tid: str, persona: str = "rep") -> tuple[str, str, list[str]]:
+def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
     """Greeting, one-line state summary, and prompt chips — computed from the
     ledger, not hardcoded. The home is a briefing officer, not a chatbox."""
     from datetime import datetime as _dt
@@ -4064,7 +4029,7 @@ def _briefing(tid: str, persona: str = "rep") -> tuple[str, str, list[str]]:
     hour = _dt.now().hour
     tod = "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
 
-    if persona == "pmm":
+    if persona == "ops":
         ev_n = len([e for e in WORLD.d.evidence if e.tenant_id == tid])
         notes = [m for m in led.memory if m.tenant_id == tid
                  and m.superseded_by is None]
@@ -4072,22 +4037,22 @@ def _briefing(tid: str, persona: str = "rep") -> tuple[str, str, list[str]]:
         material = sum(1 for r in edits if r.gate_is_material)
         bits = [f"<b>{esc_n}</b> escalation{'s' if esc_n != 1 else ''} need you"
                 if esc_n else "no escalations",
-                f"battlecards: <b>{ev_n}</b> proofs, <b>{len(notes)}</b> voice notes",
+                f"evidence vault: <b>{ev_n}</b> proofs, <b>{len(notes)}</b> voice notes",
                 f"<b>{material}</b> material edit{'s' if material != 1 else ''} to learn from"]
-        chips = ["Show escalations", "Which proof points are winning?",
-                 "What did reps change in our drafts?"]
+        chips = ["Show escalations", "Which evidence is winning?",
+                 "What did merchants change in our drafts?"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
-    if persona == "lead":
-        won_total = sum((led.outcome_for(r.run_id).outcome_value or {}).get("amount") or 0
+    if persona == "finance":
+        won_total = sum((led.outcome_for(r.run_id).outcome_value or {}).get("amount_paise") or 0
                         for r in runs
                         if led.outcome_for(r.run_id)
                         and (led.outcome_for(r.run_id).outcome_value or {}).get("won"))
         gated = [r for r in runs if r.gate_action is not None]
         used = sum(1 for r in gated if r.gate_action is not GateAction.REJECT)
         adopt = f"{100 * used // len(gated)}%" if gated else "&mdash;"
-        bits = [f"<b>${won_total:,.0f}</b> closed-won with defended moments",
-                f"<b>{adopt}</b> of counters used by reps",
-                "Scoreboard: lift reads out once the holdout has volume"]
+        bits = [f"<b>&#8377;{won_total / 100:,.0f}</b> disputes won this quarter",
+                f"<b>{adopt}</b> of responses used by merchants",
+                "win-rate by reason code reads out once volume builds"]
         chips = ["What closed recently?", "How is adoption trending?",
                  "Show the pipeline"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
@@ -4095,10 +4060,10 @@ def _briefing(tid: str, persona: str = "rep") -> tuple[str, str, list[str]]:
         would = sum(1 for row in SHADOW_ROWS if row[4] == "send")
         bits = [f"<b>{len(runs)}</b> runs through the pipeline, "
                 f"<b>{esc_n}</b> escalated",
-                "connectors: <b>4/4</b> healthy (Fathom, Slack, HubSpot, Gmail)",
-                f'<a href="/shadow">shadow scan: <b>{would}</b> counters it '
-                f'would have sent</a>']
-        chips = ["What would have sent last night?", "How are the metrics?",
+                "connectors: <b>4/4</b> healthy (bank webhook, Slack, CRM, email)",
+                f'<a href="/shadow">shadow scan: <b>{would}</b> responses it '
+                f'would have filed</a>']
+        chips = ["What would have filed last night?", "How are the metrics?",
                  "Show the run ledger"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
     bits, chips = [], []
@@ -4109,29 +4074,29 @@ def _briefing(tid: str, persona: str = "rep") -> tuple[str, str, list[str]]:
                   else f"oldest {h}h" if h
                   else f"oldest {int(age.total_seconds() // 60)}m")
         bits.append(f'<a href="/approvals"><b>{len(waiting)}</b> '
-                    f"counter-draft{'s' if len(waiting) > 1 else ''} "
+                    f"dispute response{'s' if len(waiting) > 1 else ''} "
                     f"awaiting your approval ({oldest})</a>")
         chips.append("What&rsquo;s awaiting review?")
-        comp = COMP.get(waiting[0].competitor_id, waiting[0].competitor_id)
+        comp = COMP.get(waiting[0].reason_code, waiting[0].reason_code)
         chips.append(f"Approve {esc(comp)} at {esc(_account_label(waiting[0]))}")
     if esc_n:
-        bits.append(f"<b>{esc_n}</b> escalation{'s' if esc_n > 1 else ''} for the PMM")
+        bits.append(f"<b>{esc_n}</b> escalation{'s' if esc_n > 1 else ''} for ops")
         chips.append("Show escalations")
     for r, out in wins[:1]:
         v = (out.outcome_value or {}) if out else {}
         if v.get("won"):
-            bits.append(f"<b>{esc(_account_label(r))}</b> closed won "
-                        f"${v.get('amount', 0) / 1000:.0f}k")
+            bits.append(f"<b>{esc(_account_label(r))}</b> won a "
+                        f"&#8377;{v.get('amount_paise', 0) / 100000:.0f}k dispute")
             chips.append("What closed recently?")
     if not bits:
         bits.append("your workspace is quiet &mdash; load sample data below, "
                     "or connect your rails in Settings")
         chips = ["What can you do?", "Show the ledger"]
-    chips.append("Which proof points are winning?")
+    chips.append("Which evidence is winning?")
     return (f"Good {tod}", ", ".join(bits[:3]) + ".", chips[:4])
 
 
-def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "rep") -> str:
+def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner") -> str:
     c = CONVS.get(conv_id)
     if c and c["tenant"] != tid:
         c = None
@@ -4142,8 +4107,8 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     greet, brief, chips = _briefing(tid, persona)
     pills = "".join(
         f'<a class="{"on" if persona == k else ""}" href="/?as={k}">{t}</a>'
-        for k, t in (("rep", "Rep"), ("pmm", "PMM"), ("lead", "GTM lead"),
-                      ("builder", "Builder")))
+        for k, t in (("owner", "Owner"), ("ops", "Ops lead"),
+                     ("finance", "Finance lead"), ("builder", "Builder")))
     role_html = f'<div class="rolepills"><span>View as</span>{pills}</div>' 
     name = (CONVS and "") or ""
     chips_html = "".join(
@@ -4175,16 +4140,16 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     sample_html = "" if has_runs else (
         '<form method="post" action="/api/sample" class="samplecta">'
         '<button class="btn primary">See it working &mdash; load sample data</button>'
-        '<span class="mut">Simulates a competitor call through the real '
-        'pipeline. Nothing sends anywhere.</span></form>')
+        '<span class="mut">Simulates a dispute webhook through the real '
+        'pipeline. Nothing files anywhere.</span></form>')
     waiting = sorted((r for r in WORLD.d.ledger.runs.values()
                       if r.tenant_id == tid and r.state is RunState.AWAITING_GATE),
                      key=lambda r: r.occurred_at, reverse=True)[:5]
     rows = "".join(
         f'<a class="arow" href="/tasks">{ICONS["bolt"]}'
-        f'<span>Counter to {esc(COMP.get(r.competitor_id, r.competitor_id))}&rsquo;s '
+        f'<span>Response to the {esc(COMP.get(r.reason_code, r.reason_code))} dispute '
         f'&ldquo;{esc(r.claim_text)}&rdquo;'
-        f'<span class="sub">rep {esc(REP.get(r.rep_user_id, r.rep_user_id))} &middot; '
+        f'<span class="sub">merchant &middot; '
         f'{_logo(_account_label(r))}{esc(_account_label(r))}</span></span>'
         f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>'
         for r in waiting)
@@ -4209,5 +4174,5 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
 
 if __name__ == "__main__":
     seed_conversations()
-    print(f"Relay SuperAgent workspace on http://localhost:{PORT}")
+    print(f"Relay workspace on http://localhost:{PORT}")
     HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

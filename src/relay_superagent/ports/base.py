@@ -22,19 +22,24 @@ class LlmUnavailable(Exception):
 class LlmPort(Protocol):
     """One narrow method per seam (§9.3), so each can be scripted, evaluated and
     swapped independently. A single free-form `complete()` would smear the five
-    seams back into one untestable blob."""
+    seams back into one untestable blob. Method names are the stable interface;
+    what flows through them is Dispute Defender data — a dispute narrative and
+    an evidence-backed response, not a competitive counter."""
 
-    def confirm_mention(self, text: str, competitor_names: list[str]) -> dict[str, Any]:
-        """→ {is_competitive: bool, claim_text: str|None, confidence: float}"""
+    def confirm_mention(self, text: str, reason_labels: list[str]) -> dict[str, Any]:
+        """Confirms this is a genuine, actionable dispute — not spam or a
+        duplicate webhook redelivery. → {is_competitive: bool, claim_text:
+        str|None, confidence: float}"""
         ...
 
-    def extract_claim(self, text: str, competitor_id: str) -> dict[str, Any]:
-        """→ {competitor_id, claim_text, speaker_role, confidence}"""
+    def extract_claim(self, text: str, reason_code: str) -> dict[str, Any]:
+        """→ {reason_code, claim_text, speaker_role, confidence}"""
         ...
 
     def draft_counter(self, claim: str, deal: dict, evidence: list[dict],
                       memory: list[dict]) -> dict[str, Any]:
-        """→ {counter_text, cited_evidence_ids, confidence, escalate}"""
+        """Drafts the evidence-backed dispute response. → {counter_text,
+        cited_evidence_ids, confidence, escalate}"""
         ...
 
     def judge(self, claim: str, counter: str, register_ref: str) -> dict[str, int]:
@@ -53,14 +58,14 @@ class LlmPort(Protocol):
         ...
 
 class CrmPort(Protocol):
-    def opportunity(self, opportunity_id: str) -> dict[str, Any] | None: ...
-    def deal_context(self, opportunity_id: str) -> dict[str, Any]: ...
-    def write_note(self, opportunity_id: str, text: str) -> str: ...
+    def opportunity(self, order_id: str) -> dict[str, Any] | None: ...
+    def deal_context(self, order_id: str) -> dict[str, Any]: ...
+    def write_note(self, order_id: str, text: str) -> str: ...
 
-    def open_deal_for_account(self, account_id: str) -> str | None:
-        """Email triggers arrive with no deal attached; this resolves the
-        account (a domain, a company record) to its open deal, or None —
-        and None still suppresses, exactly as before."""
+    def open_deal_for_account(self, merchant_id: str) -> str | None:
+        """Some trigger sources arrive with no order ref attached; this
+        resolves the merchant to its matching open order, or None — and
+        None still suppresses, exactly as before."""
         ...
 
 

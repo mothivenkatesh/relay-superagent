@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "relay-superagent-demo",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "demo/server.py"],
+      "port": 8787
+    }
+  ]
+}

@@ -25,7 +25,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from relay_superagent.domain.models import Arm, GateAction, MemoryNote, Outcome, Run, RunState, sha
+from relay_superagent.domain.models import AgentType, Arm, GateAction, MemoryNote, Outcome, Run, RunState, sha
 from relay_superagent.ledger import DuplicateRun
 
 _NS = uuid.UUID("6b1e5a52-0000-4000-8000-c0a2a23e0000")
@@ -39,9 +39,9 @@ def _tid(tenant_id: str) -> uuid.UUID:
         return uuid.uuid5(_NS, tenant_id)
 
 
-_RUN_COLS = """run_id, tenant_id, loop, idempotency_key, status, suppressed_reason,
-trigger_source, trigger_ref, occurred_at, opportunity_id, account_id, rep_user_id,
-competitor_id, claim_hash, claim_text, retrieved_refs, decision, evidence,
+_RUN_COLS = """run_id, tenant_id, loop, agent_type, idempotency_key, status, suppressed_reason,
+trigger_source, trigger_ref, occurred_at, order_id, merchant_id, dispute_id,
+reason_code, deadline_at, claim_hash, claim_text, retrieved_refs, decision, evidence,
 policy_version, arm, gate_actor, gate_action, gate_diff, gate_is_material,
 gate_latency_ms, gated_at, surfaced_at, acted_at, act_ref, cost_tokens"""
 
@@ -61,12 +61,12 @@ class PgLedger:
             self.conn.execute(
                 f"""INSERT INTO run ({_RUN_COLS}) VALUES
                     (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                     %s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                [uuid.UUID(run.run_id), _tid(run.tenant_id), run.loop,
+                     %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                [uuid.UUID(run.run_id), _tid(run.tenant_id), run.loop, run.agent_type.value,
                  run.idempotency_key, run.state.value, run.suppressed_reason,
                  run.trigger_source, run.trigger_ref, run.occurred_at,
-                 run.opportunity_id, run.account_id, run.rep_user_id,
-                 run.competitor_id, run.claim_hash, run.claim_text,
+                 run.order_id, run.merchant_id, run.dispute_id,
+                 run.reason_code, run.deadline_at, run.claim_hash, run.claim_text,
                  Jsonb(run.retrieved_refs), Jsonb(run.decision), Jsonb(run.evidence),
                  run.policy_version, run.arm.value,
                  run.gate_actor,
@@ -122,9 +122,11 @@ class PgLedger:
             trigger_source=row["trigger_source"], trigger_ref=row["trigger_ref"],
             occurred_at=row["occurred_at"], policy_version=row["policy_version"],
             arm=Arm(row["arm"]), loop=row["loop"],
+            agent_type=AgentType(row["agent_type"]),
             suppressed_reason=row["suppressed_reason"],
-            opportunity_id=row["opportunity_id"], account_id=row["account_id"],
-            rep_user_id=row["rep_user_id"], competitor_id=row["competitor_id"],
+            order_id=row["order_id"], merchant_id=row["merchant_id"],
+            dispute_id=row["dispute_id"], reason_code=row["reason_code"],
+            deadline_at=row["deadline_at"],
             claim_hash=row["claim_hash"], claim_text=row["claim_text"],
             retrieved_refs=row["retrieved_refs"] or {},
             decision=row["decision"], evidence=row["evidence"] or [],

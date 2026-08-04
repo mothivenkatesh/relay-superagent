@@ -29,29 +29,32 @@ class ScriptedLlm:
     so scripted responses are all the model a test needs."""
 
     mention: dict[str, Any] = field(default_factory=lambda: {
-        "is_competitive": True, "claim_text": "Acme is cheaper", "confidence": 0.9})
+        "is_competitive": True, "claim_text": "Buyer says the order never arrived",
+        "confidence": 0.9})
     claim: dict[str, Any] = field(default_factory=lambda: {
-        "claim_text": "Acme is cheaper", "speaker_role": "buyer", "confidence": 0.9})
+        "claim_text": "Buyer says the order never arrived", "speaker_role": "buyer",
+        "confidence": 0.9})
     draft: dict[str, Any] = field(default_factory=lambda: {
-        "counter_text": "On a three year basis Acme's total cost runs higher once "
-                        "implementation and per-seat overage are included; see the "
-                        "TCO comparison and the Forrester note." + " " * 40,
+        "counter_text": "Delivery was completed and signed for on the date shown "
+                        "in the courier's proof-of-delivery record; the invoice "
+                        "and the WhatsApp confirmation with the buyer corroborate "
+                        "this order was fulfilled." + " " * 20,
         "cited_evidence_ids": ["ev_tco", "ev_forrester"],
         "confidence": 0.8, "escalate": False})
     verdict: dict[str, int] = field(default_factory=lambda: {
         "addresses_claim": 5, "matches_register": 5, "evidence_grounded": 5})
     diff: dict[str, Any] = field(default_factory=lambda: {
-        "changed": ["tightened second sentence"], "implies": "prefers shorter counters",
+        "changed": ["tightened second sentence"], "implies": "prefers shorter responses",
         "example": "…", "is_material": False})
     calls: list[tuple[str, dict]] = field(default_factory=list)
 
-    def confirm_mention(self, text, competitor_names):
+    def confirm_mention(self, text, reason_labels):
         self.calls.append(("confirm_mention", {"text": text}))
         return self.mention
 
-    def extract_claim(self, text, competitor_id):
-        self.calls.append(("extract_claim", {"competitor_id": competitor_id}))
-        return {"competitor_id": competitor_id, **self.claim}
+    def extract_claim(self, text, reason_code):
+        self.calls.append(("extract_claim", {"reason_code": reason_code}))
+        return {"reason_code": reason_code, **self.claim}
 
     def draft_counter(self, claim, deal, evidence, memory):
         self.calls.append(("draft_counter", {"claim": claim, "memory": list(memory)}))
@@ -83,23 +86,24 @@ class FakeCrm:
     notes: list[tuple[str, str]] = field(default_factory=list)
     deals_by_account: dict[str, str] = field(default_factory=dict)
 
-    def opportunity(self, opportunity_id):
-        return self.opportunities.get(opportunity_id)
+    def opportunity(self, order_id):
+        return self.opportunities.get(order_id)
 
-    def open_deal_for_account(self, account_id):
-        return self.deals_by_account.get(account_id)
+    def open_deal_for_account(self, merchant_id):
+        return self.deals_by_account.get(merchant_id)
 
-    def deal_context(self, opportunity_id):
-        opp = self.opportunities.get(opportunity_id) or {}
+    def deal_context(self, order_id):
+        opp = self.opportunities.get(order_id) or {}
         return {"stage": opp.get("stage"), "amount_band": opp.get("amount_band", "unknown"),
-                "competitor_history": opp.get("competitor_history", []), "prior_losses": []}
+                "prior_dispute_history": opp.get("prior_dispute_history", []),
+                "prior_losses": []}
 
-    def write_note(self, opportunity_id, text):
-        self.notes.append((opportunity_id, text))
+    def write_note(self, order_id, text):
+        self.notes.append((order_id, text))
         return f"note_{len(self.notes)}"
 
-    def close(self, opportunity_id, won: bool):
-        self.opportunities[opportunity_id]["stage"] = "closed_won" if won else "closed_lost"
+    def close(self, order_id, won: bool):
+        self.opportunities[order_id]["stage"] = "closed_won" if won else "closed_lost"
 
 
 @dataclass

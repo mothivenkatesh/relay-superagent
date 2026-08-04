@@ -1,6 +1,7 @@
-"""The HubSpot rail on a stub transport: id parsing from record URLs,
-stage normalization, the note-with-association act, and the company-domain
-→ open-deal seam. No network, no token."""
+"""The HubSpot rail (inherited reference material) on a stub transport: id
+parsing from record URLs, stage normalization, the note-with-association act
+that would file a dispute response, and the merchant-domain → open-order
+seam. No network, no token."""
 
 from __future__ import annotations
 
@@ -88,11 +89,11 @@ def test_401_names_the_fix():
 def test_write_note_posts_body_and_deal_association_214():
     client_routes = {"POST /crm/v3/objects/notes": {"id": "note_9"}}
     h = hs(client_routes)
-    ref = h.write_note("https://app.hubspot.com/deals/789", "the counter text")
+    ref = h.write_note("https://app.hubspot.com/deals/789", "the response text")
     assert ref == "note_9"
     call = h.client.calls[0]
     body = call["json"]
-    assert body["properties"]["hs_note_body"] == "the counter text"
+    assert body["properties"]["hs_note_body"] == "the response text"
     assert body["properties"]["hs_timestamp"]
     assoc = body["associations"][0]
     assert assoc["to"]["id"] == "789"

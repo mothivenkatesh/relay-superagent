@@ -42,7 +42,7 @@ def trigger_precision(ledger: Ledger, tenant_id: str) -> float | None:
     """Share of triggered runs not suppressed as irrelevant. Suppressions for
     caps, holdout and dedupe are policy, not noise, so they don't count against
     precision."""
-    noise_reasons = {"not_competitive"}
+    noise_reasons = {"not_actionable"}
     triggered = ledger.runs_for_tenant(tenant_id)
     if not triggered:
         return None

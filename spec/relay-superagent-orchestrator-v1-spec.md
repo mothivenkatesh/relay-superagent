@@ -1,4 +1,4 @@
-# Relay SuperAgent Agent Orchestrator — Engineering Spec
+# Relay Agent Orchestrator — Engineering Spec
 
 Build agents by prompting. A GTM operator with zero technical skill
 describes a job in plain language; the Orchestrator compiles it into a

@@ -1,6 +1,13 @@
 """The Fathom rail on pure functions: Svix-style signature verification,
 payload → TriggerEvent mapping against the shape from Fathom's own OpenAPI
-example, and the payload driven end-to-end through the pipeline on fakes."""
+example, and the payload driven end-to-end through the pipeline on fakes.
+
+Fathom call recordings are inherited reference material — real disputes
+arrive as structured bank/processor webhooks with reason_code already
+attached, not a transcript to scan. `to_trigger_event` here takes an
+explicit `reason_code` the way a real caller would supply one from call
+notes; when none is given the mapping still succeeds but the pipeline
+produces no row, exactly as `classify_dispute` intends."""
 
 from __future__ import annotations
 
@@ -70,7 +77,7 @@ def test_secret_without_whsec_prefix_is_treated_as_raw_base64():
 
 
 # -- mapping ------------------------------------------------------------------
-# The shape from Fathom's OpenAPI `newMeeting` example, competitor injected.
+# The shape from Fathom's OpenAPI `newMeeting` example, dispute narrative injected.
 
 PAYLOAD = {
     "title": "Quarterly Business Review",
@@ -81,11 +88,11 @@ PAYLOAD = {
     "transcript": [
         {"speaker": {"display_name": "Jane Doe",
                      "matched_calendar_invitee_email": "jane@client.com"},
-         "text": "We're also looking at Acme, and honestly they are cheaper.",
+         "text": "The order never arrived, I want to dispute the charge.",
          "timestamp": "00:05:32"},
         {"speaker": {"display_name": "Alice Johnson",
                      "matched_calendar_invitee_email": "alice@ours.com"},
-         "text": "Happy to walk through the numbers.",
+         "text": "Happy to pull the delivery record for you.",
          "timestamp": "00:05:40"},
     ],
     "calendar_invitees": [
@@ -101,35 +108,35 @@ PAYLOAD = {
                       "record_url": "https://app.hubspot.com/contacts/123"}],
         "companies": [{"name": "Client Corp",
                        "record_url": "https://app.hubspot.com/companies/456"}],
-        "deals": [{"name": "Q3 Renewal", "amount": 50000,
+        "deals": [{"name": "Order 789", "amount": 50000,
                    "record_url": "https://app.hubspot.com/deals/789"}],
     },
 }
 
 
 def test_maps_the_openapi_example_shape():
-    ev = to_trigger_event(PAYLOAD, "t1", rep_directory={"alice@ours.com": "rep_7"})
+    ev = to_trigger_event(PAYLOAD, "t1", reason_code="RG")
     assert ev.source == "fathom"
     assert ev.source_ref == "https://fathom.video/xyz123"
-    assert ev.opportunity_id == "https://app.hubspot.com/deals/789"
-    assert ev.account_id == "https://app.hubspot.com/companies/456"
-    assert ev.rep_user_id == "rep_7"
+    assert ev.order_id == "https://app.hubspot.com/deals/789"
+    assert ev.merchant_id == "https://app.hubspot.com/companies/456"
+    assert ev.reason_code == "RG"
     assert ev.occurred_at.isoformat() == "2026-08-03T10:00:55+00:00"
-    assert "Jane Doe: We're also looking at Acme" in ev.text
-    assert "Alice Johnson: Happy to walk through" in ev.text
+    assert "Jane Doe: The order never arrived" in ev.text
+    assert "Alice Johnson: Happy to pull the delivery record" in ev.text
 
 
-def test_unknown_rep_email_passes_through_for_enrollment_check_to_decide():
-    ev = to_trigger_event(PAYLOAD, "t1", rep_directory={})
-    assert ev.rep_user_id == "alice@ours.com"
+def test_reason_code_defaults_to_none_when_not_supplied():
+    ev = to_trigger_event(PAYLOAD, "t1")
+    assert ev.reason_code is None
 
 
-def test_account_falls_back_to_external_invitee_domain():
+def test_merchant_falls_back_to_external_invitee_domain():
     p = copy.deepcopy(PAYLOAD)
     p["crm_matches"] = {}
     ev = to_trigger_event(p, "t1")
-    assert ev.account_id == "client.com"
-    assert ev.opportunity_id is None
+    assert ev.merchant_id == "client.com"
+    assert ev.order_id is None
 
 
 def test_no_transcript_and_no_ref_are_noise_not_errors():
@@ -146,26 +153,25 @@ def test_no_transcript_and_no_ref_are_noise_not_errors():
 def _wire(world):
     """Point the world's fixtures at what the payload carries."""
     world.d.policy = make_policy()
-    world.d.enrolled_reps = {"rep_7"}
+    world.d.enrolled_merchants = {"https://app.hubspot.com/companies/456"}
     world.d.crm.opportunities["https://app.hubspot.com/deals/789"] = {
         "stage": "evaluation", "amount_band": "50-100k",
-        "competitor_history": ["acme"]}
+        "prior_dispute_history": ["RG"]}
 
 
 def test_fathom_payload_reaches_the_gate(world):
     _wire(world)
-    ev = to_trigger_event(PAYLOAD, "t1", rep_directory={"alice@ours.com": "rep_7"})
+    ev = to_trigger_event(PAYLOAD, "t1", reason_code="RG")
     run = world.handle_event(ev)
     assert run.state is RunState.AWAITING_GATE
     assert run.trigger_source == "fathom"
-    assert run.competitor_id == "acme"
+    assert run.reason_code == "RG"
 
 
 def test_redelivery_of_the_same_meeting_is_one_run(world):
     _wire(world)
-    ev = to_trigger_event(PAYLOAD, "t1", rep_directory={"alice@ours.com": "rep_7"})
+    ev = to_trigger_event(PAYLOAD, "t1", reason_code="RG")
     first = world.handle_event(ev)
-    again = world.handle_event(
-        to_trigger_event(PAYLOAD, "t1", rep_directory={"alice@ours.com": "rep_7"}))
+    again = world.handle_event(to_trigger_event(PAYLOAD, "t1", reason_code="RG"))
     assert again.run_id == first.run_id
     assert len(world.d.ledger.runs) == 1

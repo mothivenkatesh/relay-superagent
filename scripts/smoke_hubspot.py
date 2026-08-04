@@ -29,5 +29,5 @@ if not args:
 opp = hs.opportunity(args[0])
 print("deal:", opp)
 if opp and "--note" in args:
-    ref = hs.write_note(args[0], "Relay SuperAgent smoke test note — safe to delete.")
+    ref = hs.write_note(args[0], "Relay smoke test note — safe to delete.")
     print("note written, id:", ref)

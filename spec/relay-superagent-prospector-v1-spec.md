@@ -1,4 +1,4 @@
-# Relay SuperAgent Prospector v1 — Engineering Spec
+# Relay Prospector v1 — Engineering Spec
 
 The second loop. Watcher defends deals that exist; Prospector starts ones that
 don't. Same harness, same ledger, same gate discipline — pointed outward.

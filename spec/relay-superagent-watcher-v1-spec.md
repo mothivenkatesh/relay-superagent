@@ -1,4 +1,4 @@
-# Relay SuperAgent Watcher v1 — Engineering Spec
+# Relay Watcher v1 — Engineering Spec
 
 For implementation. No prior context needed.
 
@@ -278,7 +278,7 @@ Write the result to `memory`, concern `counter_style`, subject the rep.
 
 ## 7. UI layer
 
-Two surfaces, one run. **Slack** for the AE mid-deal. The **Relay SuperAgent workspace** for the operator and PMM doing batch review. The workspace is where you watch the agent work rather than wait for output.
+Two surfaces, one run. **Slack** for the AE mid-deal. The **Relay workspace** for the operator and PMM doing batch review. The workspace is where you watch the agent work rather than wait for output.
 
 **Protocol: AG-UI** ([docs.ag-ui.com](https://docs.ag-ui.com)), over SSE, with CopilotKit React bindings. LangGraph is a first-party AG-UI integration, so this is wiring, not a custom transport.
 

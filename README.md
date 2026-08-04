@@ -1,43 +1,56 @@
-# Relay SuperAgent
+# Relay
 
-**An agentic platform built for SMB teams — where the next customer isn't a person clicking through a workflow, it's an agent doing the work.**
+**Pre-built agents for payment and compliance ops. Or build your own. You approve before anything sends.**
 
-Small business teams (5–10 people) don't want a tool. They're not technical, they can't bring their own API keys, and they don't have anyone whose job it is to configure an integration. What they want is someone — something — that just runs the operations: pull the insights, report what's in flight, take the delegated task and go do it. Relay SuperAgent is that someone: a SuperAgent that scaffolds and runs a fleet of sub-agents on the merchant's behalf, driven entirely by prompting.
+Relay is an agent orchestrator for payments and compliance operations, built for SMB teams (5–10 people). The merchant doesn't configure workflows — they talk to Relay: ask for insights, ask what's in flight, delegate work. A crew of specialist agents runs the operations behind that one conversation, and every action that touches money or a customer waits at a human gate first.
 
-## The four things this is (and the one thing it isn't)
+## The eight agents
 
-1. **Persona: SMB teams of 5–10.** Not enterprise, not solo freelancers. Small enough that nobody owns "the tool," big enough to have real operational surface area (payments, support, ops, insights) that's currently nobody's job.
-2. **Built for agents, not for people clicking buttons.** The platform's primary interface isn't a dashboard a human operates — it's a surface an agent (the SuperAgent, or eventually the merchant's own agents) can act through. Your next customer is an AI agent, not a user persona.
-3. **A SuperAgent, not a single bot.** One entry point scaffolds multiple sub-agents automatically to run operations end-to-end. The merchant's job is to ask — "how are we doing," "what's stuck," "go handle X" — not to configure a pipeline.
-4. **Not a workflow builder.** Workflows are a trap: they turn the product into professional-services-in-disguise, where value is delivered by an implementation partner configuring steps for a fee. This platform runs operations itself. If a workflow surface ever exists, it's a value-added layer on top — never the core product.
+| Agent | For | What it does | Status here |
+|---|---|---|---|
+| **Dispute Defender** | support lead, online merchant | Gathers the evidence, builds the case, files before the deadline | **Wired end-to-end in this repo** |
+| COD Guard | ops lead, COD-heavy D2C | Confirms COD orders before dispatch via WhatsApp/voice, blocks repeat bad addresses | Roadmap |
+| Payment Rescue | growth lead, UPI-heavy store | Reads the decline reason, calls the buyer, sends a retry link | Roadmap |
+| Cart Rescue | growth lead, ad-spending D2C | Calls the buyer in their language on a cart drop, sends a payment link | Roadmap |
+| Settlement Clarity | finance lead, multi-channel merchant | Matches payout → order → bank, flags gaps, posts to books | Roadmap |
+| Refund Shield | risk lead, high-refund D2C | Scores refund claims against cross-merchant fraud signals, holds the risky | Roadmap |
+| Loan Recovery | collections lead, NBFC/lender | On an EMI bounce: verifies, states the EMI, captures consent, acts | Roadmap |
+| Due Diligence | compliance lead, LSP/lender | Verifies on Secure ID, risk-tiers, auto-clears low-risk, escalates EDD | Roadmap |
 
-**The hard constraint from how this class of product actually wins (Lassie/dental-ops precedent):** the customer cannot bring their own keys, cannot configure connectors, and cannot tolerate a setup project. Relay SuperAgent has to hold and manage every credential and integration itself, ship a self-serve onboarding as simple as a Stripe checkout, and get to ~95%+ hands-off automation with a human-escalation path for the tail — not 100% before anything ships. The product is judged on hours of labor it took off the team's plate, not on features it exposes.
+## What's actually built (honest status)
 
-## What's inherited, what's not
+- **The engine, fully tested:** trigger → classify → draft → check → gate → act pipeline as a strict run state-machine; append-only Postgres ledger with row-level security and write-exactly-once gate fields; ports-and-fakes adapters (108 tests run in ~1s with no credentials, including live Postgres contract tests); multi-tenancy; supervisor stall detection; an orchestrator spec for "hire an agent by prompting."
+- **Dispute Defender, domain-complete:** disputes arrive as structured webhooks with a reason code; the agent structures the claim, assembles an evidence pack (delivery proof, invoice, comms log) matched to the reason code, drafts the response, and files it after the merchant approves. Dispute responses are never held out — missing a chargeback deadline is real money, so every dispute is treated.
+- **The demo workspace** (`demo/server.py`): a full merchant workspace — Home (chat), Approvals, Pipeline, Journeys, Evidence, Agents console with all eight agents — seeded with fictional Indian SMB merchants and realistic dispute rows.
+- **Not live:** the connectors run on fakes; no real bank/PG webhook is attached yet.
 
-This repo was scaffolded from [CoMarketer](https://github.com/mothivenkatesh/comarketer), a working GTM-defense agent system — kept because the **harness** is domain-agnostic and genuinely reusable:
+## The rules (enforced by code, not policy)
 
-- **Built and tested, and applies as-is:** the pipeline/run state-machine, ports-and-fakes adapter pattern (every external rail is swappable and tested on fakes in ms), an append-only Postgres ledger with row-level security, multi-tenancy, a supervisor for stall detection, and an orchestrator pattern for "hire an agent by prompting." 98 tests pass, 2 skip without a local Postgres.
-- **Not yet built, and specific to the old product:** the actual agents (Prospector, the deal-defense Watcher), the adapters (Fathom, HubSpot, Slack, Gmail) — these are GTM-sales-specific and don't map onto SMB merchant operations. They're left in place as **reference implementations of the pattern**, not code to keep.
-- **Undecided — needs the captain's call before real build starts:** which SMB operations domain this targets first (payments recon? support? inventory? something Cashfree-adjacent?), what the actual sub-agents are, what "insights / work status / delegate work" resolve to as concrete agent capabilities, and what the MVP gate is. The old MVP gate (a Fathom call → Slack DM → HubSpot note) is CoMarketer's and does not carry over.
+- Nothing is filed without a human yes. Approval happens where the merchant already is; small-and-safe can be auto-approved as trust builds.
+- Drafts cite only the evidence vault. The agent cannot invent facts.
+- Every skip is logged with a reason. Side effects happen exactly once, even across crashes.
+- Every number can be recomputed from the merchant's own record.
 
 ## Try it (15 minutes)
 
 ```bash
 git clone https://github.com/mothivenkatesh/relay-superagent && cd relay-superagent
-uv run pytest                    # tests, ~10s, no credentials needed
-make pg                          # local Postgres 17 on :5434
-uv run python demo/server.py     # workspace on http://localhost:8787
+uv run pytest                    # 108 tests, ~1s
+make pg                          # local Postgres 17 on :5435
+uv run python demo/server.py     # workspace on http://localhost:8790
 ```
 
-The demo still runs the inherited GTM-defense scenario end to end (Home → Approvals → Journeys → Agents) — useful for seeing the harness work, not representative of the SMB product yet.
+Log in with **"Continue with the demo workspace"**. Walk: Home (chat) → Approvals (decide a dispute response) → Journeys (replay a dispute like a film) → Agents (all eight, with what's live vs. next).
+
+## Origin
+
+Forked 2026-08-04 from [CoMarketer](https://github.com/mothivenkatesh/comarketer) for its domain-agnostic harness, then domain-rebuilt: the GTM deal-defense domain (competitors, deals, counter-drafts) was replaced by the dispute domain end-to-end — models, pipeline, SQL schema, prompts, tests, and demo content. The Fathom/HubSpot/Gmail adapters remain as reference implementations of the adapter pattern.
 
 ## Read more
 
 - [`CLAUDE.md`](CLAUDE.md) — project memory. Read this first.
-- [`decisions.md`](decisions.md) — every non-obvious choice with its reason, inherited from CoMarketer (D1–D21); append new decisions here going forward.
-- [`docs/`](docs/) — inherited PRDs (CoMarketer's — stale for this product; kept for reference).
-- [`spec/`](spec/) — inherited locked specs (CoMarketer's agents/orchestrator) — read for the pattern, not the domain.
+- [`decisions.md`](decisions.md) — append-only decision ledger (D1–D21 inherited, D22+ are Relay's).
+- [`spec/`](spec/) — inherited engine specs (state machine, orchestrator, context graph); read for the pattern.
 
 Secrets live in the macOS keychain only, never `.env`:
 ```bash

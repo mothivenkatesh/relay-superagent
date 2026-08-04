@@ -19,7 +19,7 @@ from relay_superagent.domain.models import MemoryNote, Run
 from relay_superagent.ledger import Ledger
 from relay_superagent.ledger_pg import PgLedger, _tid
 
-DSN = "host=localhost port=5434 dbname=relay_superagent user=relay_superagent"
+DSN = "host=localhost port=5435 dbname=relay_superagent user=relay_superagent"
 
 
 def _naive(dt):

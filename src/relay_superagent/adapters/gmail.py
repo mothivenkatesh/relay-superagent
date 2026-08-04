@@ -1,19 +1,19 @@
-"""The Gmail rail — the second trigger source.
+"""The Gmail rail — inherited reference material from the GTM fork.
 
-Spec Appendix A originally excluded the inbound-email trigger (the LangChain
-reference's noisiest idea). The captain overrode that on 2026-07-31; what
-makes it safe here is that email enters the SAME pipeline as calls: the
-enrolled-rep check, claim-hash dedupe, suppression window and the gate all
-apply, and nothing is ever auto-sent. Noise dies as a suppressed row, not in
-a rep's face.
+Real dispute triggers are a bank/payment-processor webhook, already carrying
+a structured reason_code, merchant_id, order_id and dispute_id — not an
+inbox to poll. This adapter is kept only so the harness can still demonstrate
+ingesting a free-text-shaped trigger (e.g. a merchant forwarding a chargeback
+notice email to a monitored inbox); `reason_code` has to be supplied by the
+caller when one is known, same as fathom.py.
 
 Two pieces, same split as fathom.py:
 
 - `to_trigger_event` is a pure mapper from the Gmail API message resource
   (users.messages.get, format=full) onto TriggerEvent. The message id is the
-  idempotency ref. The rep is the connected inbox's owner; the account is the
-  external correspondent's domain. Prospect email bodies quote whole threads,
-  so only the newest text is kept (reply markers cut).
+  idempotency ref. The merchant is the external correspondent's domain.
+  Quoted threads are trimmed so only the newest text is kept (reply markers
+  cut), and internal/own-sent mail is noise.
 - `GmailPoller` pulls recent inbound mail over REST with an injectable
   client. Polling, not push: Gmail push needs a GCP Pub/Sub topic — wrong
   cost for one inbox pre-gate. The supervisor's cadence is enough.
@@ -67,7 +67,7 @@ def _address(raw: str) -> str:
 
 
 def to_trigger_event(msg: dict[str, Any], tenant_id: str, inbox_email: str,
-                     rep_directory: dict[str, str] | None = None,
+                     reason_code: str | None = None,
                      ) -> TriggerEvent | None:
     """None = nothing to detect on: no text, or not from an external party
     (internal mail and own sent mail are pre-trigger noise)."""
@@ -99,9 +99,10 @@ def to_trigger_event(msg: dict[str, Any], tenant_id: str, inbox_email: str,
         source="gmail",
         source_ref=msg["id"],
         occurred_at=occurred,
-        opportunity_id=None,               # CRM linkage happens at safety/draft
-        account_id=sender.rsplit("@", 1)[-1],
-        rep_user_id=(rep_directory or {}).get(inbox_email, inbox_email),
+        order_id=None,                     # order linkage happens at safety/draft
+        merchant_id=sender.rsplit("@", 1)[-1],
+        dispute_id=None,
+        reason_code=reason_code,
         text=f"Subject: {subject}\n{sender}: {text}" if subject
              else f"{sender}: {text}",
     )

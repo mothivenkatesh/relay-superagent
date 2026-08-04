@@ -1,4 +1,4 @@
-# Relay SuperAgent — Agent Definitions (canonical)
+# Relay — Agent Definitions (canonical)
 
 Status: canonical as of 2026-08-03. Framework reference: Sudoboat,
 "How to Build a Production AI Agent" (five-layer architecture + 10-point
@@ -18,7 +18,7 @@ history are.
 
 ## The five layers, mapped to our architecture
 
-| Sudoboat layer | Relay SuperAgent implementation |
+| Sudoboat layer | Relay implementation |
 |---|---|
 | 1 · Channels | Adapters (Fathom webhook w/ Svix sigs, Gmail poller w/ reply-trim) normalize into `TriggerEvent` envelopes; edge dedup via idempotency key `sha256(tenant ‖ source:ref ‖ policy_version)` |
 | 2 · Agent core | `pipeline.py` coordinator + specialist agents below; run state machine (13 states, illegal transitions raise); short-term memory = run rows; long-term = battlecards, voice notes, outcomes. **Agent wiki ≡ battlecards + AOP playbooks**: human-readable, versioned, changed only through approval |

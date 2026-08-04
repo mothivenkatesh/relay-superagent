@@ -1,7 +1,7 @@
 [project]
 name = "relay_superagent"
 version = "0.1.0"
-description = "Relay SuperAgent Watcher v1 — the competitive loop. See spec/relay_superagent-watcher-v1-spec.md."
+description = "Relay Watcher v1 — the competitive loop. See spec/relay_superagent-watcher-v1-spec.md."
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.70",

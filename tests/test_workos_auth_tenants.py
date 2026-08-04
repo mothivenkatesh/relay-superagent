@@ -139,28 +139,30 @@ def test_registry_lookup_and_unknown_tenant():
 
 
 def test_two_tenants_share_a_ledger_but_not_policy_or_rows(world):
-    """t2 has no competitors configured, so the same text that gates for t1
-    produces nothing for t2 — and t1's rows never contain t2's id."""
+    """t2 has no dispute reasons configured, so the same webhook that gates
+    for t1 produces nothing for t2 — and t1's rows never contain t2's id."""
     d = world.d
     t2 = Pipeline(Deps(clock=d.clock, llm=d.llm, crm=d.crm, slack=d.slack,
                        url_checker=d.url_checker, ledger=d.ledger,
                        policy=default_policy("t2"), evidence=[],
-                       enrolled_reps=set()))
-    text = "We're also looking at Acme, honestly they are cheaper."
+                       enrolled_merchants=set()))
+    text = "The order never arrived, honestly it never left the warehouse."
     r1 = world.handle_event(TriggerEvent(
         tenant_id="t1", source="gmail", source_ref="m_1", occurred_at=MON_9AM,
-        opportunity_id="opp_1", account_id="a1", rep_user_id="rep_7", text=text))
+        order_id="order_1", merchant_id="merchant_7", dispute_id="dp_1",
+        reason_code="RG", text=text))
     assert r1.state is RunState.AWAITING_GATE
     r2 = t2.handle_event(TriggerEvent(
         tenant_id="t2", source="gmail", source_ref="m_1", occurred_at=MON_9AM,
-        opportunity_id=None, account_id="a1", rep_user_id="x", text=text))
-    assert r2 is None                       # empty competitor list: no trigger
+        order_id=None, merchant_id="m1", dispute_id=None,
+        reason_code="RG", text=text))
+    assert r2 is None                       # empty dispute-reason list: no trigger
     assert {r.tenant_id for r in d.ledger.runs.values()} == {"t1"}
 
 
 def test_default_policy_is_scoped_to_its_tenant():
     p = default_policy("org_9")
     assert p.tenant_id == "org_9"
-    assert p.competitors == []
+    assert p.dispute_reasons == []
     q = make_policy()
-    assert q.competitors                    # the demo tenant still has some
+    assert q.dispute_reasons                # the demo tenant still has some

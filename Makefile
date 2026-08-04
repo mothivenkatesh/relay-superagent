@@ -1,6 +1,6 @@
 PGBIN := $(HOME)/Applications/Postgres.app/Contents/Versions/17/bin
 PGDATA := .pgdata
-PGPORT := 5434
+PGPORT := 5435
 
 .PHONY: test pg pg-stop pg-reset migrate tunnel
 
@@ -14,7 +14,7 @@ tunnel:                 ## public URL for /webhooks/fathom + /slack/interactions
 test:
 	uv run pytest
 
-pg:                     ## init (once) and start the local cluster on :5434
+pg:                     ## init (once) and start the local cluster on :5435
 	@test -d $(PGDATA) || $(PGBIN)/initdb -D $(PGDATA) -U relay_superagent --auth=trust -E UTF8
 	@$(PGBIN)/pg_ctl -D $(PGDATA) -o "-p $(PGPORT) -k /tmp" -l $(PGDATA)/log start || true
 	@sleep 1

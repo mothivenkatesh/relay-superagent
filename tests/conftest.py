@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from relay_superagent.domain.models import Competitor, EvidenceItem, Policy, TriggerEvent
+from relay_superagent.domain.models import DisputeReason, EvidenceItem, Policy, TriggerEvent
 from relay_superagent.ledger import Ledger
 from relay_superagent.pipeline import Deps, Pipeline
 from relay_superagent.ports.fakes import (
@@ -18,8 +18,8 @@ def make_policy(**kw) -> Policy:
     defaults = dict(
         policy_version="pol_1",
         tenant_id="t1",
-        competitors=[Competitor(id="acme", names=["Acme", "Acme Corp"],
-                                domains=["acme.com"])],
+        dispute_reasons=[DisputeReason(id="goods_not_received", code="RG",
+                                       label="Goods/services not received")],
         banned_terms=["best", "leading", "number one"],
         holdout_pct=0,          # deterministic tests default to treated
     )
@@ -28,10 +28,10 @@ def make_policy(**kw) -> Policy:
 
 
 EVIDENCE = [
-    EvidenceItem("ev_tco", "t1", "acme", "pricing",
-                 "Three-year TCO comparison", "https://ours.example/tco"),
-    EvidenceItem("ev_forrester", "t1", "acme", "pricing",
-                 "Forrester note on hidden per-seat overage", "https://ours.example/forrester"),
+    EvidenceItem("ev_tco", "t1", "RG", "delivery_proof",
+                 "Courier proof-of-delivery, signed", "https://ours.example/tco"),
+    EvidenceItem("ev_forrester", "t1", "RG", "communication_log",
+                 "WhatsApp delivery confirmation with the buyer", "https://ours.example/forrester"),
 ]
 
 
@@ -39,8 +39,8 @@ EVIDENCE = [
 def world():
     clock = FakeClock(MON_9AM)
     crm = FakeCrm(opportunities={
-        "opp_1": {"stage": "evaluation", "amount_band": "50-100k",
-                  "competitor_history": ["acme"]},
+        "order_1": {"stage": "evaluation", "amount_band": "50-100k",
+                    "prior_dispute_history": ["RG"]},
     })
     deps = Deps(
         clock=clock,
@@ -51,16 +51,16 @@ def world():
         ledger=Ledger(),
         policy=make_policy(),
         evidence=list(EVIDENCE),
-        enrolled_reps={"rep_7"},
+        enrolled_merchants={"merchant_7"},
     )
     return Pipeline(deps)
 
 
 def event(**kw) -> TriggerEvent:
     defaults = dict(
-        tenant_id="t1", source="gong", source_ref="call_42", occurred_at=MON_9AM,
-        opportunity_id="opp_1", account_id="acct_1", rep_user_id="rep_7",
-        text="Well, we're also looking at Acme, and honestly they are cheaper.",
+        tenant_id="t1", source="bank_webhook", source_ref="dispute_42", occurred_at=MON_9AM,
+        order_id="order_1", merchant_id="merchant_7", dispute_id="dp_42", reason_code="RG",
+        text="Buyer says the order never arrived, disputing the charge.",
     )
     defaults.update(kw)
     return TriggerEvent(**defaults)

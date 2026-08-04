@@ -2,10 +2,10 @@
 
 `safety` (§6.3) runs before any retrieval or generation: cheap lookups, any
 failure suppresses the run with zero LLM spend. `layer1` (§6.6) runs on every
-draft before the judge: any failure blocks the draft from ever reaching a rep.
+drafted dispute response before the judge: any failure blocks the draft from
+ever reaching a merchant.
 
-A prompt-level guardrail does not survive a motivated buyer on a recorded call.
-These do.
+A prompt-level guardrail does not survive a chargeback deadline. These do.
 """
 
 from __future__ import annotations
@@ -23,42 +23,42 @@ _PHONE = re.compile(r"(?:\+?\d[\d\s\-()]{8,}\d)")
 
 
 def safety(run: Run, policy: Policy, ledger: Ledger, crm: CrmPort,
-           enrolled_reps: set[str], tokens_spent_today: int) -> str | None:
+           enrolled_merchants: set[str], tokens_spent_today: int) -> str | None:
     """Returns a suppression reason, or None to proceed. Order is cheapest first;
     every check must hold, and none of them needs a model."""
 
-    opp = crm.opportunity(run.opportunity_id) if run.opportunity_id else None
-    if opp is None:
-        return "no_opportunity"
-    if opp.get("stage") in CLOSED_STAGES:
-        return "opportunity_closed"
+    order = crm.opportunity(run.order_id) if run.order_id else None
+    if order is None:
+        return "no_order"
+    if order.get("stage") in CLOSED_STAGES:
+        return "order_closed"
 
     window = timedelta(days=policy.suppress_window_days)
     for other in ledger.runs_for_tenant(run.tenant_id):
         if other.run_id == run.run_id:
             continue
-        if (other.opportunity_id == run.opportunity_id
-                and other.competitor_id == run.competitor_id
+        if (other.order_id == run.order_id
+                and other.reason_code == run.reason_code
                 and other.gate_action is not None
                 and other.gate_action.value in ("approve", "edit")
                 and other.gated_at is not None
                 and run.occurred_at - other.gated_at <= window):
             return "recently_countered"
-        if (other.account_id == run.account_id and run.claim_hash
+        if (other.merchant_id == run.merchant_id and run.claim_hash
                 and other.claim_hash == run.claim_hash
                 and other.state in (RunState.ACTED, RunState.RESOLVED)):
             return "claim_already_handled"
 
-    if run.rep_user_id not in enrolled_reps:
-        return "rep_not_enrolled"
+    if run.merchant_id not in enrolled_merchants:
+        return "merchant_not_enrolled"
 
     today = [r for r in ledger.runs_for_tenant(run.tenant_id)
-             if r.rep_user_id == run.rep_user_id
+             if r.merchant_id == run.merchant_id
              and r.occurred_at.date() == run.occurred_at.date()
              and r.state not in (RunState.SUPPRESSED,)
              and r.run_id != run.run_id]
-    if len(today) >= policy.per_rep_per_day:
-        return "rep_daily_cap"
+    if len(today) >= policy.per_merchant_per_day:
+        return "merchant_daily_cap"
 
     if tokens_spent_today >= policy.tenant_tokens_per_day:
         return "tenant_token_ceiling"
@@ -85,12 +85,12 @@ def layer1(draft: Draft, run: Run, policy: Policy,
         if re.search(rf"\b{re.escape(term.lower())}\b", lowered):
             failures.append(f"banned_term:{term}")
 
-    lo, hi = policy.counter_len_bounds
+    lo, hi = policy.response_len_bounds
     if not (lo <= len(draft.counter_text) <= hi):
         failures.append("length_out_of_bounds")
 
-    if run.competitor_id and policy.competitor_by_id(run.competitor_id) is None:
-        failures.append("unknown_competitor")
+    if run.reason_code and policy.reason_by_code(run.reason_code) is None:
+        failures.append("unknown_reason_code")
 
     if _EMAIL.search(draft.counter_text) or _PHONE.search(draft.counter_text):
         failures.append("contact_info_in_counter")

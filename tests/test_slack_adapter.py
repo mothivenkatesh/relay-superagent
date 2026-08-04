@@ -16,10 +16,10 @@ from relay_superagent.adapters.slack import (
     RealSlack, SlackError, gate_card, parse_interaction, verify_signature,
 )
 
-GATE = {"run_id": "r-42", "claim": "Acme is cheaper",
-        "counter": "Three-year TCO says otherwise.",
+GATE = {"run_id": "r-42", "claim": "Buyer says the order never arrived",
+        "counter": "Courier proof-of-delivery shows this order was signed for.",
         "evidence": ["https://ours.example/tco"],
-        "reasoning": "Acme was named on a call for an open deal.",
+        "reasoning": "A goods-not-received dispute was filed on an open order.",
         "actions": ["send", "edit", "dismiss"]}
 
 
@@ -49,8 +49,8 @@ def make(payload=None) -> RealSlack:
 def test_gate_card_carries_claim_counter_evidence_reasoning_and_buttons():
     blocks = gate_card(GATE)
     text = json.dumps(blocks)
-    assert "> Acme is cheaper" in text                     # claim, quoted
-    assert "Three-year TCO says otherwise." in text
+    assert "> Buyer says the order never arrived" in text  # claim, quoted
+    assert "Courier proof-of-delivery shows this order was signed for." in text
     assert "ours.example/tco" in text
     assert "Why you're seeing this" in text                # §6.7: required
     actions = blocks[-1]

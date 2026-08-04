@@ -24,7 +24,7 @@ ts = slack.dm(sys.argv[1], {
                "implementation and per-seat overage are included; the TCO model "
                "puts the crossover at month nine.",
     "evidence": ["https://ours.example/tco"],
-    "reasoning": "This is the Relay SuperAgent smoke test — buttons won't work until "
+    "reasoning": "This is the Relay smoke test — buttons won't work until "
                  "the interactions tunnel is up, and that's expected.",
 })
 print(f"Gate card posted, ts={ts}. Check Slack — claim, counter, evidence, "

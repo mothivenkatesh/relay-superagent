@@ -1,21 +1,15 @@
-"""Competitor detection (§6.2). Deterministic match first, model second, never
-the model without a match. The word-boundary match is the cost control that
-keeps the LLM off 99% of transcripts; the model's only job on the remainder is
-to reject false positives ("Acme Street") and pull out the claim.
+"""Dispute classification (§6.2). Disputes arrive as structured webhooks from
+the bank or payment processor with a reason_code already attached — there is
+no free-text detection step the way a sales-call transcript needed regex
+matching for a competitor name. "Detection" here is just a deterministic
+lookup: is this reason_code one the merchant's policy has evidence coverage
+for at all? An unknown or uncovered code is pre-trigger noise, not a run.
 """
 
 from __future__ import annotations
 
-import re
-
-from relay_superagent.domain.models import Competitor, Policy
+from relay_superagent.domain.models import DisputeReason, Policy
 
 
-def match_competitors(text: str, policy: Policy) -> list[Competitor]:
-    hits: list[Competitor] = []
-    lowered = text.lower()
-    for comp in policy.competitors:
-        names = comp.names + comp.domains
-        if any(re.search(rf"\b{re.escape(n.lower())}\b", lowered) for n in names):
-            hits.append(comp)
-    return hits
+def classify_dispute(reason_code: str | None, policy: Policy) -> DisputeReason | None:
+    return policy.reason_by_code(reason_code) if reason_code else None

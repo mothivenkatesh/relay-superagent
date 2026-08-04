@@ -7,8 +7,8 @@ responses are schema-valid JSON and there is no parsing heuristics layer.
 
 Failure mapping is the contract that matters: connection errors, rate-limit
 exhaustion, 5xx and refusals all become `LlmUnavailable`, which the pipeline
-converts into PMM escalation. A rep never sees a stack trace; a 400 is a bug in
-this file and is allowed to propagate loudly.
+converts into PMM escalation. A merchant never sees a stack trace; a 400 is a
+bug in this file and is allowed to propagate loudly.
 """
 
 from __future__ import annotations
@@ -36,12 +36,12 @@ def _schema(properties: dict[str, Any], required: list[str] | None = None) -> di
 CONFIRM_SCHEMA = _schema({
     "is_competitive": {"type": "boolean"},
     "claim_text": {"type": ["string", "null"],
-                   "description": "The competitive claim, paraphrased tightly; null if none"},
+                   "description": "The dispute narrative, paraphrased tightly; null if none"},
     "confidence": {"type": "number"},
 })
 
 CLAIM_SCHEMA = _schema({
-    "competitor_id": {"type": "string"},
+    "reason_code": {"type": "string"},
     "claim_text": {"type": "string"},
     "speaker_role": {"type": "string", "enum": ["buyer", "rep", "other"]},
     "confidence": {"type": "number"},
@@ -52,7 +52,7 @@ DRAFT_SCHEMA = _schema({
     "cited_evidence_ids": {"type": "array", "items": {"type": "string"}},
     "confidence": {"type": "number"},
     "escalate": {"type": "boolean",
-                 "description": "True if a human should review before any rep sees this"},
+                 "description": "True if a human should review before any merchant sees this"},
 })
 
 JUDGE_SCHEMA = _schema({
@@ -70,36 +70,42 @@ DIFF_SCHEMA = _schema({
 
 # The five seam prompts, canonical and inspectable. These are code: versioned
 # in git, exercised by evals/, rendered read-only in the agent console.
-# Marketer customization enters as DATA (playbook rules, voice memory, policy)
-# injected into these fixed templates — never by editing them at runtime.
+# Merchant customization enters as DATA (evidence library, response-style
+# memory, policy) injected into these fixed templates — never by editing them
+# at runtime.
 SEAM_PROMPTS = {
     "confirm_mention": (
-        "You screen sales-call transcript excerpts. Decide whether the "
-        "named competitor is being discussed competitively (an evaluation, "
-        "comparison, price or capability claim) as opposed to an incidental "
-        "mention (a street name, an unrelated company, small talk)."),
+        "You screen inbound dispute/chargeback webhooks for a merchant. "
+        "Decide whether this is a genuine, actionable dispute (a real "
+        "chargeback filed against a real order) as opposed to noise (a "
+        "duplicate webhook redelivery, a test payload, or a notification "
+        "with no dispute actually attached)."),
     "extract_claim": (
-        "Extract the single competitive claim being made about the "
-        "competitor in this excerpt. competitor_id must be echoed exactly "
-        "as given. claim_text is the claim in one tight sentence."),
+        "Extract the single dispute claim being made in this narrative. "
+        "reason_code must be echoed exactly as given. claim_text is the "
+        "buyer's claim in one tight sentence (e.g. 'buyer says the order "
+        "never arrived')."),
     "draft_counter": (
-        "You draft counters to competitive claims for a B2B sales rep. "
-        "Rules: cite ONLY evidence ids from the list provided, never invent "
-        "a fact or a source, never use superlatives like best or leading, "
-        "no contact details, 2-4 sentences, confident and specific. If the "
-        "evidence cannot support a counter to this claim, set escalate=true "
-        "and say why in counter_text."),
+        "You draft evidence-backed responses to payment disputes for a "
+        "merchant. Rules: cite ONLY evidence ids from the list provided, "
+        "never invent a fact or a source, never use superlatives like best "
+        "or leading, no contact details, 2-4 sentences, confident and "
+        "specific, and reference the concrete proof (delivery record, "
+        "invoice, communication log) that backs the response. If the "
+        "evidence cannot support a response to this claim, set "
+        "escalate=true and say why in counter_text."),
     "judge": (
-        "Score this drafted counter 1-5 on each axis. addresses_claim: "
-        "does it answer the specific claim made, not a nearby one. "
-        "matches_register: professional, factual, no hype, no disparagement. "
-        "evidence_grounded: every assertion is supported by the cited "
-        "evidence. Score strictly; 5 means you would send it yourself."),
+        "Score this drafted dispute response 1-5 on each axis. "
+        "addresses_claim: does it answer the specific claim made, not a "
+        "nearby one. matches_register: professional, factual, no hype, no "
+        "disparagement of the buyer. evidence_grounded: every assertion is "
+        "supported by the cited evidence. Score strictly; 5 means you would "
+        "file it with the bank yourself."),
 }
 
 SEAM_PROMPTS["narrate"] = (
-    "You rewrite a structured GTM result into one to three conversational "
-    "sentences for a marketer. Use ONLY facts present in FACTS — every "
+    "You rewrite a structured Relay result into one to three conversational "
+    "sentences for a merchant. Use ONLY facts present in FACTS — every "
     "number, name and claim in your reply must appear there verbatim. Never "
     "add analysis, advice or data that is not present. Plain, warm, direct.")
 
@@ -110,17 +116,17 @@ NARRATE_SCHEMA = {
     "additionalProperties": False,
 }
 
-SEAM_PROMPTS["semantic_diff"] = """You compare an AI-drafted sales counter with the version a human \
-sales rep actually sent, and classify the edit.
+SEAM_PROMPTS["semantic_diff"] = """You compare an AI-drafted dispute response with the version a human \
+merchant actually sent, and classify the edit.
 
 is_material is true ONLY if the meaning changed: a different claim, a different \
-competitor, an argument added or removed, or a factual correction. It is false for \
-typo, grammar, tone, length or formatting changes. This value drives billing, so \
-when genuinely uncertain, choose true (the customer-favourable answer).
+piece of evidence, an argument added or removed, or a factual correction. It is \
+false for typo, grammar, tone, length or formatting changes. This value drives \
+billing, so when genuinely uncertain, choose true (the customer-favourable answer).
 
 changed: the specific differences. implies: what the edit suggests about how this \
-rep likes to sell (one sentence). example: a short quote from the edited text that \
-shows the preference."""
+merchant likes to respond (one sentence). example: a short quote from the edited \
+text that shows the preference."""
 
 
 class ClaudeLlm:
@@ -135,20 +141,20 @@ class ClaudeLlm:
         self.quality_model = quality_model
 
     # -- seam 1 ---------------------------------------------------------------
-    def confirm_mention(self, text: str, competitor_names: list[str]) -> dict[str, Any]:
+    def confirm_mention(self, text: str, reason_labels: list[str]) -> dict[str, Any]:
         return self._call(
             self.fast_model,
             system=SEAM_PROMPTS["confirm_mention"],
-            user=f"Competitor names: {', '.join(competitor_names)}\n\nExcerpt:\n{text}",
+            user=f"Dispute reason(s): {', '.join(reason_labels)}\n\nNarrative:\n{text}",
             schema=CONFIRM_SCHEMA,
         )
 
     # -- seam 2 ---------------------------------------------------------------
-    def extract_claim(self, text: str, competitor_id: str) -> dict[str, Any]:
+    def extract_claim(self, text: str, reason_code: str) -> dict[str, Any]:
         return self._call(
             self.fast_model,
             system=SEAM_PROMPTS["extract_claim"],
-            user=f"competitor_id: {competitor_id}\n\nExcerpt:\n{text}",
+            user=f"reason_code: {reason_code}\n\nNarrative:\n{text}",
             schema=CLAIM_SCHEMA,
         )
 
@@ -161,9 +167,9 @@ class ClaudeLlm:
         return self._call(
             self.quality_model,
             system=SEAM_PROMPTS["draft_counter"],
-            user=f"Claim to counter: {claim}\n\nDeal context: {json.dumps(deal)}\n\n"
+            user=f"Claim to respond to: {claim}\n\nOrder context: {json.dumps(deal)}\n\n"
                  f"Available evidence:\n{ev}\n\n"
-                 + (f"This rep's style, learned from their edits:\n{style}" if style else ""),
+                 + (f"This merchant's style, learned from their edits:\n{style}" if style else ""),
             schema=DRAFT_SCHEMA,
         )
 
@@ -172,7 +178,7 @@ class ClaudeLlm:
         return self._call(
             self.quality_model,
             system=SEAM_PROMPTS["judge"],
-            user=f"Claim: {claim}\n\nDrafted counter: {counter}",
+            user=f"Claim: {claim}\n\nDrafted response: {counter}",
             schema=JUDGE_SCHEMA,
         )
 

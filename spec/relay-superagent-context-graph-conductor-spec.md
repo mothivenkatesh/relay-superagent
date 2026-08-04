@@ -1,4 +1,4 @@
-# Relay SuperAgent Context Graph + Conductor — Engineering Spec
+# Relay Context Graph + Conductor — Engineering Spec
 
 The third piece of the system, and the one that makes the loops compound.
 Watcher defends deals, Prospector starts them; the Graph is what both know,

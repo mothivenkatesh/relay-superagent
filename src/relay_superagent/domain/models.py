@@ -80,15 +80,36 @@ class Arm(StrEnum):
     HOLDOUT = "holdout"
 
 
+class AgentType(StrEnum):
+    """Which of Relay's real public agents produced this run — the full
+    8-agent lineup from the canonical intro deck. Dispute Defender is the
+    only one wired end-to-end in this codebase today; the rest exist so the
+    ledger, metrics and demo console can already speak in terms of the
+    full agent fleet."""
+
+    DISPUTE_DEFENDER = "dispute_defender"
+    COD_GUARD = "cod_guard"
+    PAYMENT_RESCUE = "payment_rescue"
+    CART_RESCUE = "cart_rescue"
+    SETTLEMENT_CLARITY = "settlement_clarity"
+    REFUND_SHIELD = "refund_shield"
+    LOAN_RECOVERY = "loan_recovery"
+    DUE_DILIGENCE = "due_diligence"
+
+
 def sha(*parts: str) -> str:
     return hashlib.sha256("‖".join(parts).encode()).hexdigest()
 
 
 @dataclass
-class Competitor:
+class DisputeReason:
+    """A chargeback/dispute reason code, the way a bank or payment processor
+    actually sends it — not fuzzy text to regex-match. e.g. id="goods_not_received",
+    code="RG", label="Goods/services not received"."""
+
     id: str
-    names: list[str]
-    domains: list[str] = field(default_factory=list)
+    code: str
+    label: str
 
 
 @dataclass
@@ -98,26 +119,26 @@ class Policy:
 
     policy_version: str
     tenant_id: str
-    competitors: list[Competitor]
+    dispute_reasons: list[DisputeReason]
     banned_terms: list[str]
-    per_rep_per_day: int = 5
+    per_merchant_per_day: int = 5
     tenant_tokens_per_day: int = 2_000_000
     gate_timeout_hours: int = 24
     judge_threshold: int = 4
     holdout_pct: int = 20
     suppress_window_days: int = 7
-    counter_len_bounds: tuple[int, int] = (120, 1200)
+    response_len_bounds: tuple[int, int] = (120, 1200)
 
-    def competitor_by_id(self, cid: str) -> Competitor | None:
-        return next((c for c in self.competitors if c.id == cid), None)
+    def reason_by_code(self, code: str) -> DisputeReason | None:
+        return next((r for r in self.dispute_reasons if r.code == code), None)
 
 
 @dataclass
 class EvidenceItem:
     evidence_id: str
     tenant_id: str
-    competitor_id: str
-    claim_class: str
+    reason_code: str
+    evidence_type: str          # 'delivery_proof' | 'invoice' | 'communication_log' | 'refund_policy'
     text: str
     source_url: str
 
@@ -133,16 +154,21 @@ class Draft:
 @dataclass
 class TriggerEvent:
     """A normalised inbound event (§6.1). The payload lives in blob storage; only
-    the ref travels."""
+    the ref travels. Disputes arrive as structured bank/processor webhooks — the
+    reason_code is already attached, unlike a sales-call transcript that has to
+    be scanned for a competitor mention."""
 
     tenant_id: str
-    source: str            # 'gong' | 'gmail'
+    source: str            # 'bank_webhook' | 'gateway_webhook'
     source_ref: str        # external id, never the payload
     occurred_at: datetime
-    opportunity_id: str | None
-    account_id: str | None
-    rep_user_id: str | None
-    text: str              # transcript/email text, already fetched for detection
+    merchant_id: str | None
+    order_id: str | None
+    dispute_id: str | None
+    reason_code: str | None
+    text: str              # freeform dispute narrative, may be empty — most
+                            # fields here are already structured
+    deadline_at: datetime | None = None   # respond-by date from the processor
 
 
 @dataclass
@@ -160,12 +186,14 @@ class Run:
     arm: Arm
     state: RunState = RunState.RECEIVED
     loop: str = "watcher"
+    agent_type: AgentType = AgentType.DISPUTE_DEFENDER
 
     suppressed_reason: str | None = None
-    opportunity_id: str | None = None
-    account_id: str | None = None
-    rep_user_id: str | None = None
-    competitor_id: str | None = None
+    merchant_id: str | None = None
+    order_id: str | None = None
+    dispute_id: str | None = None
+    reason_code: str | None = None
+    deadline_at: datetime | None = None
     claim_hash: str | None = None
     claim_text: str | None = None
 
@@ -205,7 +233,7 @@ class Outcome:
     outcome_id: str
     tenant_id: str
     run_id: str
-    outcome_key: str          # 'opportunity_closed'
+    outcome_key: str          # 'dispute_resolved'
     outcome_value: dict[str, Any]
     observed_at: datetime
     source: str
@@ -218,16 +246,16 @@ class MemoryNote:
 
     memory_id: str
     tenant_id: str
-    subject_type: str          # 'rep' | 'tenant'
+    subject_type: str          # 'merchant' | 'tenant'
     subject_id: str
-    concern: str               # 'counter_style'
+    concern: str               # 'response_style'
     body: dict[str, Any]       # {changed, implies, example}
     source_run: str
     superseded_by: str | None = None
 
 
-def assign_arm(account_id: str, holdout_pct: int) -> Arm:
-    """Stable per account (§6.4): two reps on one deal must land in the same arm,
-    or they contaminate each other."""
-    bucket = int(sha(account_id)[:8], 16) % 100
+def assign_arm(merchant_id: str, holdout_pct: int) -> Arm:
+    """Stable per merchant (§6.4): repeat disputes on the same merchant must
+    land in the same arm, or they contaminate each other."""
+    bucket = int(sha(merchant_id)[:8], 16) % 100
     return Arm.HOLDOUT if bucket < holdout_pct else Arm.TREATED

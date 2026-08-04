@@ -1,22 +1,24 @@
-"""The HubSpot rail — Lane A's last adapter, the acting end of the gate
-sentence ("my Approve writes a note onto the real HubSpot deal").
+"""The HubSpot rail — inherited reference material from the GTM fork, kept
+compiling against the Dispute Defender port shapes but not wired into a real
+dispute flow (a real deployment would file responses with the bank/payment
+processor, not a CRM deal). See README: reference implementation only.
 
 CrmPort over the v3 CRM API with a private-app token from the keychain:
 
-- `opportunity` / `deal_context` read a deal. Runs carry the deal ref as
-  whatever the trigger provided — a raw id or a record URL (Fathom's
+- `opportunity` / `deal_context` read an order record. Runs carry the order
+  ref as whatever the trigger provided — a raw id or a record URL (Fathom's
   crm_matches sends URLs) — so ids are parsed from either.
 - `write_note` is the act: notes v3 with the note→deal association
   (HUBSPOT_DEFINED type 214, verified against their associations docs).
   Returns the note id — the effect table's external ref.
-- `open_deal_for_account` implements the seam Gmail triggers need:
-  company domain → company search → associated deals → first open one.
+- `open_deal_for_account` implements the seam some triggers need:
+  merchant domain → company search → associated deals → first open one.
 
 Stage normalization: HubSpot's default-pipeline internal values
 (closedwon/closedlost) map onto the policy layer's closed_won/closed_lost;
 custom-pipeline stages pass through and count as open, which fails safe —
-a mistaken counter on a live deal is gated anyway; a suppressed counter on
-a closed deal costs nothing.
+a mistaken response filed on a live order is gated anyway; a suppressed
+response on a closed order costs nothing.
 """
 
 from __future__ import annotations
@@ -86,8 +88,8 @@ class HubSpot:
 
     # -- reads ----------------------------------------------------------------
 
-    def opportunity(self, opportunity_id: str) -> dict[str, Any] | None:
-        did = _deal_id(opportunity_id)
+    def opportunity(self, order_id: str) -> dict[str, Any] | None:
+        did = _deal_id(order_id)
         if not did:
             return None
         data = self._req("GET", f"/crm/v3/objects/deals/{did}",
@@ -101,18 +103,18 @@ class HubSpot:
                 "stage": _STAGE_MAP.get(stage_raw, stage_raw or "unknown"),
                 "amount": amount, "amount_band": _band(amount)}
 
-    def deal_context(self, opportunity_id: str) -> dict[str, Any]:
-        opp = self.opportunity(opportunity_id) or {}
+    def deal_context(self, order_id: str) -> dict[str, Any]:
+        opp = self.opportunity(order_id) or {}
         return {"stage": opp.get("stage"),
                 "amount_band": opp.get("amount_band", "unknown"),
-                "competitor_history": [], "prior_losses": []}
+                "prior_dispute_history": [], "prior_losses": []}
 
     # -- the act ---------------------------------------------------------------
 
-    def write_note(self, opportunity_id: str, text: str) -> str:
-        did = _deal_id(opportunity_id)
+    def write_note(self, order_id: str, text: str) -> str:
+        did = _deal_id(order_id)
         if not did:
-            raise HubSpotError(f"no deal id in ref: {opportunity_id!r}")
+            raise HubSpotError(f"no deal id in ref: {order_id!r}")
         data = self._req("POST", "/crm/v3/objects/notes", json={
             "properties": {
                 "hs_note_body": text,
@@ -128,10 +130,10 @@ class HubSpot:
             raise HubSpotError("note created but no id returned")
         return data["id"]
 
-    # -- account -> open deal (the Gmail seam) --------------------------------
+    # -- merchant -> open order (the Gmail seam) -------------------------------
 
-    def open_deal_for_account(self, account_id: str) -> str | None:
-        domain = (account_id or "").strip().lower()
+    def open_deal_for_account(self, merchant_id: str) -> str | None:
+        domain = (merchant_id or "").strip().lower()
         if not domain or "." not in domain:
             return None
         found = self._req("POST", "/crm/v3/objects/companies/search", json={

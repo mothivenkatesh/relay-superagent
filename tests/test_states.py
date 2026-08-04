@@ -14,7 +14,7 @@ from relay_superagent.domain.models import (
 
 def make_run(state=RunState.RECEIVED) -> Run:
     r = Run(run_id="r1", tenant_id="t1", idempotency_key="k1",
-            trigger_source="gong", trigger_ref="c1",
+            trigger_source="bank_webhook", trigger_ref="c1",
             occurred_at=datetime(2026, 8, 3, 9, 0),
             policy_version="pol_1", arm=Arm.TREATED)
     r.state = state

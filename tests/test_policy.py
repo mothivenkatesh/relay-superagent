@@ -10,33 +10,33 @@ from .conftest import event, make_policy
 
 # -- safety (exercised through the pipeline so the ordering is real) ----------
 
-def test_closed_opportunity_suppresses_before_any_drafting(world):
-    world.d.crm.opportunities["opp_1"]["stage"] = "closed_lost"
+def test_closed_order_suppresses_before_any_drafting(world):
+    world.d.crm.opportunities["order_1"]["stage"] = "closed_lost"
     run = world.handle_event(event())
     assert run.state is RunState.SUPPRESSED
-    assert run.suppressed_reason == "opportunity_closed"
+    assert run.suppressed_reason == "order_closed"
     assert not any(n == "draft_counter" for n, _ in world.d.llm.calls)
 
 
-def test_unknown_opportunity_suppresses(world):
-    run = world.handle_event(event(opportunity_id="opp_missing"))
-    assert run.suppressed_reason == "no_opportunity"
+def test_unknown_order_suppresses(world):
+    run = world.handle_event(event(order_id="order_missing"))
+    assert run.suppressed_reason == "no_order"
 
 
-def test_unenrolled_rep_suppresses(world):
-    run = world.handle_event(event(rep_user_id="rep_99"))
-    assert run.suppressed_reason == "rep_not_enrolled"
+def test_unenrolled_merchant_suppresses(world):
+    run = world.handle_event(event(merchant_id="merchant_99"))
+    assert run.suppressed_reason == "merchant_not_enrolled"
 
 
-def test_rep_daily_cap_suppresses_the_sixth_run(world):
-    # cap is 5; give each run its own opportunity so dedupe doesn't fire first
+def test_merchant_daily_cap_suppresses_the_sixth_run(world):
+    # cap is 5; give each run its own order so dedupe doesn't fire first
     for i in range(5):
-        world.d.crm.opportunities[f"opp_{i+10}"] = {"stage": "evaluation"}
-        r = world.handle_event(event(source_ref=f"c{i}", opportunity_id=f"opp_{i+10}"))
+        world.d.crm.opportunities[f"order_{i+10}"] = {"stage": "evaluation"}
+        r = world.handle_event(event(source_ref=f"d{i}", order_id=f"order_{i+10}"))
         assert r.state is RunState.AWAITING_GATE
-    world.d.crm.opportunities["opp_99"] = {"stage": "evaluation"}
-    sixth = world.handle_event(event(source_ref="c9", opportunity_id="opp_99"))
-    assert sixth.suppressed_reason == "rep_daily_cap"
+    world.d.crm.opportunities["order_99"] = {"stage": "evaluation"}
+    sixth = world.handle_event(event(source_ref="d9", order_id="order_99"))
+    assert sixth.suppressed_reason == "merchant_daily_cap"
 
 
 def test_token_ceiling_suppresses(world):
@@ -46,7 +46,7 @@ def test_token_ceiling_suppresses(world):
 
 
 def test_suppressed_runs_are_still_written(world):
-    world.d.crm.opportunities["opp_1"]["stage"] = "closed_won"
+    world.d.crm.opportunities["order_1"]["stage"] = "closed_won"
     world.handle_event(event())
     assert len(world.d.ledger.runs) == 1     # the precision denominator survives
 
@@ -54,7 +54,7 @@ def test_suppressed_runs_are_still_written(world):
 # -- layer 1 ------------------------------------------------------------------
 
 def _draft(**kw):
-    d = dict(counter_text="A perfectly reasonable counter." + " " * 120,
+    d = dict(counter_text="A perfectly reasonable dispute response." + " " * 110,
              cited_evidence_ids=["ev_tco"], confidence=0.9, escalate=False)
     d.update(kw)
     return Draft(**d)
@@ -80,7 +80,7 @@ def test_unresolved_evidence_blocks(world):
     assert "evidence_unresolved:ev_invented" in _check(bad, world, run)
 
 
-def test_dead_source_blocks_and_routes_to_pmm_not_rep(world):
+def test_dead_source_blocks_and_routes_to_pmm_not_merchant(world):
     world.d.url_checker.dead.add("https://ours.example/tco")
     run = world.handle_event(event())
     assert run.state is RunState.FAILED           # escalated, not surfaced
@@ -90,7 +90,7 @@ def test_dead_source_blocks_and_routes_to_pmm_not_rep(world):
 
 def test_contact_info_in_counter_blocks(world):
     run = world.handle_event(event())
-    bad = _draft(counter_text="Email me at rep@ours.example for a discount." + " " * 90)
+    bad = _draft(counter_text="Email me at ops@ours.example for a discount." + " " * 90)
     assert "contact_info_in_counter" in _check(bad, world, run)
 
 

@@ -212,12 +212,12 @@ approval as an execution surface — our gate is the frontier's picture, not a d
 All ten written into PRD v1.4 §6 + Appendix B in plain words. Nothing starts before the
 Watcher gate passes.
 
-## D20 — Identity: Relay SuperAgent is the Track Record for GTM work (2026-08-02)
+## D20 — Identity: Relay is the Track Record for GTM work (2026-08-02)
 Ratified after the Dixon-canon read (36 pieces), the value-chain research, and the
 53-competitor scan (Sortment, OpenGTM, Kami, Next 50). Everything upstream commoditizes
 (agents bundled free, the approval gate now exists as an open-source student project,
 drafting free, signals crowded); the layer that can't commoditize is proof of what
-caused revenue. Identity: we sell the scoreboard, not the agent. Relay SuperAgent = the
+caused revenue. Identity: we sell the scoreboard, not the agent. Relay = the
 customer's GTM Track Record — every decision, the action it produced, and the outcome
 it caused — with the Scoreboard (randomized sit-out deals → measured lift) as the
 causal instrument. Watcher is workload #1 writing into it, not the company.
@@ -244,3 +244,22 @@ doctrine to earned-autonomy scaffolding (per the Orchestrator ladder): the Track
 Record doesn't care who did the work, only that it's provable. Sequence unchanged
 and non-negotiable: Watcher gate → first customer → first agency → open the write
 surface. A settlement layer with zero settled outcomes is a whitepaper.
+
+## D22 — Dispute Defender is the wired domain (2026-08-04)
+The fork's first real domain: a payment dispute/chargeback filed against a
+merchant's order, with a deadline. Engine (state machine, ledger, gates,
+ports/fakes) untouched; domain data replaced end-to-end (DisputeReason,
+reason_code/merchant_id/order_id/dispute_id/deadline_at, evidence types).
+Notable calls: (1) disputes are NEVER held out — runs are built arm=TREATED,
+a missed chargeback deadline is real financial harm, not an A/B cell;
+(2) LlmPort/CrmPort method names kept verbatim (confirm_mention/draft_counter/
+deal_context/…) so the reference adapters keep importing — what flows through
+them changed, the seams did not; (3) the account→open-deal resolution step is
+gone: order_id arrives on the webhook, a missing order suppresses as no_order;
+(4) TriggerEvent.deadline_at added with a None default at the end of the
+dataclass so every existing kwargs construction site stays valid;
+(5) escalation channel renamed #relay-dispute-review (Deps.escalation_channel);
+(6) demo world: 6 invented Indian SMB merchants, all 8 real Relay agents on
+the Agents console with verbatim intro-deck one-liners — Dispute Defender
+live, the other seven visibly badged roadmap. 108 tests green (Postgres
+contract tests included, no skips).

@@ -13,13 +13,23 @@
 -- Deliberately absent: the pgvector embedding column on evidence_item. Nothing
 -- reads embeddings yet; schema that nothing reads is schema that rots. It
 -- arrives in 002 with the retrieval that uses it.
+--
+-- Dispute Defender rebuild: opportunity_id/account_id/competitor_id became
+-- order_id/merchant_id/reason_code; rep_user_id is dropped (a merchant
+-- approves its own dispute response — there is no separate rep); dispute_id,
+-- deadline_at and agent_type are new. Dropping and recreating rather than
+-- ALTERing: this is a dev/demo cluster with no production data to preserve,
+-- and the old GTM seed data is being fully replaced anyway (§7).
 
 BEGIN;
+
+DROP TABLE IF EXISTS effect, outcome, memory, evidence_item, policy, run CASCADE;
 
 CREATE TABLE IF NOT EXISTS run (
   run_id            uuid PRIMARY KEY,
   tenant_id         uuid NOT NULL,
   loop              text NOT NULL DEFAULT 'watcher',
+  agent_type        text NOT NULL DEFAULT 'dispute_defender',
   idempotency_key   text NOT NULL,
   status            text NOT NULL,
   suppressed_reason text,
@@ -28,10 +38,11 @@ CREATE TABLE IF NOT EXISTS run (
   trigger_ref       text NOT NULL,
   occurred_at       timestamptz NOT NULL,
 
-  opportunity_id    text,
-  account_id        text,
-  rep_user_id       text,
-  competitor_id     text,
+  order_id          text,
+  merchant_id       text,
+  dispute_id        text,
+  reason_code       text,
+  deadline_at       timestamptz,
   claim_hash        text,
   claim_text        text,
 
@@ -61,7 +72,7 @@ CREATE TABLE IF NOT EXISTS run (
   UNIQUE (tenant_id, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS run_tenant_status ON run (tenant_id, status, created_at);
-CREATE INDEX IF NOT EXISTS run_tenant_opp ON run (tenant_id, opportunity_id);
+CREATE INDEX IF NOT EXISTS run_tenant_order ON run (tenant_id, order_id);
 
 -- gate_* columns are written exactly once: a second write with a different
 -- value is a bug upstream, and the database refuses to hide it.
@@ -117,8 +128,8 @@ CREATE INDEX IF NOT EXISTS memory_live
 CREATE TABLE IF NOT EXISTS evidence_item (
   evidence_id   uuid PRIMARY KEY,
   tenant_id     uuid NOT NULL,
-  competitor_id text NOT NULL,
-  claim_class   text NOT NULL,
+  reason_code   text NOT NULL,
+  evidence_type text NOT NULL,
   text          text NOT NULL,
   source_url    text NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now()

@@ -18,8 +18,8 @@ from relay_superagent.ledger import DuplicateRun, Ledger
 
 # Tests get their OWN database — the contract fixtures truncate tables,
 # and sharing the dev db once wiped seeded demo data mid-session.
-PG_SUPER = "postgresql://relay_superagent@localhost:5434/relay_superagent_test"
-PG_APP = "postgresql://relay_superagent_app@localhost:5434/relay_superagent_test"
+PG_SUPER = "postgresql://relay_superagent@localhost:5435/relay_superagent_test"
+PG_APP = "postgresql://relay_superagent_app@localhost:5435/relay_superagent_test"
 NOW = datetime(2026, 8, 3, 9, 0)
 
 
@@ -38,7 +38,7 @@ PG_UP = _pg_available()
 def make_run(idem="k1", tenant="t1", **kw) -> Run:
     defaults = dict(
         run_id=str(uuid.uuid4()), tenant_id=tenant, idempotency_key=idem,
-        trigger_source="gong", trigger_ref="c1", occurred_at=NOW,
+        trigger_source="bank_webhook", trigger_ref="c1", occurred_at=NOW,
         policy_version="pol_1", arm=Arm.TREATED)
     defaults.update(kw)
     return Run(**defaults)
@@ -77,9 +77,9 @@ def test_same_key_different_tenant_would_not_collide(ledger):
 
 def test_outcome_append_is_idempotent(ledger):
     run = ledger.insert(make_run())
-    a = ledger.append_outcome("t1", run.run_id, "opportunity_closed",
+    a = ledger.append_outcome("t1", run.run_id, "dispute_resolved",
                               {"won": True}, NOW, "crm")
-    b = ledger.append_outcome("t1", run.run_id, "opportunity_closed",
+    b = ledger.append_outcome("t1", run.run_id, "dispute_resolved",
                               {"won": False}, NOW, "crm")
     assert a.outcome_id == b.outcome_id
     assert ledger.outcome_for(run.run_id).outcome_value == {"won": True}
@@ -88,9 +88,9 @@ def test_outcome_append_is_idempotent(ledger):
 def test_effect_fires_exactly_once(ledger):
     run = ledger.insert(make_run())
     calls = []
-    ref1 = ledger.effect(run.run_id, "slack_post", "rep_7",
+    ref1 = ledger.effect(run.run_id, "slack_post", "merchant_7",
                          lambda: calls.append(1) or "ext_1")
-    ref2 = ledger.effect(run.run_id, "slack_post", "rep_7",
+    ref2 = ledger.effect(run.run_id, "slack_post", "merchant_7",
                          lambda: calls.append(1) or "ext_2")
     assert calls == [1]
     assert ref1 == ref2 == "ext_1"
@@ -98,37 +98,37 @@ def test_effect_fires_exactly_once(ledger):
 
 def test_distinct_targets_are_distinct_effects(ledger):
     run = ledger.insert(make_run())
-    ledger.effect(run.run_id, "slack_post", "rep_7", lambda: "a")
-    ledger.effect(run.run_id, "crm_note", "opp_1", lambda: "b")
+    ledger.effect(run.run_id, "slack_post", "merchant_7", lambda: "a")
+    ledger.effect(run.run_id, "crm_note", "order_1", lambda: "b")
     run2 = ledger.insert(make_run(idem="k2"))
-    ledger.effect(run2.run_id, "slack_post", "rep_7", lambda: "c")
+    ledger.effect(run2.run_id, "slack_post", "merchant_7", lambda: "c")
     # three distinct (run, type, target) triples, three firings — asserted via refs
-    assert ledger.effect(run2.run_id, "slack_post", "rep_7", lambda: "d") == "c"
+    assert ledger.effect(run2.run_id, "slack_post", "merchant_7", lambda: "d") == "c"
 
 
 def test_memory_appends_and_filters_superseded(ledger):
     run = ledger.insert(make_run())
     live = MemoryNote(memory_id=str(uuid.uuid4()), tenant_id="t1",
-                      subject_type="rep", subject_id="rep_7",
-                      concern="counter_style", body={"implies": "short"},
+                      subject_type="merchant", subject_id="merchant_7",
+                      concern="response_style", body={"implies": "short"},
                       source_run=run.run_id)
     dead = MemoryNote(memory_id=str(uuid.uuid4()), tenant_id="t1",
-                      subject_type="rep", subject_id="rep_7",
-                      concern="counter_style", body={"implies": "old"},
+                      subject_type="merchant", subject_id="merchant_7",
+                      concern="response_style", body={"implies": "old"},
                       source_run=run.run_id, superseded_by=live.memory_id)
     ledger.append_memory(live)
     ledger.append_memory(dead)
-    got = ledger.memory_for("t1", "rep_7", "counter_style")
+    got = ledger.memory_for("t1", "merchant_7", "response_style")
     assert [m.body for m in got] == [{"implies": "short"}]
 
 
 def test_saved_mutations_round_trip(ledger):
     run = ledger.insert(make_run())
-    run.claim_text = "Acme is cheaper"
+    run.claim_text = "Buyer says the order never arrived"
     run.cost_tokens = 1234
     ledger.save(run)
     got = next(r for r in ledger.runs_for_tenant("t1") if r.run_id == run.run_id)
-    assert got.claim_text == "Acme is cheaper"
+    assert got.claim_text == "Buyer says the order never arrived"
     assert got.cost_tokens == 1234
 
 

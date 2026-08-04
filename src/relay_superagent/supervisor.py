@@ -1,7 +1,7 @@
 """The supervisor: a worker loop over the run table with no model in it.
 
 It does the three things that have exactly one correct answer — expire stalled
-gates into PMM escalation (never auto-send), enforce the per-rep queue cap, and
+gates into human escalation (never auto-send), enforce the per-merchant queue cap, and
 resolve acted runs whose outcome has arrived. In production this is
 `SELECT … FOR UPDATE SKIP LOCKED` over Postgres; the sweep's shape is identical.
 """
@@ -15,7 +15,7 @@ from relay_superagent.domain.models import GateAction, Policy, Run, RunState
 from relay_superagent.ledger import Ledger
 from relay_superagent.ports.base import Clock, SlackPort
 
-# A rep with more than this many undecided cards stops getting new ones (§8).
+# A merchant with more than this many undecided cards stops getting new ones (§8).
 QUEUE_CAP = 3
 
 # Working states a run can crash-park in (e.g. dead between draft and the
@@ -33,7 +33,7 @@ class SweepReport:
     timed_out: list[str] = field(default_factory=list)
     resolved: list[str] = field(default_factory=list)
     stalled: list[str] = field(default_factory=list)
-    reps_over_cap: set[str] = field(default_factory=set)
+    merchants_over_cap: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -42,7 +42,7 @@ class Supervisor:
     clock: Clock
     slack: SlackPort
     policy: Policy
-    pmm_channel: str = "#relay_superagent-review"
+    escalation_channel: str = "#relay-dispute-review"
     # run_id -> state as of the previous sweep. Same working state on two
     # consecutive sweeps = stalled. Deliberately in-memory: after a process
     # restart the first sweep re-marks and the second escalates, which is
@@ -66,7 +66,7 @@ class Supervisor:
                 continue
             self._seen.pop(run.run_id, None)
             if run.state is RunState.AWAITING_GATE:
-                waiting[run.rep_user_id] = waiting.get(run.rep_user_id, 0) + 1
+                waiting[run.merchant_id] = waiting.get(run.merchant_id, 0) + 1
                 if run.surfaced_at and now - run.surfaced_at >= timeout:
                     self._time_out(run)
                     report.timed_out.append(run.run_id)
@@ -75,19 +75,19 @@ class Supervisor:
                 self.ledger.save(run)
                 report.resolved.append(run.run_id)
 
-        report.reps_over_cap = {rep for rep, n in waiting.items() if n >= QUEUE_CAP}
+        report.merchants_over_cap = {m for m, n in waiting.items() if n >= QUEUE_CAP}
         return report
 
-    def over_cap(self, rep_user_id: str) -> bool:
+    def over_cap(self, merchant_id: str) -> bool:
         n = sum(1 for r in self.ledger.runs.values()
-                if r.state is RunState.AWAITING_GATE and r.rep_user_id == rep_user_id)
+                if r.state is RunState.AWAITING_GATE and r.merchant_id == merchant_id)
         return n >= QUEUE_CAP
 
     def _time_out(self, run: Run) -> None:
         self.ledger.effect(
-            run.run_id, "pmm_escalation", "gate_timeout",
+            run.run_id, "escalation", "gate_timeout",
             lambda: self.slack.channel_post(
-                self.pmm_channel,
+                self.escalation_channel,
                 {"run": run.run_id, "reason": "gate_timeout", "claim": run.claim_text}))
         run.record_gate("system", GateAction.TIMEOUT, self.clock.now())
         run.transition(RunState.TIMED_OUT)
@@ -96,12 +96,12 @@ class Supervisor:
         self.ledger.save(run)
 
     def _fail_stalled(self, run: Run) -> None:
-        """A crash-parked run: never silence, never auto-send. The PMM gets
-        the run id and where it died; a human decides whether to re-drive."""
+        """A crash-parked run: never silence, never auto-send. The review
+        channel gets the run id and where it died; a human decides whether to re-drive."""
         self.ledger.effect(
-            run.run_id, "pmm_escalation", f"stalled:{run.state}",
+            run.run_id, "escalation", f"stalled:{run.state}",
             lambda: self.slack.channel_post(
-                self.pmm_channel,
+                self.escalation_channel,
                 {"run": run.run_id, "reason": f"stalled_at_{run.state}",
                  "claim": run.claim_text}))
         run.transition(RunState.FAILED)

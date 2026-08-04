@@ -1,4 +1,4 @@
-"""The Fathom rail — Lane A step 3, the trigger end of the gate sentence.
+"""The Fathom rail — inherited reference material from the GTM fork.
 
 Two pure pieces; the HTTP endpoint that uses them lives in the serving layer:
 
@@ -7,17 +7,17 @@ Two pure pieces; the HTTP endpoint that uses them lives in the serving layer:
   webhook-signature), HMAC-SHA256 over ``{id}.{timestamp}.{body}``, base64
   digests, the secret base64-decoded from after its ``whsec_`` prefix, and
   possibly several space-delimited ``v1,<sig>`` entries of which any one may
-  match. Replay window 5 minutes, checked before any crypto.
-- `to_trigger_event` maps the meeting payload onto TriggerEvent. The webhook
-  already carries ``crm_matches`` (deals/companies with record URLs), so deal
-  linkage costs no CRM round-trip at ingest. The fathom.video URL is the
-  stable meeting ref — webhook-id changes only per message, the URL names the
-  recording — so idempotency dedupes redelivery AND re-registration.
-
-Reps arrive as emails (``recorded_by.email``); Slack wants member ids. The
-mapping is tenant config, passed in as ``rep_directory`` — unknown emails fall
-through unchanged so the pipeline's enrolled-rep check suppresses them
-instead of a KeyError deciding policy.
+  match. Replay window 5 minutes, checked before any crypto. This piece is
+  domain-agnostic and unchanged.
+- `to_trigger_event` maps a meeting payload onto TriggerEvent. Fathom call
+  recordings are not how disputes actually arrive in production (a real
+  deployment is driven by a bank/payment-processor webhook that already
+  carries reason_code, merchant_id, order_id and dispute_id structured); this
+  adapter is kept only so the harness can still demonstrate ingesting a
+  transcript-shaped trigger. `reason_code` has to be supplied by the caller
+  when one is known from the call notes — the payload itself has no dispute
+  reason concept, so it defaults to None (which means "no row", per
+  `classify_dispute`).
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def _iso(ts: str | None) -> datetime | None:
 
 
 def to_trigger_event(payload: dict[str, Any], tenant_id: str,
-                     rep_directory: dict[str, str] | None = None,
+                     reason_code: str | None = None,
                      ) -> TriggerEvent | None:
     """None means "nothing to detect on" — no transcript or no stable ref —
     which is pre-trigger noise, not an error and not a run."""
@@ -83,15 +83,12 @@ def to_trigger_event(payload: dict[str, Any], tenant_id: str,
     matches = payload.get("crm_matches") or {}
     deals = matches.get("deals") or []
     companies = matches.get("companies") or []
-    account = (companies[0].get("record_url") or companies[0].get("name")
+    merchant = (companies[0].get("record_url") or companies[0].get("name")
                if companies else None)
-    if not account:
+    if not merchant:
         external = [i for i in payload.get("calendar_invitees") or []
                     if i.get("is_external") and i.get("email_domain")]
-        account = external[0]["email_domain"] if external else None
-
-    rep_email = (payload.get("recorded_by") or {}).get("email")
-    rep = (rep_directory or {}).get(rep_email, rep_email)
+        merchant = external[0]["email_domain"] if external else None
 
     occurred = (_iso(payload.get("recording_end_time"))
                 or _iso(payload.get("created_at"))
@@ -102,8 +99,9 @@ def to_trigger_event(payload: dict[str, Any], tenant_id: str,
         source="fathom",
         source_ref=source_ref,
         occurred_at=occurred,
-        opportunity_id=deals[0].get("record_url") if deals else None,
-        account_id=account,
-        rep_user_id=rep,
+        merchant_id=merchant,
+        order_id=deals[0].get("record_url") if deals else None,
+        dispute_id=None,
+        reason_code=reason_code,
         text="\n".join(lines),
     )

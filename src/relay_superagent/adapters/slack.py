@@ -69,7 +69,7 @@ def gate_card(b: dict[str, Any]) -> list[dict[str, Any]]:
             {"type": "button", "action_id": "reject", "value": run_id,
              "text": {"type": "plain_text", "text": "Dismiss"}},
             {"type": "button", "action_id": "open_workspace", "url": WORKSPACE_URL,
-             "text": {"type": "plain_text", "text": "Edit in Relay SuperAgent"}},
+             "text": {"type": "plain_text", "text": "Edit in Relay"}},
         ],
     })
     return blocks
