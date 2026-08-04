@@ -762,7 +762,6 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">C</span><b>Relay</b></div>
-    <div class="brandline" style="font-size:11px;color:#8a8d9c;padding:0 14px 10px;line-height:1.35">Pre-built agents for payment and compliance ops. You approve before anything sends.</div>
     {nav("/", "home", "Home", key="cmd")}
     {nav("/approvals", "tasks", "Approvals", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
     {nav("/projects", "folder", "Pipeline", key="projects")}
