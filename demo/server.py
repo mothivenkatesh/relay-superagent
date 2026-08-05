@@ -754,6 +754,11 @@ WORK_CSS = """
 .compose:hover{background:#E3E5EE;color:var(--ink,#1B1F30)}
 .compose svg{width:15px;height:15px}
 .navblock{margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid #ECECF1}
+.navbtn{width:100%;border:0;background:none;font:inherit;cursor:pointer;
+  text-align:left}
+.railsearch{margin:0 4px 10px;padding:8px 12px;font:inherit;font-size:13px;
+  border:1.5px solid #C7CDF3;border-radius:10px;outline:none;background:#fff}
+.railsearch:focus{border-color:var(--accent)}
 .navblock .nav{margin-bottom:1px}
 .nav.on{background:#ECECF1;color:var(--ink,#1B1F30)}
 .nav.on svg{color:var(--ink,#1B1F30)}
@@ -1080,19 +1085,31 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
             f'{c["word"]}</span><span class="cdot {c["key"]}"></span>'
             f'</span></span></a>')
 
-    rows = "".join(case_row(c) for c in cases) or (
+    # Fin's Operator grouping: chats bucketed by when they last moved, so
+    # the list reads as a day, not an archive.
+    from datetime import datetime as _dt, timedelta as _td
+    today = _dt.utcnow().date()
+    week_ago = today - _td(days=7)
+    groups = [("Today", [c for c in cases if c["last"].date() >= today]),
+              ("Previous 7 days", [c for c in cases
+                                   if week_ago <= c["last"].date() < today]),
+              ("Older", [c for c in cases if c["last"].date() < week_ago])]
+    rows = "".join(
+        (f'<div class="navsec csec" data-st="hdr">{label}</div>'
+         + "".join(case_row(c) for c in cs))
+        for label, cs in groups if cs) or (
         '<div class="cempty">Chats appear here as work comes in.</div>')
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
-      <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span>
-      <a class="compose" href="/" title="New message" aria-label="New message">{ICONS["pen"]}</a></div>
+      <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
     <div class="navblock">
-      <div class="navsec">Workspace</div>
-      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Your team</span></a>
+      <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
+      <a class="nav" href="/">{ICONS["pen"]}<span>New chat</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled">{ICONS["moon"]}<span>Scheduled</span></a>
-      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Memory</span></a>
     </div>
+    <input class="railsearch" id="railsearch" hidden placeholder="Search chats"
+      oninput="railSearch(this.value)">
     <div class="railhead"><span class="navsec">Chats</span>
       <span class="railfilter">
       <button class="rf on" data-f="all" onclick="railFilter(this)">All</button>
@@ -1104,6 +1121,8 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       {convs if convs is not None else ''}
     </div>
     <div class="railsys">
+      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Your team</span></a>
+      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Memory</span></a>
       <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
       <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
@@ -1114,6 +1133,18 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     const need = b.dataset.f === 'need';
     document.querySelectorAll('#raillist [data-st]')
       .forEach(el => {{ el.hidden = need && el.dataset.st !== 'need'; }});
+  }}
+  function railSearchToggle(){{
+    const s = document.getElementById('railsearch');
+    s.hidden = !s.hidden;
+    if (!s.hidden) s.focus(); else {{ s.value = ''; railSearch(''); }}
+  }}
+  function railSearch(v){{
+    v = v.trim().toLowerCase();
+    document.querySelectorAll('#raillist .rail, #raillist .conv')
+      .forEach(el => {{ el.hidden = !!v && !el.textContent.toLowerCase().includes(v); }});
+    document.querySelectorAll('#raillist .navsec')
+      .forEach(el => {{ el.hidden = !!v; }});
   }}
   </script>"""
 
@@ -3477,12 +3508,27 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     if q:
         agents = [a for a in agents if q.lower() in a["name"].lower()]
 
+    # Grouped as product families, the way Fin groups its surface: three
+    # names a founder can hold, not six org-chart desks.
+    FAMILIES = [
+        ("Relay for Commerce", ("support", "calling", "inventory"),
+         "The order side: buyers, calls, deliveries, disputes, stock."),
+        ("Relay for Finance", ("accounts", "analyst"),
+         "The money side: settlements, cash, payouts, the daily numbers."),
+        ("Relay for Trust", ("risk",),
+         "The checks: refund fraud, filings, KYC, mule accounts."),
+    ]
     desks = ""
-    for key, title, line in DESKS:
-        mine = [a for a in agents if a["desk"] == key]
+    for title, keys, line in FAMILIES:
+        mine = [a for a in agents if a["desk"] in keys]
         if not mine:
             continue
-        desks += (f'<h2 class="sec">{title}</h2>'
+        n_on_fam = sum(1 for a in mine
+                       if a["status"] == "live" or DEMO_ON.get(a["slug"]))
+        desks += (f'<h2 class="sec">{title} '
+                  f'<span class="st {"ok" if n_on_fam else "mut"}" '
+                  f'style="margin-left:8px">{n_on_fam} of {len(mine)} on'
+                  f'</span></h2>'
                   f'<div class="pagehint">{line}</div>'
                   f'<div class="atable" style="grid-template-columns:1fr">'
                   + "".join(_relay_agent_card(a, tid) for a in mine) + '</div>')
@@ -3492,12 +3538,12 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
                               f'href="/agents?f={key}">{label}</a>')
     n_all = len(RELAY_AGENTS)
-    n_on = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
-    n_desks = len({a["desk"] for a in RELAY_AGENTS})
+    n_on = sum(1 for a in RELAY_AGENTS
+               if a["status"] == "live" or DEMO_ON.get(a["slug"]))
     return (f'<h1 class="page">Your team</h1>'
-            f'<div class="pagehint">{n_all} agents, {n_desks} desks. '
-            f'the people you would otherwise hire. Nothing that touches '
-            f'money or a customer goes out until you say yes. '
+            f'<div class="pagehint">{n_all} agents in three families: the '
+            f'people you would otherwise hire. Nothing that touches money '
+            f'or a customer goes out until you say yes. '
             f'{n_on} working; open any of the rest to switch it on.</div>'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
@@ -6335,7 +6381,7 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
     if fresh:
         lines.append(("bolt", f'<b>{len(fresh)}</b> new dispute'
                       f'{"s" if len(fresh) != 1 else ""} came in. '
-                      f'{"replies are drafted" if n_wait else "all handled"}.'))
+                      f'{"Replies are drafted" if n_wait else "All handled"}.'))
     else:
         lines.append(("bolt", "A quiet night: nothing new came in."))
     lines.append(("tasks", f'Your team has handled <b>{handled}</b> '
@@ -6456,7 +6502,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     rows = "".join(
         f'<a class="arow" href="/cases/{esc(r.order_id or "")}">{ICONS["bolt"]}'
         f'<span>Wrote the reply to the bank for '
-        f'{esc(_account_label(r))}. {esc(bought(r.order_id))}. '
+        f'{esc(_account_label(r))} &middot; {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
         f'<span class="sub">Waiting on you &middot; '
         f'{_logo(_account_label(r))}{esc(_account_label(r))} &middot; '
