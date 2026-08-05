@@ -749,7 +749,11 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
 # rail that lists work, the steps that tick off while you watch, the work
 # product that comes out the other end, and the case page it opens into.
 WORK_CSS = """
-.newone{margin-bottom:6px;font-weight:500}
+.newone{font-weight:500}
+.navblock{margin:2px 0 12px;padding-bottom:10px;border-bottom:1px solid #ECECF1}
+.navblock .nav{margin-bottom:1px}
+.nav.on{background:#ECECF1;color:var(--ink,#1B1F30)}
+.nav.on svg{color:var(--ink,#1B1F30)}
 .railfilter{display:flex;gap:6px;padding:2px 8px 8px}
 .rf{font:inherit;font-size:12.5px;font-weight:500;color:var(--mut,#8A8D9C);
   background:none;border:1px solid transparent;border-radius:8px;padding:5px 11px;
@@ -1045,6 +1049,13 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     <div class="brand"><span class="logo">R</span>
       <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
     <a class="nav newone" href="/">{ICONS["home"]}<span>New message</span></a>
+    <div class="navblock">
+      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Your team</span></a>
+      <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled">{ICONS["moon"]}<span>Scheduled</span></a>
+      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Memory</span></a>
+      <a class="nav{' on' if active == 'journeys' else ''}" href="/journeys">{ICONS["ledger"]}<span>History</span></a>
+      <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
+    </div>
     <div class="railfilter">
       <button class="rf on" data-f="all" onclick="railFilter(this)">All</button>
       <button class="rf" data-f="need" onclick="railFilter(this)">Needs you
@@ -1054,13 +1065,6 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       <div class="navsec" data-st="need">Cases</div>
       {rows}
       {convs if convs is not None else ''}
-    </div>
-    <div class="railfoot">
-      <a href="/agents">Your team</a><span>&middot;</span>
-      <a href="/scheduled">Scheduled</a><span>&middot;</span>
-      <a href="/memory">Memory</a><span>&middot;</span>
-      <a href="/journeys">History</a><span>&middot;</span>
-      <a href="/settings">Settings</a>
     </div>
   </aside>
   <script>
