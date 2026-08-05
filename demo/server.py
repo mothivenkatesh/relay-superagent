@@ -4020,11 +4020,11 @@ _SCHED_INTRO = """
 <script>
 const ONB = [
   {e:'&#9749;', h:'Start every day already caught up',
-   p:'Your team works while you are away. The morning brief is written and waiting before you sit down &mdash; what came in, what was handled, what needs your yes.'},
-  {e:'&#128172;', h:'Set it once, in plain words',
-   p:'Tell Relay what you want and when &mdash; &ldquo;every Friday evening, tell me what we won this week.&rdquo; No settings, no forms. Saying it is setting it.'},
-  {e:'&#128214;', h:'Every run is something you can read',
-   p:'Each time a routine runs, it leaves a note here you can open like a conversation. Nothing happens off-stage, and nothing is ever sent without your yes.'}];
+   p:'The morning brief is written before you sit down &mdash; what came in overnight, what was handled, the few things that need your yes.'},
+  {e:'&#128172;', h:'Say it once, it runs forever',
+   p:'&ldquo;Every Friday evening, tell me what we won this week.&rdquo; That sentence is the whole setup &mdash; no settings, no forms.'},
+  {e:'&#128214;', h:'Nothing happens behind your back',
+   p:'Every run leaves a note you can open like a chat, and nothing is ever sent anywhere without your yes.'}];
 function onbShow(i){
   window._onb = i;
   document.getElementById('onbSlides').innerHTML =
@@ -5795,9 +5795,9 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     has_runs = any(r.tenant_id == tid for r in WORLD.d.ledger.runs.values())
     sample_html = "" if has_runs else (
         '<form method="post" action="/api/sample" class="samplecta">'
-        '<button class="btn primary">See it working &mdash; load sample data</button>'
-        '<span class="mut">Puts one made-up dispute through the real '
-        'agent. Nothing is filed anywhere.</span></form>')
+        '<button class="btn primary">Watch it defend one dispute</button>'
+        '<span class="mut">A made-up dispute, the real agent. Nothing is '
+        'filed anywhere.</span></form>')
 
     # The AI-CFO headline: one number, big, in rupees, from the record.
     kept, n_wins, window = recovered(tid)
@@ -5807,8 +5807,8 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
                  f'dispute{"s" if n_wins != 1 else ""} your team won</span></div>')
     else:
         money = ('<div class="money"><b class="big">&#8377;0</b>'
-                 '<span class="cap">nothing won back yet &mdash; your team is '
-                 'still working</span></div>')
+                 '<span class="cap">your team is on the job &mdash; the '
+                 'first win lands here</span></div>')
 
     n_wait = sum(1 for r in WORLD.d.ledger.runs.values()
                  if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
