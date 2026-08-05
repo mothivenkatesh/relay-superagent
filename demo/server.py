@@ -1855,6 +1855,22 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .slimcard .slimdesc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;font-size:12.5px}
 .slimcard .go2{flex:none}
+.outcome{font-size:24px;font-weight:600;letter-spacing:-.01em;color:var(--ink);
+  margin:20px 0 10px;max-width:640px}
+.hsteps{margin:4px 0 6px;max-width:560px}
+.hstep{display:flex;gap:14px;padding:9px 2px;align-items:flex-start}
+.hstep .hdot{width:9px;height:9px;border-radius:50%;background:var(--ink);
+  flex:none;margin-top:5px;box-shadow:0 0 0 3px #ECECF1}
+.hstep b{display:block;font-size:14px;color:var(--ink)}
+.hstep .mut{font-size:13px}
+.capwrap{display:flex;flex-wrap:wrap;gap:8px;max-width:640px;margin:4px 0 6px}
+.capchip{display:inline-flex;align-items:center;gap:7px;background:#fff;
+  border:1px solid var(--hair);border-radius:999px;padding:7px 14px;
+  font-size:12.5px;color:var(--text)}
+.capchip svg{width:13px;height:13px;color:#6A6D7D}
+.capchip.act{background:var(--accent-soft,#E9EBF8);border-color:transparent;
+  color:#3A46A8}
+.capchip.act svg{color:#3A46A8}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -2843,6 +2859,90 @@ DESK_ACCESS = {
 
 DEMO_ON: dict[str, bool] = {}    # slug -> switched on (demo state, in-memory)
 
+# One outcome, three-or-four steps. The Razorpay Agent Studio grammar:
+# say what you get, then how, in one glance — never a wall of rows.
+AGENT_STORY = {
+    "three_way_recon": dict(
+        outcome="Every rupee tied out, every morning",
+        steps=[("Pull", "your orders, the payouts, the bank"),
+               ("Match", "line by line, all three ways"),
+               ("Flag", "what didn&rsquo;t tie, with the reason"),
+               ("Report", "one morning note: matched, short, stuck")]),
+    "settlement_insights": dict(
+        outcome="Know what you were actually paid",
+        steps=[("Watch", "every settlement as it lands"),
+               ("Break down", "what was deducted, and why"),
+               ("Tell you", "what&rsquo;s landing today and what&rsquo;s stuck")]),
+    "cashflow_forecast": dict(
+        outcome="See a cash crunch a week before it hits",
+        steps=[("Read", "what&rsquo;s landing and what&rsquo;s going out"),
+               ("Project", "your cash position 7 days ahead"),
+               ("Warn", "the moment a tight week shows up")]),
+    "payouts_desk": dict(
+        outcome="Vendors, staff and refunds paid on time, every time",
+        steps=[("Line up", "what&rsquo;s due, to whom, by when"),
+               ("Ask", "you approve the list &mdash; one yes"),
+               ("Pay", "each one, the way they want to be paid"),
+               ("Record", "every payment against its bill")]),
+    "payment_forms": dict(
+        outcome="Any odd payment collected with one form",
+        steps=[("Hear", "what you need &mdash; a bulk order, an advance"),
+               ("Build", "the form, checks included"),
+               ("Collect", "the money straight into your account")]),
+    "stock_watch": dict(
+        outcome="Never oversell, never sit on dead stock",
+        steps=[("Watch", "stock across every channel"),
+               ("Warn", "before you run out, days ahead"),
+               ("Draft", "the reorder &mdash; sent only on your yes")]),
+    "refund_shield": dict(
+        outcome="Refund fraud caught before the money leaves",
+        steps=[("Check", "every claim against the order and delivery"),
+               ("Score", "what looks wrong, and why"),
+               ("Hold", "the doubtful ones for your call")]),
+    "gst_compliance": dict(
+        outcome="Filing-ready books, no month-end scramble",
+        steps=[("Tie", "GST, TDS and e-invoices to real orders"),
+               ("Spot", "what won&rsquo;t match before it&rsquo;s filed"),
+               ("Hand over", "one clean file your CA can use")]),
+    "kyc_desk": dict(
+        outcome="Every buyer checked in seconds, not at the counter",
+        steps=[("Screen", "the buyer the moment it matters"),
+               ("Verify", "the standard checks, automatically"),
+               ("Escalate", "the risky ones to a deeper look"),
+               ("Block", "mule accounts before money moves")]),
+    "dispute_defender": dict(
+        outcome="Every dispute answered before the deadline",
+        steps=[("Read", "the dispute the moment the bank sends it"),
+               ("Gather", "the proof from your own records"),
+               ("Write", "the reply &mdash; you approve it"),
+               ("File", "before the deadline, exactly once")]),
+    "returns_desk": dict(
+        outcome="Refunds released only when the goods are back",
+        steps=[("Follow", "every return from pickup to doorstep"),
+               ("Check", "the item actually arrived back"),
+               ("Release", "the refund, and record it")]),
+    "cart_rescue": dict(
+        outcome="Dropped carts called back within the hour",
+        steps=[("Spot", "a cart left at checkout"),
+               ("Call", "the buyer while they still care"),
+               ("Send", "the payment link that closes it")]),
+    "payment_rescue": dict(
+        outcome="Failed payments turned back into orders",
+        steps=[("Read", "why the payment failed"),
+               ("Wait", "a few minutes &mdash; then call"),
+               ("Send", "a fresh link that works")]),
+    "cod_guard": dict(
+        outcome="COD confirmed before dispatch, returns cut",
+        steps=[("Call", "every COD order before it ships"),
+               ("Confirm", "the buyer actually wants it"),
+               ("Block", "addresses that keep bouncing")]),
+    "daily_mis": dict(
+        outcome="Your numbers every morning, with the why",
+        steps=[("Collect", "yesterday from every channel"),
+               ("Compare", "against the weeks before"),
+               ("Tell you", "what changed and why it changed")]),
+}
+
 
 # A person reading this is not a developer. Nobody should ever see a slug like
 # "detection-agent" on screen &mdash; each worker has a plain job title, the way
@@ -2913,15 +3013,17 @@ def roster_detail_content(tid: str, a: dict) -> str:
                   f'<input type="hidden" name="slug" value="{a["slug"]}">'
                   f'<button class="btn primary">Switch on &mdash; it only '
                   f'watches for the first week</button></form>')
-    verb = "It reads" if on else "It will read"
-    dverb = "It can" if on else "It will"
-    reads = "".join(f'<div class="trow slim"><span class="ico">{ICONS["book"]}</span>'
-                    f'<span class="tdesc">{verb} {r}</span></div>'
-                    for r in acc["reads"])
-    does = "".join(f'<div class="trow slim"><span class="ico">{ICONS["bolt"]}</span>'
-                   f'<span class="tdesc">{dverb} {d} &mdash; <span class="mut">'
-                   f'never before your yes</span></span></div>'
-                   for d in acc["does"])
+    story = AGENT_STORY.get(a["slug"], {})
+    steps = "".join(
+        f'<div class="hstep"><span class="hdot"></span>'
+        f'<div><b>{w}</b><span class="mut">{d}</span></div></div>'
+        for w, d in story.get("steps", []))
+    caps = "".join(
+        f'<span class="capchip">{ICONS["book"]} Reads {r}</span>'
+        for r in acc["reads"]) + "".join(
+        f'<span class="capchip act">{ICONS["bolt"]} Can {d} &middot; '
+        f'after your yes</span>'
+        for d in acc["does"])
     rules = "".join(f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
                     f'<span class="tdesc">{r}</span></div>'
                     for r in acc["rules"])
@@ -2930,16 +3032,17 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'{_identicon(a["slug"], 44)}'
         f'<div><h1>{a["role"]}</h1>'
         f'<div class="meta">{state}<span>&middot;</span>'
-        f'<span>{a["name"]}</span></div></div></div>'
-        f'<div class="pane-detail" style="max-width:640px;margin-bottom:14px">'
-        f'<h3>The job</h3><p>{a["desc"]}</p>'
-        f'<p style="margin-top:10px" class="mut"><b>Without Relay:</b> '
-        f'{a["today"]}</p>'
-        f'<p style="margin-top:10px" class="mut">Replaces {a["replaces"]}.</p></div>'
-        f'<h2 class="sec">What it touches</h2>{reads}{does}'
+        f'<span>{a["name"]}</span></div></div>'
+        f'<div style="margin-left:auto">{action}</div></div>'
+        f'<div class="outcome">{story.get("outcome", a["desc"])}</div>'
+        f'<p class="mut" style="max-width:560px;margin:0 0 6px">{a["desc"]}</p>'
+        f'<p class="mut" style="font-size:12.5px;margin:0 0 22px">'
+        f'Replaces {a["replaces"]}.</p>'
+        f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
+        f'<h2 class="sec">What it can touch</h2>'
+        f'<div class="capwrap">{caps}</div>'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
-        f'{helpers}'
-        f'<div style="margin-top:18px">{action}</div>')
+        f'{helpers}')
 
 
 def agent_detail_content(tid: str, slug: str, tab: str = "overview",
@@ -3129,11 +3232,12 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
                 f'href="/agents/{a["slug"]}">{inner}</a>')
     stat = ('<span class="st wait" style="flex:none">watching</span>' if watching
             else '<span class="st mut" style="flex:none">Off</span>')
+    line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
     return (f'<a class="arow2 slimcard" href="/agents/{a["slug"]}">'
             f'{_identicon(a["slug"], 28)}'
             f'<span class="dot2 {"on" if watching else "off"}"></span>'
             f'<b>{a["role"]}</b>'
-            f'<span class="mut slimdesc">{a["desc"]}</span>'
+            f'<span class="mut slimdesc">{line}</span>'
             f'{stat}<span class="go2">&rsaquo;</span></a>')
 
 
