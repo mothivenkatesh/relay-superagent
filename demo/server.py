@@ -7967,10 +7967,7 @@ font-size:13.5px;color:var(--text);margin-bottom:1px;position:relative}
 background:linear-gradient(#FDFDFE,#F1F2F8)}
 .convhead{display:flex;align-items:center;padding:16px 32px;color:var(--ink);
 font-size:14.5px;font-weight:500;flex:none}
-.convhead .newchat{margin-left:auto;font-size:13px;font-weight:500;color:var(--text);
-background:var(--pill);border-radius:9px;padding:8px 12px}
-.convhead .newchat:hover{background:#E6E7EC}
-.uwrap{display:flex;align-items:center;gap:16px;margin-left:16px;font-size:13.5px;
+.uwrap{display:flex;align-items:center;gap:16px;margin-left:auto;font-size:13.5px;
 color:var(--mut)}
 .uwrap .logout{color:var(--mut)}
 .uwrap .logout:hover{color:var(--ink)}
@@ -8058,8 +8055,8 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
   font-size:13px;font-weight:500;color:#26293A;background:var(--pill);
   border-radius:9px;padding:8px 12px;transition:background .12s}
 .mode summary:hover{background:#E6E7EC}
-.mode summary:active,.newchat:active,.hint:active{background:#DEDFE6}
-.mode summary:focus-visible,.newchat:focus-visible,.hint:focus-visible{
+.mode summary:active,.hint:active{background:#DEDFE6}
+.mode summary:focus-visible,.hint:focus-visible{
   outline:2px solid #98A5F0;outline-offset:2px}
 .mode summary::-webkit-details-marker{display:none}
 .mode summary svg{width:14px;height:14px;color:#5A5D6D}
@@ -8182,7 +8179,6 @@ background:none}
 __SIDEBAR__
 <div class="main">
   <div class="convhead" id="convhead"><span id="ctitle">__CONVTITLE__</span>
-    <a class="newchat" id="newchat" href="/">+&ensp;New chat</a>
     <span class="uwrap"><span class="bizchip">__BIZ__</span><span class="uemail">__USER__</span>
     <a class="logout" href="/logout">Log out</a>
     <span class="avatar">__INITIAL__</span></span></div>
@@ -8210,8 +8206,6 @@ __SIDEBAR__
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         <button type="button" class="cbtn" id="micbtn" onclick="micGo()" aria-label="Say it instead">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg></button>
-        <button type="button" class="cbtn" onclick="amToggle(event)" aria-label="How Relay answers">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
         <div class="ammenu" id="ammenu" hidden>
           <button type="button" class="mopt" onclick="amSet('auto')"><div>Auto<small>Relay reads the ask and picks the right agent to answer.</small></div><span class="tick" id="tk-auto">&#10003;</span></button>
           <button type="button" class="mopt" onclick="amPick()"><div>One agent<small>You choose who answers. Typing / does the same.</small></div></button>
@@ -8365,7 +8359,6 @@ const box = document.getElementById('box');
 if (CONV) document.getElementById('empty')?.remove();
 if (!CONV){
   document.getElementById('ctitle').style.visibility = 'hidden';
-  document.getElementById('newchat').style.visibility = 'hidden';
 }
 function convMenu(ev, id, pinned){
   ev.preventDefault(); ev.stopPropagation();
@@ -8482,7 +8475,6 @@ async function send(text){
     const t = document.getElementById('ctitle');
     t.style.visibility = '';
     t.textContent = data.title || 'Conversation';
-    document.getElementById('newchat').style.visibility = '';
     history.replaceState(null, '', '/?c=' + CONV);
   }
   await runSteps(data.steps);
