@@ -1255,18 +1255,29 @@ def _account_label(r) -> str:
     return customer_of(r.order_id)
 
 
+def auto_send_chip(r) -> str:
+    """Earned autonomy, visible where it applies: once small ones may send
+    themselves, every small waiting item says so, and says how to stop it."""
+    if (autonomy_mode(r.tenant_id) == "small"
+            and price_of(r.order_id) < SMALL_LIMIT_PAISE):
+        return ('<span class="st ok" title="Under your small-amount line">'
+                'sends itself at 6 PM unless you stop it</span>')
+    return ""
+
+
 def task_row(r) -> str:
     plain = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
     customer = esc(_account_label(r))
     when = r.occurred_at.strftime("%b %-d")
     rid = r.run_id
     counter = esc((r.decision or {}).get("counter_text", ""))
+    auto = auto_send_chip(r)
     return f"""
 <div class="taskwrap">
   <div class="trow">
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
-    <span class="tdesc">Reply to the bank for
+    <span class="tdesc">{auto} Reply to the bank for
       <a href="/cases/{esc(r.order_id or "")}"><b>{customer}</b></a>.
       {esc(bought(r.order_id))}. {plain}.
       <a class="mut" href="/cases/{esc(r.order_id or "")}">{esc(case_no(r.order_id))} &rarr;</a>
@@ -2150,6 +2161,18 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 2px}
 .cashdone{margin-top:12px;background:#FAFAFC;border-radius:12px;
   padding:12px 16px;font-size:13.5px;color:var(--text)}
 .cashdone.ok{background:#E9F7EF;color:#177245;font-weight:500}
+.trace{margin-top:12px;border-top:1px solid #F1F1F5;padding-top:12px}
+.trace-h{font-size:11px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--mut);margin-bottom:8px}
+.tr3{display:flex;align-items:center;gap:12px;padding:6px 0;
+  position:relative}
+.tr3 .tpill{width:8px;height:18px;border-radius:99px;background:#1E9E5A;
+  flex:none}
+.tr3.running .tpill{animation:pulse 1.4s ease infinite}
+@keyframes pulse{50%{opacity:.4}}
+.tr3 .tlabel{flex:1;font-size:13px;color:var(--ink)}
+.tr3 .tstat{font-size:12px;color:#1E9E5A;font-weight:600}
+.tr3.running .tstat{color:#177245}
 .assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:8px 8px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:16px 0 24px}
@@ -4895,6 +4918,20 @@ PROPS_DEF = {
         declined="Left alone. The orders stay unpaid."),
 }
 
+PROP_EXECS = {
+    "cashflow_forecast": [('Payout calendar updated', 'done'), ('Courier told about the new date', 'done'), ("Watching Thursday's balance", 'running')],
+    "stock_watch": [('Order sent to Vasudha Farms', 'done'), ('Delivery slot confirmed for Tuesday', 'done'), ('Watching the stock until it lands', 'running')],
+    "payouts_desk": [('14 payments scheduled for the morning', 'done'), ('Every receiver told what is coming', 'done'), ('Receipts will file against their bills', 'running')],
+    "refund_shield": [('Refusal sent, proof attached', 'done'), ('Replacement offered instead', 'done'), ("Watching for the buyer's reply", 'running')],
+    "cod_guard": [('3 orders held from dispatch', 'done'), ('Slots handed to confirmed orders', 'done'), ('Pincode on watch', 'running')],
+    "returns_desk": [('Refund released to the buyer', 'done'), ('Buyer told, with the timeline', 'done'), ('Case closed and written down', 'done')],
+    "payment_forms": [('Form sent on WhatsApp', 'done'), ('Watching for the payment', 'running')],
+    "kyc_desk": [('Buyer cleared', 'done'), ('Payment allowed through', 'done'), ('The check written into the record', 'done')],
+    "gst_compliance": [('File sent to your CA', 'done'), ('A copy kept in your records', 'done')],
+    "cart_rescue": [('Call list locked: 12 buyers', 'done'), ('First calls go out at 6 PM', 'running')],
+    "payment_rescue": [('Fresh links sent to all 5', 'done'), ('Two have already paid', 'done'), ('Calls follow where links sit unused', 'running')],
+}
+
 # Reporting agents close their loop in the morning note, not a card.
 REPORT_AGENTS = {"three_way_recon", "settlement_insights", "daily_mis"}
 
@@ -4916,8 +4953,19 @@ def prop_card(tid: str, slug: str) -> str:
     p = prop_state(tid, slug)
     role = next((a["role"] for a in RELAY_AGENTS if a["slug"] == slug), slug)
     if p["state"] == "approved":
+        steps = PROP_EXECS.get(slug, [])
+        trace = ""
+        if steps:
+            rows2 = "".join(
+                f'<div class="tr3 {st}"><span class="tpill"></span>'
+                f'<span class="tlabel">{txt}</span>'
+                f'<span class="tstat">{st}</span></div>'
+                for txt, st in steps)
+            trace = (f'<div class="trace"><div class="trace-h">What it is '
+                     f'doing with your yes</div>{rows2}</div>')
         verdict = (f'<div class="cashdone ok">Approved by '
-                   f'{mention(p["decided_by"])}. {d["approved"]}</div>')
+                   f'{mention(p["decided_by"])}. {d["approved"]}</div>'
+                   + trace)
     elif p["state"] == "declined":
         verdict = f'<div class="cashdone">{d["declined"]}</div>'
     else:
@@ -5024,8 +5072,9 @@ def mode_ui(tid: str) -> str:
     else:
         opt_small = (
             f'<div class="mopt off"><div>Let Relay send small ones itself'
-            f'<small>Opens after 20 yeses without changing the wording '
-            f': you are at {n}.</small>'
+            f'<small>Opens after 20 clean yeses (approved without a '
+            f'rewording). You are at <b>{n} of {YES_TARGET}</b>, '
+            f'{YES_TARGET - n} to go.</small>'
             f'<span class="yesbar"><i style="width:{min(100, n * 100 // YES_TARGET)}%"></i></span>'
             f'</div></div>')
     opt_never = ('<div class="mopt off"><div>Skip approvals entirely'
@@ -7367,7 +7416,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         f'<span>Wrote the reply to the bank for '
         f'{mention(_account_label(r))} &middot; {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
-        f'<span class="sub">Waiting on you &middot; '
+        f'<span class="sub">{auto_send_chip(r) or "Waiting on you"} &middot; '
         f'{_logo(_account_label(r))}{esc(_account_label(r))} &middot; '
         f'{esc(channel_of(r.order_id))}</span></span>'
         f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>'
