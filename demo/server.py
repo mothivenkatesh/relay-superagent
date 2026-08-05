@@ -895,6 +895,8 @@ WORK_CSS = """
 .prow:last-child{border-bottom:none}
 .prow b{display:block;color:var(--ink,#1B1F30);font-size:13px;margin-bottom:2px}
 .prow span{color:var(--mut,#8A8D9C);font-size:12.5px;overflow-wrap:anywhere}
+.mention{display:inline-block;border-radius:8px;padding:0 6px;
+  font-weight:600;font-size:.95em;white-space:nowrap;line-height:1.5}
 @keyframes wfadein{to{opacity:1}}
 """
 
@@ -1583,6 +1585,18 @@ SOURCE_WORDS = {"bank_webhook": "straight from the bank",
                 "sample": "a made-up one, for trying it out"}
 
 
+def mention(name: str) -> str:
+    """A person's name as a WhatsApp-style mention tag: @Name in that
+    person's own color, the way a group chat colors its members. "you"
+    stays plain prose; tags are for named people."""
+    n = (name or "").strip()
+    if not n or n.lower() == "you":
+        return "you"
+    color = _LOGO_COLORS[sum(n.encode()) % len(_LOGO_COLORS)]
+    return (f'<span class="mention" style="background:{color}1a;'
+            f'color:{color}">@{esc(n)}</span>')
+
+
 def _who(actor: str | None, seed: str = "") -> str:
     """Name on a decision. Seeded history is attributed across the team
     (deterministic per run, like every other fact in this fictional world)
@@ -1627,7 +1641,8 @@ def plain_step(e: dict, r) -> tuple[str, str]:
             return ("Put it in front of you", "waiting on your yes")
         if kind == "approved":
             who = _who(d.removeprefix('by '), seed=r.run_id)
-            return (f"{who[0].upper()}{who[1:]} said yes", "sent as written")
+            return (("You said yes" if who == "you"
+                     else f"{mention(who)} said yes"), "sent as written")
         if kind == "edited":
             return ("You changed the wording",
                     "you fixed a fact" if r.gate_is_material else "just the wording")
@@ -1640,7 +1655,8 @@ def plain_step(e: dict, r) -> tuple[str, str]:
         return ("Handed it to a person", plain_detail(d))
     if agent == "note" or kind == "note":
         who = _who(agent if agent != "note" else None)
-        return (f"Note from {who}", esc(d))
+        return (("Note from you" if who == "you"
+                 else f"Note from {mention(who)}"), esc(d))
     return (esc(kind.replace("_", " ").capitalize()), plain_detail(d))
 
 
@@ -1778,7 +1794,7 @@ def case_content(tid: str, order_id: str) -> str:
         # is the select itself, so the state and the action are one thing.
         assign_ui = (
             f'<div class="assignbar">'
-            + (f'<span>Waiting on <b>{esc(assignee)}</b> to say yes.</span>'
+            + (f'<span>Waiting on {mention(assignee)} to say yes.</span>'
                if assignee else
                '<span>This yes is with <b>you</b>.</span>')
             + f'<form method="post" action="/api/assign">'
@@ -4795,7 +4811,7 @@ def prop_card(tid: str, slug: str) -> str:
     role = next((a["role"] for a in RELAY_AGENTS if a["slug"] == slug), slug)
     if p["state"] == "approved":
         verdict = (f'<div class="cashdone ok">Approved by '
-                   f'{esc(p["decided_by"] or "you")}. {d["approved"]}</div>')
+                   f'{mention(p["decided_by"])}. {d["approved"]}</div>')
     elif p["state"] == "declined":
         verdict = f'<div class="cashdone">{d["declined"]}</div>'
     else:
@@ -7113,7 +7129,7 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
             if w != "you":
                 mates[w.split()[0]] = mates.get(w.split()[0], 0) + 1
     if mates:
-        said = " and ".join(f'<b>{n}</b> ({c})' for n, c in
+        said = " and ".join(f'{mention(n)} ({c})' for n, c in
                             sorted(mates.items(), key=lambda x: -x[1]))
         lines.append(("bot", f'Yeses from teammates: {said}.'))
     if kept:
@@ -7242,7 +7258,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     rows = "".join(
         f'<a class="arow" href="/cases/{esc(r.order_id or "")}">{ICONS["bolt"]}'
         f'<span>Wrote the reply to the bank for '
-        f'{esc(_account_label(r))} &middot; {esc(bought(r.order_id))}. '
+        f'{mention(_account_label(r))} &middot; {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
         f'<span class="sub">Waiting on you &middot; '
         f'{_logo(_account_label(r))}{esc(_account_label(r))} &middot; '
