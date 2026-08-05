@@ -800,6 +800,23 @@ WORK_CSS = """
 .quietrow .rlabel{color:var(--mut);font-weight:400}
 .quietrow:hover .rlabel{color:var(--ink,#1B1F30)}
 .qword{flex:none;font-size:10.5px;color:#B9BCC7}
+.conv{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:8px;
+font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
+.conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
+.conv .ctitle{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .kebab{visibility:hidden;color:var(--mut,#8A8D9C);padding:0 2px;font-size:15px}
+.conv:hover{background:#F0F0F5}
+.conv:hover .kebab{visibility:visible}
+.conv.active{background:#ECECF1;color:var(--ink,#1B1F30)}
+.cbadge{flex:none;font-size:11px}
+.needsrow{display:flex;align-items:center;gap:10px;margin:4px 0 12px;
+  padding:10px 12px;border-radius:12px;background:#FBF2E2;color:#9A6215}
+.needsrow .rbadge{margin:0}
+.nr-t{flex:1;min-width:0}
+.nr-t b{display:block;font-size:13px}
+.nr-sub{display:block;font-size:11.5px;opacity:.8}
+.needsrow .nharrow{opacity:.6}
+.needsrow:hover .nharrow{opacity:1}
 .spot-scrim{position:fixed;inset:0;background:rgba(24,25,32,.4);z-index:80;
   display:none}
 .spot-scrim.open{display:block}
@@ -1179,69 +1196,28 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     STAFF. One row per agent, unread-bold when it needs your yes, and the
     work aggregates under the agent responsible: 7 disputes are one
     Disputes Officer row carrying a 7, not seven rows."""
-    # Ten UX rules in one list: attention groups beat roster order,
-    # money beats counts, quiet is a feature. Needs-you rows are two-line
-    # with the ask and the stake, sorted by rupees; everyone else is one
-    # calm muted line with no dot at all.
+    # HCI: the sidebar is chrome: stable landmarks and temporal recall.
+    # The work queue is primary content and lives on the main canvas; the
+    # rail keeps ONE ambient landmark for it, then conversation history.
     led_r = WORLD.d.ledger
-    d_wait = [r for r in led_r.runs.values()
-              if r.tenant_id == tid and r.state is RunState.AWAITING_GATE]
-    needs, quiet = [], []
-    n_need = 0
-    for a in RELAY_AGENTS:
-        slug = a["slug"]
-        if slug == "dispute_defender":
-            if d_wait:
-                total = sum(price_of(r.order_id) for r in d_wait)
-                needs.append((a, f'{len(d_wait)} replies to the bank',
-                              f'&#8377;{inr(total)}', total // 100,
-                              len(d_wait)))
-                n_need += len(d_wait)
-            else:
-                quiet.append((a, "all disputes answered"))
-        elif slug in PROPS_DEF:
-            d = PROPS_DEF[slug]
-            p = prop_state(tid, slug)
-            if p["state"] == "waiting":
-                needs.append((a, d["rail"], d["stake"], d["stake_n"], 1))
-                n_need += 1
-            else:
-                quiet.append((a, "done for today"))
-        elif slug in REPORT_AGENTS:
-            quiet.append((a, "note in your brief"))
-        else:
-            quiet.append((a, "watching"))
-    needs.sort(key=lambda t: -t[3])
-
+    n_need = sum(1 for r in led_r.runs.values()
+                 if r.tenant_id == tid
+                 and r.state is RunState.AWAITING_GATE) + props_waiting(tid)
     rows = ""
-    if needs:
-        rows += (f'<a class="needshdr" href="/approvals" '
-                 f'title="Review everything in one queue">Needs you'
-                 f'<span class="rbadge">{n_need}</span>'
-                 f'<span class="nharrow">&rarr;</span></a>')
-        for a, ask, stake, _n, badge in needs:
-            b = (f'<span class="rbadge">{badge}</span>' if badge > 1
-                 else '<span class="cdot need"></span>')
-            rows += (
-                f'<a class="rail unread{" active" if active == a["slug"] else ""}" '
-                f'data-st="need" href="/agents/{a["slug"]}" '
-                f'title="{esc(a["role"])}">'
-                f'{avatar(a["slug"], 30, True)}'
-                f'<span class="rbody"><span class="rtop"><span class="rname">'
-                f'{esc(a["role"])}</span>'
-                f'<span class="rstake">{stake}</span></span>'
-                f'<span class="rsub"><span class="rprev">{ask}</span>'
-                f'{b}</span></span></a>')
-    if quiet:
-        rows += '<div class="navsec csec" data-st="hdr">All quiet</div>'
-        for a, word in quiet:
-            rows += (
-                f'<a class="rail arow-min quietrow'
-                f'{" active" if active == a["slug"] else ""}" '
-                f'href="/agents/{a["slug"]}" title="{esc(a["role"])}">'
-                f'{avatar(a["slug"], 22, True)}'
-                f'<span class="rlabel">{esc(a["role"])}</span>'
-                f'<span class="qword">{word}</span></a>')
+    if n_need:
+        total_p = sum(price_of(r.order_id) for r in led_r.runs.values()
+                      if r.tenant_id == tid
+                      and r.state is RunState.AWAITING_GATE)
+        total_p += 100 * sum(
+            PROPS_DEF[sl].get("stake_n", 0) for sl in PROPS_DEF
+            if prop_state(tid, sl)["state"] == "waiting")
+        rows += (
+            f'<a class="needsrow" href="/approvals">'
+            f'<span class="rbadge">{n_need}</span>'
+            f'<span class="nr-t"><b>Need your yes</b>'
+            f'<span class="nr-sub">&#8377;{inr(total_p)} riding on '
+            f'them</span></span>'
+            f'<span class="nharrow">&rarr;</span></a>')
     return f"""
   <button class="burger" aria-label="Menu"
     onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
@@ -1257,6 +1233,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
 
     <div class="raillist" id="raillist">
       {rows}
+      {convs if convs is not None else ''}
     </div>
     <div class="railsys">
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
