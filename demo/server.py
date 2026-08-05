@@ -1847,6 +1847,14 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .hzn{font-size:12.5px;color:var(--mut);border-top:1px solid #F1F1F5;
   padding-top:9px;margin-top:2px}
 .hzn.on{color:#177245;font-weight:500}
+.slimcard{display:flex !important;align-items:center;gap:10px;
+  padding:12px 16px !important;font-size:14px;color:var(--ink)}
+.slimcard .dot2{position:static;border:0;width:7px;height:7px;flex:none}
+.slimcard .ident{flex:none}
+.slimcard b{flex:none;font-weight:600}
+.slimcard .slimdesc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;font-size:12.5px}
+.slimcard .go2{flex:none}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -2794,6 +2802,48 @@ AGENT_DEFS = {
                "How often you have to fix a reply is on the bill &mdash; you can check it yourself."]),
 }
 
+# Every roster agent opens to a real page, wired or not. What each desk may
+# read and the rules it works under are written per desk, in plain words —
+# honest "will" phrasing for the ones not switched on yet. Switching one on
+# is a demo-level act: it starts in watching mode and touches nothing.
+DESK_ACCESS = {
+    "accounts": dict(
+        reads=["your orders", "what the bank settled", "payout statements"],
+        does=["write you a summary", "flag what didn&rsquo;t tie"],
+        rules=["It reads statements; it never moves money.",
+               "Anything that doesn&rsquo;t tie is shown to you, never patched over.",
+               "Every number can be traced back to a bank line."]),
+    "inventory": dict(
+        reads=["stock counts", "orders coming in", "supplier lead times"],
+        does=["warn you before you run out", "draft a reorder for your yes"],
+        rules=["It never places an order itself &mdash; a reorder waits for your yes.",
+               "A warning names the product, the days left, and why."]),
+    "risk": dict(
+        reads=["refund claims", "filing deadlines", "the rules that apply to you"],
+        does=["flag the risky ones", "keep your filings on time"],
+        rules=["A doubt goes to you, never a quiet guess.",
+               "Deadlines are watched every day; a near-miss is said out loud."]),
+    "support": dict(
+        reads=["disputes from the bank", "your orders", "the proof on file"],
+        does=["write the reply for your yes", "file it once you agree"],
+        rules=["Nothing reaches a bank or a buyer without your yes.",
+               "Every claim in a reply points at proof on file."]),
+    "calling": dict(
+        reads=["dropped carts", "failed payments", "orders waiting confirmation"],
+        does=["call or message the buyer", "bring back the ones worth saving"],
+        rules=["It never calls the same buyer twice about one thing.",
+               "Calling hours are respected &mdash; no 9 PM calls.",
+               "A buyer who says stop is never contacted again."]),
+    "analyst": dict(
+        reads=["everything the other agents record"],
+        does=["write your daily one-pager"],
+        rules=["Numbers are counted from the record, never guessed.",
+               "Bad news is on page one, not buried."]),
+}
+
+DEMO_ON: dict[str, bool] = {}    # slug -> switched on (demo state, in-memory)
+
+
 # A person reading this is not a developer. Nobody should ever see a slug like
 # "detection-agent" on screen &mdash; each worker has a plain job title, the way
 # you would name the person you hired to do it.
@@ -2814,10 +2864,91 @@ def worker_name(slug: str) -> str:
         "-", " ").title()
 
 
+def roster_detail_content(tid: str, a: dict) -> str:
+    """One page per roster agent, wired or not. The not-yet ones read like
+    a hire you could make today: what the job is, what it would touch, the
+    rules it works under, and one button. Brief it like someone joining on
+    Monday — no tabs, no settings, one screen."""
+    on = a["status"] == "live" or DEMO_ON.get(a["slug"], False)
+    acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
+    helpers = ""
+    if a["status"] == "live":
+        state = '<span class="st ok">working</span>'
+        action = ""
+        # The machinery lives here, one level down — never on the team
+        # page. Most founders never need this list; the ones who ask
+        # "but what is it actually doing?" find every part named.
+        led = WORLD.d.ledger
+        runs = [r for r in led.runs.values() if r.tenant_id == tid]
+        n_sup = sum(1 for r in runs if r.state is RunState.SUPPRESSED)
+        n_drafted = sum(1 for r in runs if r.decision)
+        n_acted = sum(1 for r in runs
+                      if r.state in (RunState.ACTED, RunState.RESOLVED))
+        crew = [("ear", "detection-agent", f"{len(runs)} disputes read"),
+                ("funnel", "eligibility-agent", f"{n_sup} set aside"),
+                ("pen", "response-agent", f"{n_drafted} replies written"),
+                ("shield", "compliance-agent", "checks every reply"),
+                ("note", "filing-agent", f"{n_acted} filed"),
+                ("moon", "escalation-agent", "hands the stuck ones to a person"),
+                ("chart", "reporting-agent", "keeps the numbers")]
+        helpers = (
+            f'<h2 class="sec">How the work is split</h2>'
+            f'<div class="pagehint">Seven hands inside this one role. Open '
+            f'any of them if you want the detail.</div>'
+            + "".join(
+                f'<a class="trow slim" href="/agents/{s}" style="display:flex">'
+                f'<span class="ico">{ICONS[i]}</span>'
+                f'<span class="tdesc"><b>{worker_name(s)}</b> '
+                f'<span class="mut">{stat}</span></span>'
+                f'<span class="go2">&rsaquo;</span></a>'
+                for i, s, stat in crew))
+    elif on:
+        state = '<span class="st wait">watching &mdash; learning your business</span>'
+        action = (f'<form method="post" action="/api/agent_off">'
+                  f'<input type="hidden" name="slug" value="{a["slug"]}">'
+                  f'<button class="btn ghost">Switch it off</button></form>')
+    else:
+        state = '<span class="st mut">not switched on</span>'
+        action = (f'<form method="post" action="/api/agent_on">'
+                  f'<input type="hidden" name="slug" value="{a["slug"]}">'
+                  f'<button class="btn primary">Switch on &mdash; it only '
+                  f'watches for the first week</button></form>')
+    verb = "It reads" if on else "It will read"
+    dverb = "It can" if on else "It will"
+    reads = "".join(f'<div class="trow slim"><span class="ico">{ICONS["book"]}</span>'
+                    f'<span class="tdesc">{verb} {r}</span></div>'
+                    for r in acc["reads"])
+    does = "".join(f'<div class="trow slim"><span class="ico">{ICONS["bolt"]}</span>'
+                   f'<span class="tdesc">{dverb} {d} &mdash; <span class="mut">'
+                   f'never before your yes</span></span></div>'
+                   for d in acc["does"])
+    rules = "".join(f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
+                    f'<span class="tdesc">{r}</span></div>'
+                    for r in acc["rules"])
+    return (
+        f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
+        f'{_identicon(a["slug"], 44)}'
+        f'<div><h1>{a["role"]}</h1>'
+        f'<div class="meta">{state}<span>&middot;</span>'
+        f'<span>{a["name"]}</span></div></div></div>'
+        f'<div class="pane-detail" style="max-width:640px;margin-bottom:14px">'
+        f'<h3>The job</h3><p>{a["desc"]}</p>'
+        f'<p style="margin-top:10px" class="mut"><b>Without Relay:</b> '
+        f'{a["today"]}</p>'
+        f'<p style="margin-top:10px" class="mut">Replaces {a["replaces"]}.</p></div>'
+        f'<h2 class="sec">What it touches</h2>{reads}{does}'
+        f'<h2 class="sec">Rules it works under</h2>{rules}'
+        f'{helpers}'
+        f'<div style="margin-top:18px">{action}</div>')
+
+
 def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                          item: int = 0) -> str:
     a = AGENT_DEFS.get(slug)
     if not a:
+        roster = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
+        if roster is not None:
+            return roster_detail_content(tid, roster)
         return '<h1 class="page">We don&rsquo;t have anyone by that name</h1>'
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -2973,46 +3104,40 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 
 
 def _relay_agent_card(a: dict, tid: str = "t1") -> str:
-    """Name, what it does, what it costs you without Relay, and the proof it
-    has been running for months. No persona line: the reader is the owner,
-    and the owner is every role."""
+    """A wired agent earns the full card. Everything else is one calm row —
+    role, one line, Off — that opens to its page. The founder scanning this
+    at 9 PM sees at a glance what is working and is not asked to read
+    fourteen pitches (Hick: the pitch lives one click away, not here)."""
     live = a["status"] == "live"
+    watching = not live and DEMO_ON.get(a["slug"], False)
     if live:
         since, n = _working_since(tid)
         horizon = (f'Working since {since} &middot; {n} disputes checked '
                    f'&middot; never sleeps' if since
                    else "Switched on &middot; never sleeps")
-        horizon_html = f'<div class="hzn on">{horizon}</div>'
-        switch = '<span class="st ok">On</span>'
-    else:
-        horizon_html = '<div class="hzn">Not switched on</div>'
-        switch = '<span class="st mut">Off</span>'
-    inner = (f'<div class="aname" style="margin-bottom:8px;flex-wrap:wrap;'
-             f'row-gap:6px">'
-             f'{_identicon(a["slug"])}'
-             f'<span class="dot2 {"on" if live else "off"}"></span>'
-             f'<b style="font-size:15px">{a["role"]}</b>'
-             f'<span class="st mut" style="flex:none">{a["name"]}</span>'
-             f'<span style="margin-left:auto;flex:none">{switch}</span></div>'
-             f'<div style="margin:2px 0 10px">{a["desc"]}</div>'
-             f'<div class="mut" style="margin:0 0 10px;font-size:12.5px;'
-             f'border-left:2px solid var(--hair);padding-left:10px">'
-             f'<b>Without Relay:</b> {a["today"]}</div>'
-             f'<div class="repl">Replaces {a["replaces"]}.</div>'
-             f'{horizon_html}')
-    if live:
-        return f'<a class="arow2" style="display:block;padding:16px" href="/agents/detection-agent">{inner}</a>'
-    return f'<div class="arow2" style="display:block;padding:16px;opacity:.75">{inner}</div>'
+        inner = (f'<div class="aname" style="margin-bottom:8px;flex-wrap:wrap;'
+                 f'row-gap:6px">'
+                 f'{_identicon(a["slug"])}'
+                 f'<span class="dot2 on"></span>'
+                 f'<b style="font-size:15px">{a["role"]}</b>'
+                 f'<span class="st mut" style="flex:none">{a["name"]}</span>'
+                 f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
+                 f'<div style="margin:2px 0 10px">{a["desc"]}</div>'
+                 f'<div class="repl">Replaces {a["replaces"]}.</div>'
+                 f'<div class="hzn on">{horizon}</div>')
+        return (f'<a class="arow2" style="display:block;padding:16px" '
+                f'href="/agents/{a["slug"]}">{inner}</a>')
+    stat = ('<span class="st wait" style="flex:none">watching</span>' if watching
+            else '<span class="st mut" style="flex:none">Off</span>')
+    return (f'<a class="arow2 slimcard" href="/agents/{a["slug"]}">'
+            f'{_identicon(a["slug"], 28)}'
+            f'<span class="dot2 {"on" if watching else "off"}"></span>'
+            f'<b>{a["role"]}</b>'
+            f'<span class="mut slimdesc">{a["desc"]}</span>'
+            f'{stat}<span class="go2">&rsaquo;</span></a>')
 
 
 def agents_content(tid: str, f: str = "all", q: str = "") -> str:
-    led = WORLD.d.ledger
-    runs = [r for r in led.runs.values() if r.tenant_id == tid]
-    n_sup = sum(1 for r in runs if r.state is RunState.SUPPRESSED)
-    n_drafted = sum(1 for r in runs if r.decision)
-    n_acted = sum(1 for r in runs if r.state in (RunState.ACTED, RunState.RESOLVED))
-    n_esc = len(WORLD.d.slack.channel_posts)
-
     agents = RELAY_AGENTS
     if f in ("active", "planned"):
         want = "live" if f == "active" else "roadmap"
@@ -3032,49 +3157,20 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     if not desks:
         desks = '<div class="empty">Nothing matches.</div>'
 
-    crew_rows = [
-        ("ear", "detection-agent", f"{len(runs)} disputes read"),
-        ("funnel", "eligibility-agent", f"{n_sup} set aside"),
-        ("pen", "response-agent", f"{n_drafted} replies written"),
-        ("shield", "compliance-agent", "every reply"),
-        ("note", "filing-agent", f"{n_acted} filed"),
-        ("moon", "escalation-agent", f"{n_esc} handed to a person"),
-        ("chart", "reporting-agent", f"{len(runs)} rows"),
-    ]
-    def crew_row(icon, name, stat):
-        inner = (f'<span class="aname"><span class="tile">{ICONS[icon]}</span>'
-                 f'<span class="dot2 on"></span><b>{worker_name(name)}</b></span>'
-                 f'<span class="st ok">working</span>'
-                 f'<span class="mut" style="font-size:12.5px">{stat}</span>'
-                 f'<span class="go2">&rsaquo;</span>')
-        return f'<a class="arow2" href="/agents/{name}">{inner}</a>'
-    crew_table = "".join(crew_row(*r) for r in crew_rows)
-
     seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
                               f'href="/agents?f={key}">{label}</a>')
     n_all = len(RELAY_AGENTS)
     n_on = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
     n_desks = len({a["desk"] for a in RELAY_AGENTS})
     return (f'<h1 class="page">Your team</h1>'
-            f'<div class="pagehint">A team of {n_all} agents running the '
-            f'business day to day, under {n_desks} managers you would '
-            f'otherwise have to hire. Each one holds a named role and '
-            f'replaces a real job for less than that job costs. They work '
-            f'unattended and never stop &mdash; but nothing that touches '
-            f'money or a customer goes out until you say yes. In this demo '
-            f'{n_on} is switched on; the other {n_all - n_on} are off.</div>'
+            f'<div class="pagehint">{n_all} agents, {n_desks} desks &mdash; '
+            f'the people you would otherwise hire. Nothing that touches '
+            f'money or a customer goes out until you say yes. '
+            f'{n_on} working; open any of the rest to switch it on.</div>'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span></div>'
-            f'{desks}'
-            f'<h2 class="sec">Inside Dispute Defender</h2>'
-            f'<div class="pagehint">The seven helpers that do the actual work '
-            f'&mdash; one reads the dispute, one writes the reply, one checks '
-            f'it, one files it. Open any of them to see what it may touch and '
-            f'the rules it works under.</div>'
-            f'<div class="atable"><div class="thead"><span>Name</span>'
-            f'<span>Status</span><span>What it did</span><span></span></div>'
-            f'{crew_table}</div>')
+            f'{desks}')
 
 
 def activity_content(tid: str, f: str = "all") -> str:
@@ -3692,6 +3788,69 @@ function shstart(){
 </script>""")
 
 
+# ------------------------------------------------------------- autonomy
+# Earned, never assumed: the founder starts approving everything, and the
+# option to let small ones send themselves opens only after 20 clean yeses
+# — approvals where the wording wasn't touched. Counted off the ledger,
+# not a stored number, so it can always be checked.
+YES_TARGET = 20
+SMALL_LIMIT_PAISE = 50_000       # "small" = under Rs 500
+
+AUTONOMY: dict[str, str] = {}    # tid -> "all" (default) | "small"
+
+
+def clean_yeses(tid: str) -> int:
+    led = WORLD.d.ledger
+    return sum(1 for r in led.runs.values()
+               if r.tenant_id == tid
+               and r.gate_action is not None
+               and r.gate_action.value == "approve"
+               and not r.gate_is_material)
+
+
+def autonomy_mode(tid: str) -> str:
+    return AUTONOMY.get(tid, "all")
+
+
+def mode_ui(tid: str) -> str:
+    """The approve-mode chip on the composer. One control, three lines,
+    nothing to configure: the second option unlocks itself and says how
+    far along you are; the third is a promise, not a setting."""
+    n = clean_yeses(tid)
+    unlocked = n >= YES_TARGET
+    mode = autonomy_mode(tid)
+    label = ("Small ones send themselves" if mode == "small"
+             else "You approve everything")
+    tick = '<span class="tick">&#10003;</span>'
+
+    opt_all = (f'<form method="post" action="/api/mode" style="display:contents">'
+               f'<input type="hidden" name="mode" value="all">'
+               f'<button class="mopt" type="submit">You say yes to everything'
+               f'{tick if mode == "all" else ""}</button></form>')
+    if unlocked:
+        opt_small = (
+            f'<form method="post" action="/api/mode" style="display:contents">'
+            f'<input type="hidden" name="mode" value="small">'
+            f'<button class="mopt" type="submit"><div>Let Relay send small '
+            f'ones itself<small>Under &#8377;{SMALL_LIMIT_PAISE // 100} and '
+            f'nothing unusual. Everything still lands in History.</small>'
+            f'</div>{tick if mode == "small" else ""}</button></form>')
+    else:
+        opt_small = (
+            f'<div class="mopt off"><div>Let Relay send small ones itself'
+            f'<small>Opens after 20 yeses without changing the wording '
+            f'&mdash; you are at {n}.</small>'
+            f'<span class="yesbar"><i style="width:{min(100, n * 100 // YES_TARGET)}%"></i></span>'
+            f'</div></div>')
+    opt_never = ('<div class="mopt off"><div>Skip approvals entirely'
+                 '<small>Never. Nothing sends without you &mdash; by design.'
+                 '</small></div></div>')
+    return (f'<details class="mode" id="mode2">'
+            f'<summary>{ICONS["gear"]}<span>{label}</span></summary>'
+            f'<div class="menu">{opt_all}{opt_small}{opt_never}</div>'
+            f'</details>')
+
+
 # ------------------------------------------------------------- scheduled
 # The ADK long-horizon pattern, in plain clothes: scheduled work lives as
 # things you can open and read, not cron lines. Each routine is written the
@@ -3904,9 +4063,14 @@ def settings_content(tid: str, s: str = "team") -> str:
             f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
             f'<span class="tdesc"><b>{esc(k)}</b> <span class="mut">{v}</span></span></div>'
             for k, v in [
-                ("You approve before anything sends", "nothing goes to a bank "
-                 "without your yes; if you don&rsquo;t answer, it waits for a "
-                 "person &mdash; it never sends itself"),
+                (("Small ones send themselves" if autonomy_mode(tid) == "small"
+                  else "You approve before anything sends"),
+                 ("under &#8377;500 and nothing unusual goes out on its own; "
+                  "everything else still waits for your yes, and all of it "
+                  "lands in History" if autonomy_mode(tid) == "small" else
+                  "nothing goes to a bank without your yes; if you "
+                  "don&rsquo;t answer, it waits for a person &mdash; it "
+                  "never sends itself")),
                 ("Never more than 3 at a time", "your attention is protected; "
                  "if a flood arrives, a person is told"),
                 ("The same claim is never worked twice", "not within a week, "
@@ -4159,6 +4323,31 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/auth/signup", "/auth/login", "/auth/demo",
                          "/auth/verify"):
             return self._auth(raw)
+        if self.path in ("/api/agent_on", "/api/agent_off"):
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            slug = (parse_qs(raw).get("slug") or [""])[0]
+            if any(x["slug"] == slug for x in RELAY_AGENTS):
+                DEMO_ON[slug] = self.path.endswith("_on")
+            self.send_response(303)
+            self.send_header("Location", f"/agents/{slug}")
+            self.end_headers(); return
+        if self.path == "/api/mode":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            tid = sess["tenant_id"]
+            mode = (parse_qs(raw).get("mode") or ["all"])[0]
+            # The unlock is checked here too — the UI disables the option,
+            # but the server is the one that keeps the promise.
+            if mode == "small" and clean_yeses(tid) >= YES_TARGET:
+                AUTONOMY[tid] = "small"
+            elif mode == "all":
+                AUTONOMY[tid] = "all"
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.end_headers(); return
         if self.path == "/api/routine":
             sess = self._session()
             if not sess:
@@ -5192,11 +5381,17 @@ main{flex:1;overflow-y:auto;padding:8px 0 14px}
   border:1px solid var(--hair);border-radius:12px;box-shadow:0 10px 32px rgba(27,31,48,.12);
   padding:6px;min-width:290px;z-index:5}
 .mopt{display:flex;gap:10px;align-items:baseline;padding:9px 11px;border-radius:8px;
-  font-size:13.5px;color:var(--ink)}
+  font-size:13.5px;color:var(--ink);width:100%;border:0;background:none;
+  font-family:inherit;text-align:left;cursor:pointer}
 .mopt .tick{margin-left:auto;color:var(--accent);font-weight:600}
 .mopt:hover{background:#F5F5F8}
-.mopt.off{color:var(--mut)}
-.mopt.off small{display:block;font-size:11.5px;color:var(--mut);margin-top:2px}
+.mopt.off{color:var(--mut);cursor:default}
+.mopt.off:hover{background:none}
+.mopt small{display:block;font-size:11.5px;color:var(--mut);margin-top:2px;
+  font-weight:400}
+.yesbar{display:block;height:4px;border-radius:99px;background:#ECECF1;
+  margin-top:7px;overflow:hidden}
+.yesbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .active-h{display:flex;align-items:baseline;margin:30px 0 4px}
 .active-h span{font-size:13px;font-weight:600;color:var(--mut)}
 .active-h a{margin-left:auto;font-size:12.5px;color:var(--accent)}
@@ -5282,17 +5477,7 @@ __SIDEBAR__
   <form class="hcomposer" onsubmit="event.preventDefault();send(box.value)">
     <input id="box" placeholder="Ask anything, or tell Relay what to do" autofocus autocomplete="off">
     <div class="hrow">
-      <details class="mode" id="mode2">
-        <summary>""" + ICONS["gear"] + """<span>You approve everything</span></summary>
-        <div class="menu">
-          <div class="mopt" onclick="document.getElementById('mode2').open=false">
-            You say yes to everything<span class="tick">&#10003;</span></div>
-          <div class="mopt off"><div>Let Relay send small ones itself
-            <small>Opens up after you have said yes 20 times without changing the wording.</small></div></div>
-          <div class="mopt off"><div>Skip approvals entirely
-            <small>Never. Nothing sends without you &mdash; by design.</small></div></div>
-        </div>
-      </details>
+      __MODEUI__
       <button class="sendbtn" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
@@ -5546,9 +5731,11 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
                  f'needs your yes.</span>'
                  f'<span class="go">&rarr;</span></a>')
 
+    # Three rows, not five: the founder reads this on a phone at 9 PM.
+    # Everything else is one tap away behind "See all".
     waiting = sorted((r for r in WORLD.d.ledger.runs.values()
                       if r.tenant_id == tid and r.state is RunState.AWAITING_GATE),
-                     key=lambda r: r.occurred_at, reverse=True)[:5]
+                     key=lambda r: r.occurred_at, reverse=True)[:3]
     rows = "".join(
         f'<a class="arow" href="/cases/{esc(r.order_id or "")}">{ICONS["bolt"]}'
         f'<span>Wrote the reply to the bank for '
@@ -5562,6 +5749,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     active = (f'<div class="active-h"><span>What your team did today</span>'
               f'<a href="/approvals">See all &rarr;</a></div>{rows}') if rows else ""
     page = (CHAT_TEMPLATE
+            .replace("__MODEUI__", mode_ui(tid))
             .replace("__SIDEBAR__", sidebar_html("cmd", tid, convs=conv_list_html(tid, cid)))
             .replace("__CONVTITLE__", title)
             .replace("__CONVID__", cid)
