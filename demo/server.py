@@ -736,22 +736,6 @@ def influenced_won(tid: str) -> int:
     return total
 
 
-def signals_html(tid: str = "t1") -> str:
-    led = WORLD.d.ledger
-    raw = [correction_rate(led, tid), counter_usage_rate(led, tid),
-           trigger_precision(led, tid), gate_latency_p95_ms(led, tid)]
-    if all(v is None for v in raw):
-        return ""              # no numbers yet: show nothing, not an excuse
-    won = influenced_won(tid)
-    sig = ([("Disputes won", f"&#8377;{won/100000:.0f}k")] if won else []) + [
-        ("Responses merchants used", fmt_pct(raw[1])),
-        ("Real alerts", fmt_pct(raw[2])),
-        ("Response time", _fmt_latency(raw[3])),
-        ("Needed edits", fmt_pct(raw[0]))]
-    return "".join(
-        f'<div class="bm"><span>{ICONS["bm"]}{k}</span><i>{v}</i></div>' for k, v in sig)
-
-
 def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
     led = WORLD.d.ledger
     n_wait = sum(1 for r in led.runs.values()
@@ -764,18 +748,13 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
     <div class="brand"><span class="logo">C</span><b>Relay</b></div>
     {nav("/", "home", "Home", key="cmd")}
     {nav("/approvals", "tasks", "Approvals", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
-    {nav("/projects", "folder", "Pipeline", key="projects")}
     {nav("/journeys", "bolt", "Journeys", key="journeys")}
-    {nav("/impact", "ledger", "Impact", key="activity")}
     <hr class="side">
-    {nav("/knowledge", "book", "Evidence", key="knowledge")}
-    {nav("/workflows", "flow", "Playbooks", key="workflows")}
     {nav("/agents", "bot", "Agents", key="agents")}
-    {nav("/shadow", "search", "Shadow trial", key="shadow")}
     <hr class="side">
     {nav("/settings", "gear", "Settings", key="settings")}
     <hr class="side">
-    {convs if convs is not None else (lambda b: '<div class="navsec">Signals</div>' + b if b else '')(signals_html(tid))}
+    {convs if convs is not None else ''}
   </aside>"""
 
 
@@ -2421,7 +2400,7 @@ def account_journey_content(tid: str, acct_id: str) -> str:
     rows = "\n".join(ledger_row(r) for r in reversed(runs))
     return (
         '<div class="tkscope">'
-        f'<div class="dhead"><a class="back2" href="/projects">&lsaquo;</a>'
+        f'<div class="dhead"><a class="back2" href="/journeys">&lsaquo;</a>'
         f'<div><h1><span class="goalk">Goal:</span> {goal_line}</h1>'
         f'<div class="meta">{_logo(label)}{esc(label)}'
         f'<span>&middot;</span><span>{stats}</span></div></div>'
@@ -4071,8 +4050,7 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
         bits = [f"<b>{len(runs)}</b> runs through the pipeline, "
                 f"<b>{esc_n}</b> escalated",
                 "connectors: <b>4/4</b> healthy (bank webhook, Slack, CRM, email)",
-                f'<a href="/shadow">shadow scan: <b>{would}</b> responses it '
-                f'would have filed</a>']
+                f'shadow scan: <b>{would}</b> responses it would have filed']
         chips = ["What would have filed last night?", "How are the metrics?",
                  "Show the run ledger"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
