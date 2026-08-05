@@ -3081,6 +3081,11 @@ DESK_ACCESS = {
 }
 
 DEMO_ON: dict[str, bool] = {}    # slug -> switched on (demo state, in-memory)
+# Stress posture: the whole team starts switched on (watching), so every
+# surface shows a full office at work. Captain's call for the demo; the
+# gate still applies to anything an agent would DO.
+DEMO_ON.update({a["slug"]: True for a in RELAY_AGENTS
+                if a["status"] != "live"})
 
 # One rescue, followed through: the multithreaded story a founder needs to
 # see to believe a caller agent. Voice and WhatsApp are one conversation to
@@ -6814,6 +6819,21 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
                       f'{"s" if n_wins != 1 else ""} your team won.'))
     else:
         lines.append(("chart", "The first win lands here."))
+    # The rest of the office reports in one line each, only when that
+    # agent is on. Demo beats, same fiction as the rest of the world.
+    desk_beats = [
+        ("stock_watch", "bm", "Stock: Amla Juice has <b>6 days</b> left at "
+         "this pace. A reorder draft waits on your yes."),
+        ("cashflow_forecast", "flow", "Cash: Thursday looks tight, vendor "
+         "day and a GST debit collide. One payout move suggested."),
+        ("cod_guard", "send", "COD: <b>31 of 38</b> confirmed for dispatch; "
+         "3 held after two unanswered calls."),
+        ("three_way_recon", "ledger", "Books: 211 of 214 tied out on their "
+         "own; one payout short by <b>&#8377;4,310</b>, named."),
+    ]
+    for slug, icon, text in desk_beats:
+        if DEMO_ON.get(slug):
+            lines.append((icon, text))
     return lines
 
 
