@@ -898,7 +898,8 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .railfoot a{color:var(--mut,#8A8D9C)}
 .railfoot a:hover{color:var(--ink,#1B1F30)}
 .cempty{padding:4px 8px;font-size:12.5px;color:var(--mut,#8A8D9C)}
-.navsec.csec{margin-top:16px}
+.navsec.csec{margin-top:16px;display:flex;align-items:center;gap:6px}
+.navsec.csec svg{width:12px;height:12px;flex:none}
 .steps{align-self:stretch;max-width:100%}
 .btn.scanning{color:#fff;border-color:transparent;
   background:linear-gradient(100deg,var(--accent,#5266EB) 25%,#B9C2F7 45%,var(--accent,#5266EB) 65%);
@@ -1075,6 +1076,8 @@ ICONS = {
     'cmd': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8" />  <path d="m4 17 6-6-6-6" /></svg>',
     'ledger': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />  <path d="M14 2v5a1 1 0 0 0 1 1h5" />  <path d="M10 9H8" />  <path d="M16 13H8" />  <path d="M16 17H8" /></svg>',
     'alert': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />  <path d="M12 9v4" />  <path d="M12 17h.01" /></svg>',
+    'pin': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+    'chat': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>',
     'search': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" />  <circle cx="11" cy="11" r="8" /></svg>',
     'bolt': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></svg>',
     'bm': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" /></svg>',
@@ -7913,13 +7916,13 @@ def conv_list_html(tid: str, active: str = "") -> str:
 
     out = ""
     if pinned:
-        out += ('<div class="navsec csec" data-st="chat">Pinned</div>'
+        out += (f'<div class="navsec csec" data-st="chat">{ICONS["pin"]}<span>Pinned</span></div>'
                 + "".join(row(c) for c in pinned))
     if recents:
-        out += ('<div class="navsec csec" data-st="chat">Conversations</div>'
+        out += (f'<div class="navsec csec" data-st="chat">{ICONS["chat"]}<span>Conversations</span></div>'
                 + "".join(row(c) for c in recents))
     if not out:
-        out = ('<div class="navsec csec" data-st="chat">Conversations</div>'
+        out = (f'<div class="navsec csec" data-st="chat">{ICONS["chat"]}<span>Conversations</span></div>'
                '<div class="cempty" data-st="chat">Conversations appear here.</div>')
     return out
 
@@ -8098,7 +8101,8 @@ margin:0 0 16px;font-size:12.5px;color:var(--mut)}
 color:var(--text);text-decoration:none;font-weight:500}
 .rolepills a:hover{background:#F0F0F5}
 .rolepills a.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.navsec.csec{margin-top:16px}
+.navsec.csec{margin-top:16px;display:flex;align-items:center;gap:6px}
+.navsec.csec svg{width:12px;height:12px;flex:none}
 .conv{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:8px;
 font-size:13.5px;color:var(--text);margin-bottom:1px;position:relative}
 .conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
