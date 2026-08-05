@@ -3117,6 +3117,80 @@ AGENT_THREADS = {
 }
 
 
+# A day on the job, one per agent: the fastest way to believe an agent is
+# to watch one shift. Three or four beats, real objects, real amounts, and
+# the gate visible wherever money would move.
+AGENT_DAYS = {
+    "three_way_recon": [
+        ("7:00 AM", "Pulled yesterday: 214 orders, 3 payouts, one bank statement.", ""),
+        ("7:04 AM", "211 tied out on their own.", "matched"),
+        ("7:05 AM", "&#8377;4,310 short on one payout. Named the 3 orders inside it.", "flagged"),
+        ("7:06 AM", "Wrote the morning note. Your accounts person starts at zero.", "done")],
+    "settlement_insights": [
+        ("11:20 AM", "Settlement landed: &#8377;1,84,220.", ""),
+        ("11:21 AM", "Broke it down: &#8377;2,140 fees, &#8377;890 held back, reason named.", "done"),
+        ("11:22 AM", "&ldquo;Landing today&rdquo; updated. Nothing stuck.", "done")],
+    "cashflow_forecast": [
+        ("8:00 AM", "Read what lands this week and what goes out.", ""),
+        ("8:01 AM", "Thursday looks tight: vendor day and a GST debit collide.", "warned"),
+        ("8:01 AM", "Suggested moving one payout by two days. Your call.", "your yes")],
+    "payouts_desk": [
+        ("6:00 PM", "Lined up 14 payments due tomorrow: vendors, 2 refunds, the courier.", ""),
+        ("6:01 PM", "One list, one yes. You approved from your phone.", "your yes"),
+        ("6:02 PM", "Paid each one the way they want it. Every payment against its bill.", "done")],
+    "payment_forms": [
+        ("2:10 PM", "A bulk buyer wants to pay &#8377;2.6 lakh as a 40% advance.", ""),
+        ("2:11 PM", "Built the form: PAN, the advance, balance on delivery. One link.", "done"),
+        ("2:12 PM", "Buyer paid in one step. The books already know.", "paid")],
+    "stock_watch": [
+        ("9:00 AM", "Counted every channel: store, Amazon, Flipkart, quick commerce.", ""),
+        ("9:01 AM", "Amla Juice: 6 days left at this pace. The supplier needs 10.", "warned"),
+        ("9:02 AM", "Drafted the reorder. It goes nowhere until your yes.", "your yes")],
+    "refund_shield": [
+        ("4:40 PM", "Refund claim: &ldquo;bottle arrived broken&rdquo;, &#8377;1,249.", ""),
+        ("4:41 PM", "Checked the photo, the delivery scan, the history: second claim in 3 weeks.", "flagged"),
+        ("4:41 PM", "Held for a person. The buyer sees &ldquo;being reviewed&rdquo;, not a no.", "held")],
+    "gst_compliance": [
+        ("18th, 10:00 AM", "Tied the month&rsquo;s invoices to real orders. Two won&rsquo;t match.", ""),
+        ("10:01 AM", "Named both, with the fix for each.", "flagged"),
+        ("10:02 AM", "One clean file to your CA. Nothing rebuilt by hand.", "done")],
+    "returns_desk": [
+        ("Monday", "Return picked up: Shilajit Resin, &#8377;1,899.", "tracking"),
+        ("Wednesday", "Reached the warehouse. Seal checked, item fine.", "checked"),
+        ("Wednesday", "Refund released the same hour. It never went out early.", "done")],
+    "cod_guard": [
+        ("10:00 AM", "38 COD orders lined up for dispatch today.", ""),
+        ("10:20 AM", "31 confirmed on call, 4 more on WhatsApp.", "confirmed"),
+        ("10:25 AM", "3 never picked up twice. Held from dispatch, pincode noted.", "held")],
+    "daily_mis": [
+        ("7:30 AM", "Collected yesterday from every channel.", ""),
+        ("7:31 AM", "Orders up 12%, but returns on one SKU doubled. Said why.", "insight"),
+        ("7:32 AM", "One page, in your morning brief.", "done")],
+    "dispute_defender": [
+        ("9:14 AM", "Bank sends a dispute: &ldquo;never arrived&rdquo;, &#8377;549.", ""),
+        ("9:14 AM", "Proof pulled: delivery scan, WhatsApp thread, policy as it read that day.", "done"),
+        ("9:15 AM", "Reply written and put in front of you. One tap.", "your yes"),
+        ("9:40 AM", "Filed with the bank, exactly once. Deadline was 6 days out.", "filed")],
+}
+
+
+def day_html(slug: str) -> str:
+    day = AGENT_DAYS.get(slug)
+    if not day:
+        return ""
+    rows = "".join(
+        f'<div class="thr"><span class="tht">{when}</span>'
+        f'<span class="thb">{text}</span>'
+        + (f'<span class="st {"ok" if stat in ("done", "paid", "matched", "confirmed", "checked", "filed") else "wait" if stat == "your yes" else "mut"}">{stat}</span>'
+           if stat else '')
+        + '</div>'
+        for when, text, stat in day)
+    return (f'<h2 class="sec">A day on the job</h2>'
+            f'<div class="pagehint">One real shift, start to finish. '
+            f'Anything that moves money stops for your yes.</div>'
+            f'<div class="thread2">{rows}</div>')
+
+
 def risk_ladder_html() -> str:
     """Agentic due diligence: the depth of the check follows the risk, and
     the deep tier is honestly long horizon. The agent holds an open check
@@ -3367,7 +3441,7 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
         f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
-        f'{thread_html(a["slug"])}'
+        f'{thread_html(a["slug"]) or day_html(a["slug"])}'
         f'{risk_ladder_html() if a["slug"] == "kyc_desk" else ""}'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
         f'<h2 class="sec">When a person takes over</h2>{handoff}'
