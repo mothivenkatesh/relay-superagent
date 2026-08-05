@@ -1228,7 +1228,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       oninput="railSearch(this.value)"
       onkeydown="if(event.key === 'Escape') railSearchToggle()">
     <div class="raillist" id="railresults" hidden></div>
-    <div class="railhead"><span class="navsec">Agents</span></div>
+
     <div class="raillist" id="raillist">
       {rows}
     </div>
@@ -5868,6 +5868,31 @@ def decisions_content(tid):
             'is a fact once made.</div>' + rows)
 
 
+# Connections the founder can actually manage. Relay still holds every
+# key; pausing stops reads, disconnecting removes it, connecting adds.
+CONN_DEFS = [
+    ("Your store", "ojaswellness.in orders and disputes"),
+    ("Amazon and Flipkart", "marketplace orders and claims"),
+    ("WhatsApp", "buyer messages, and your yeses on the go"),
+    ("Voice calls", "the callers ring buyers through this"),
+    ("Bank and settlements", "what landed, what was deducted"),
+    ("Email", "dispute mail from the bank"),
+]
+CONN_MORE = [
+    ("Tally", "your books, posted automatically"),
+    ("Zoho Books", "invoices tied to orders"),
+    ("Shiprocket", "courier scans as dispute proof"),
+    ("Instagram", "DMs from buyers who shop there"),
+    ("Quick commerce", "Blinkit and Zepto orders"),
+]
+CONN_STATE: dict = {}
+
+
+def conn_state(tid: str) -> dict:
+    return CONN_STATE.setdefault(
+        tid, {n: "on" for n, _ in CONN_DEFS})
+
+
 def settings_content(tid: str, s: str = "team") -> str:
     # Each tab is a job the founder actually comes here to do, named as
     # that job — not as a module.
@@ -5924,26 +5949,55 @@ def settings_content(tid: str, s: str = "team") -> str:
                  f'hand over. You don&rsquo;t manage them: they come '
                  f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
-        CONNS = [
-            ("Your store", "ojaswellness.in orders and disputes", True),
-            ("Amazon and Flipkart", "marketplace orders and claims", True),
-            ("WhatsApp", "buyer messages, and your yeses on the go", True),
-            ("Voice calls", "the callers ring buyers through this", True),
-            ("Bank and settlements", "what landed, what was deducted", True),
-            ("Email", "dispute mail from the bank", True),
-            ("Quick commerce", "coming with the stock agent", False),
-        ]
-        body = ('<div class="pagehint">What Relay is connected to. Relay '
-                'holds every key itself: nothing to set up, nothing to '
-                'lose.</div>'
-                + "".join(
-            '<div class="trow slim"><span class="ico">' + ICONS["flow"]
-            + '</span><span class="tdesc"><b>' + n
-            + '</b> <span class="mut">' + d + '</span></span>'
-            + ('<span class="st ok">connected</span>' if on else
-               '<span class="st mut">coming</span>')
-            + '</div>'
-            for n, d, on in CONNS))
+        st = conn_state(tid)
+        rows = ""
+        for n, d in CONN_DEFS + CONN_MORE:
+            state = st.get(n, "off")
+            if state == "off":
+                continue
+            paused = state == "paused"
+            rows += (
+                '<div class="trow slim" style="display:flex">'
+                '<span class="ico">' + ICONS["flow"] + '</span>'
+                '<span class="tdesc"><b>' + n + '</b> '
+                '<span class="mut">' + d + '</span></span>'
+                + ('<span class="st mut">paused</span>' if paused
+                   else '<span class="st ok">connected</span>')
+                + '<span class="rtools">'
+                '<form method="post" action="/api/conn_act" '
+                'style="display:contents">'
+                '<input type="hidden" name="name" value="' + n + '">'
+                '<input type="hidden" name="act" value="'
+                + ("resume" if paused else "pause") + '">'
+                '<button class="rtool">'
+                + ("Resume" if paused else "Pause") + '</button></form>'
+                '<form method="post" action="/api/conn_act" '
+                'style="display:contents">'
+                '<input type="hidden" name="name" value="' + n + '">'
+                '<input type="hidden" name="act" value="disconnect">'
+                '<button class="rtool danger">Disconnect</button></form>'
+                '</span></div>')
+        more = ""
+        for n, d in CONN_MORE + [(n2, d2) for n2, d2 in CONN_DEFS
+                                 if st.get(n2) == "off"]:
+            if st.get(n) in ("on", "paused"):
+                continue
+            more += (
+                '<div class="trow slim" style="display:flex">'
+                '<span class="ico">' + ICONS["flow"] + '</span>'
+                '<span class="tdesc"><b>' + n + '</b> '
+                '<span class="mut">' + d + '</span></span>'
+                '<form method="post" action="/api/conn_act" '
+                'style="display:contents">'
+                '<input type="hidden" name="name" value="' + n + '">'
+                '<input type="hidden" name="act" value="connect">'
+                '<button class="btn ghost sm">Connect</button></form>'
+                '</div>')
+        body = ('<div class="pagehint">Relay holds every key itself: '
+                'nothing to set up, nothing to lose. Pause stops reading; '
+                'disconnect removes it.</div>'
+                + rows
+                + '<h2 class="sec">More you can plug in</h2>' + more)
     elif s == "decisions":
         body = decisions_content(tid)
     elif s == "data":
@@ -6424,6 +6478,39 @@ class Handler(BaseHTTPRequestHandler):
                              "/settings?s=decisions")
             self.send_response(303)
             self.send_header("Location", "/")
+            self.end_headers(); return
+        if self.path == "/api/conn_act":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            name = (form.get("name") or [""])[0]
+            act = (form.get("act") or [""])[0]
+            tid = sess["tenant_id"]
+            st = conn_state(tid)
+            known = [n for n, _ in CONN_DEFS] + [n for n, _ in CONN_MORE]
+            me = (sess.get("email") or "you").split("@")[0]
+            if name in known:
+                if act == "pause" and st.get(name) == "on":
+                    st[name] = "paused"
+                    log_decision(tid, me, "Paused the <b>" + esc(name)
+                                 + "</b> connection",
+                                 "/settings?s=connectors")
+                elif act == "resume" and st.get(name) == "paused":
+                    st[name] = "on"
+                    log_decision(tid, me, "Resumed the <b>" + esc(name)
+                                 + "</b> connection",
+                                 "/settings?s=connectors")
+                elif act == "disconnect" and st.get(name) in ("on", "paused"):
+                    st[name] = "off"
+                    log_decision(tid, me, "Disconnected <b>" + esc(name)
+                                 + "</b>", "/settings?s=connectors")
+                elif act == "connect" and st.get(name, "off") == "off":
+                    st[name] = "on"
+                    log_decision(tid, me, "Connected <b>" + esc(name)
+                                 + "</b>", "/settings?s=connectors")
+            self.send_response(303)
+            self.send_header("Location", "/settings?s=connectors")
             self.end_headers(); return
         if self.path in ("/api/prop_act", "/api/cashflow_act"):
             sess = self._session()
