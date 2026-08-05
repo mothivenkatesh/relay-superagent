@@ -749,11 +749,17 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
 # rail that lists work, the steps that tick off while you watch, the work
 # product that comes out the other end, and the case page it opens into.
 WORK_CSS = """
-.newone{font-weight:500}
-.navblock{margin:2px 0 12px;padding-bottom:10px;border-bottom:1px solid #ECECF1}
+.compose{margin-left:auto;width:30px;height:30px;border-radius:99px;
+  display:grid;place-items:center;color:#4A4E63;background:#EDEEF4}
+.compose:hover{background:#E3E5EE;color:var(--ink,#1B1F30)}
+.compose svg{width:15px;height:15px}
+.navblock{margin:0 0 10px;padding-bottom:10px;border-bottom:1px solid #ECECF1}
 .navblock .nav{margin-bottom:1px}
 .nav.on{background:#ECECF1;color:var(--ink,#1B1F30)}
 .nav.on svg{color:var(--ink,#1B1F30)}
+.railhead{display:flex;align-items:center;justify-content:space-between;
+  padding-right:2px}
+.railhead .navsec{margin:0}
 .railfilter{display:flex;gap:6px;padding:2px 8px 8px}
 .rf{font:inherit;font-size:12.5px;font-weight:500;color:var(--mut,#8A8D9C);
   background:none;border:1px solid transparent;border-radius:8px;padding:5px 11px;
@@ -763,11 +769,27 @@ WORK_CSS = """
 .rf i{font-style:normal;font-size:11px;font-weight:600;color:#4553C8;
   background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:0 5px}
 .raillist{padding-bottom:8px;flex:1;overflow-y:auto;min-height:0}
-.rail{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;
+.rail{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;
   font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px}
+#raillist [data-st][hidden]{display:none}
 .rail:hover{background:#F0F0F5}
 .rail.active{background:#ECECF1;color:var(--ink,#1B1F30)}
+.rail .alogo{width:30px;height:30px;border-radius:99px;flex:none;display:grid;
+  place-items:center;color:#fff;font-size:13px;font-weight:600}
+.rbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.rtop{display:flex;align-items:baseline;gap:8px}
+.rname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-weight:500;color:var(--ink,#1B1F30)}
+.rwhen{flex:none;font-size:11px;color:var(--mut,#8A8D9C)}
+.rsub{display:flex;align-items:center;gap:8px}
+.rprev{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:12px;color:var(--mut,#8A8D9C)}
+.rail.unread .rname{font-weight:700}
+.rail.unread .rprev{color:var(--text,#3A3D4D)}
+.rail.unread .cdot.need{width:9px;height:9px}
 .rlabel{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.railsys{flex:none;padding-top:8px;margin-top:6px;border-top:1px solid #ECECF1}
+.railsys .nav{margin-bottom:1px}
 .cdot{width:7px;height:7px;border-radius:50%;flex:none}
 .cdot.need{background:#E8A33D}
 .cdot.work{background:var(--accent,#5266EB)}
@@ -1036,35 +1058,51 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     it was never a place of its own."""
     cases = rail_cases(tid)
     n_need = sum(1 for c in cases if c["key"] == "need")
-    rows = "".join(
-        f'<a class="rail{" active" if active == c["order"] else ""}" '
-        f'data-st="{c["key"]}" href="/cases/{esc(c["order"])}" '
-        f'title="{esc(c["label"])} — {c["word"]}">'
-        f'<span class="cdot {c["key"]}"></span>'
-        f'<span class="rlabel">{esc(c["label"])}</span></a>'
-        for c in cases) or (
-        '<div class="cempty">Cases appear here as they come in.</div>')
+
+    def case_row(c):
+        # WhatsApp's chat-row grammar: avatar, name (bold when it needs
+        # you, the way unread is bold), muted preview, time on the right.
+        name, _, product = c["label"].partition(" · ")
+        need = c["key"] == "need"
+        return (
+            f'<a class="rail{" active" if active == c["order"] else ""}'
+            f'{" unread" if need else ""}" data-st="{c["key"]}" '
+            f'href="/cases/{esc(c["order"])}" '
+            f'title="{esc(c["label"])} — {c["word"]}">'
+            f'{_logo(name, 30)}'
+            f'<span class="rbody"><span class="rtop"><span class="rname">'
+            f'{esc(name)}</span><span class="rwhen">'
+            f'{c["last"].strftime("%b %-d")}</span></span>'
+            f'<span class="rsub"><span class="rprev">{esc(product)} &middot; '
+            f'{c["word"]}</span><span class="cdot {c["key"]}"></span>'
+            f'</span></span></a>')
+
+    rows = "".join(case_row(c) for c in cases) or (
+        '<div class="cempty">Chats appear here as work comes in.</div>')
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
-      <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
-    <a class="nav newone" href="/">{ICONS["home"]}<span>New message</span></a>
+      <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span>
+      <a class="compose" href="/" title="New message" aria-label="New message">{ICONS["pen"]}</a></div>
     <div class="navblock">
+      <div class="navsec">Workspace</div>
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Your team</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled">{ICONS["moon"]}<span>Scheduled</span></a>
       <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Memory</span></a>
-      <a class="nav{' on' if active == 'journeys' else ''}" href="/journeys">{ICONS["ledger"]}<span>History</span></a>
-      <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
-    <div class="railfilter">
+    <div class="railhead"><span class="navsec">Chats</span>
+      <span class="railfilter">
       <button class="rf on" data-f="all" onclick="railFilter(this)">All</button>
       <button class="rf" data-f="need" onclick="railFilter(this)">Needs you
-        {f'<i>{n_need}</i>' if n_need else ''}</button>
+        {f'<i>{n_need}</i>' if n_need else ''}</button></span>
     </div>
     <div class="raillist" id="raillist">
-      <div class="navsec" data-st="need">Cases</div>
       {rows}
       {convs if convs is not None else ''}
+    </div>
+    <div class="railsys">
+      <a class="nav{' on' if active == 'journeys' else ''}" href="/journeys">{ICONS["ledger"]}<span>History</span></a>
+      <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
   </aside>
   <script>
