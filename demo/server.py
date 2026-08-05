@@ -8147,11 +8147,6 @@ box-shadow:0 6px 24px rgba(82,102,235,.10)}
 background:none}
 .cbox input::placeholder{color:#9A9DAB}
 .lcluster{position:relative;display:flex;align-items:center;gap:2px}
-.amchip{border:0;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;
-  color:#8A6A15;background:#F6EFDA;border-radius:9px;padding:5px 10px;
-  margin-right:4px;transition:background .12s}
-.amchip:hover{background:#F0E6C8}
-.amchip.build{color:#3B4CC9;background:var(--accent-soft)}
 .cbtn{border:0;background:none;cursor:pointer;color:#5B5E6B;width:30px;height:30px;
   border-radius:8px;display:flex;align-items:center;justify-content:center;
   transition:background .12s}
@@ -8201,16 +8196,10 @@ __SIDEBAR__
       oninput="mpopScan()" onkeydown="mpopKeys(event)">
     <div class="hrow">
       <div class="lcluster">
-        <button type="button" class="amchip" id="amchip" onclick="amToggle(event)">Auto</button>
         <button type="button" class="cbtn" onclick="plusToggle(event)" aria-label="Add to this ask">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         <button type="button" class="cbtn" id="micbtn" onclick="micGo()" aria-label="Say it instead">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg></button>
-        <div class="ammenu" id="ammenu" hidden>
-          <button type="button" class="mopt" onclick="amSet('auto')"><div>Auto<small>Relay reads the ask and picks the right agent to answer.</small></div><span class="tick" id="tk-auto">&#10003;</span></button>
-          <button type="button" class="mopt" onclick="amPick()"><div>One agent<small>You choose who answers. Typing / does the same.</small></div></button>
-          <button type="button" class="mopt" onclick="amSet('build')"><div>Build an agent<small>Describe a job in a sentence. Relay drafts the teammate.</small></div><span class="tick" id="tk-build" hidden>&#10003;</span></button>
-        </div>
         <div class="ammenu" id="plusmenu" hidden>
           <button type="button" class="mopt" onclick="plusFilePick()"><div>Add a file<small>Lands in Knowledge; every agent reads it.</small></div></button>
           <button type="button" class="mopt" onclick="plusOrder()"><div>Find an order or buyer<small>Search everything Relay knows.</small></div></button>
@@ -8229,42 +8218,16 @@ __SIDEBAR__
 <script>
 let CONV = "__CONVID__";
 const MENT = __MENTIONS__;
-let AMODE = 'auto';
 function closeMenus(){
-  document.getElementById('ammenu').hidden = true;
   document.getElementById('plusmenu').hidden = true;
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('.lcluster')) closeMenus();
 });
-function amToggle(ev){
-  ev.stopPropagation();
-  const m = document.getElementById('ammenu');
-  const show = m.hidden; closeMenus(); m.hidden = !show;
-}
 function plusToggle(ev){
   ev.stopPropagation();
   const m = document.getElementById('plusmenu');
   const show = m.hidden; closeMenus(); m.hidden = !show;
-}
-function amSet(mode){
-  AMODE = mode; closeMenus();
-  const chip = document.getElementById('amchip');
-  chip.textContent = mode === 'build' ? 'Build' : 'Auto';
-  chip.classList.toggle('build', mode === 'build');
-  document.getElementById('tk-auto').hidden = mode !== 'auto';
-  document.getElementById('tk-build').hidden = mode !== 'build';
-  if (!box.dataset.ph) box.dataset.ph = box.placeholder;
-  box.placeholder = mode === 'build'
-    ? 'Describe the job: what to watch, what to do, when to check with you'
-    : box.dataset.ph;
-  box.focus();
-}
-function amPick(){
-  amSet('auto');
-  if (!/\/$/.test(box.value))
-    box.value += (box.value && !/\s$/.test(box.value) ? ' ' : '') + '/';
-  box.focus(); mpopScan();
 }
 function plusFilePick(){ closeMenus(); document.getElementById('bfile').click(); }
 async function plusFile(inp){
@@ -8466,9 +8429,8 @@ async function send(text){
     '<span class="shl"></span><span class="shl" style="width:72%"></span>');
   const res = await fetch('/api/chat', {method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({message:text, conv_id: CONV, mode: AMODE})});
+    body: JSON.stringify({message:text, conv_id: CONV})});
   const data = await res.json();
-  if (AMODE === 'build') amSet('auto');
   think.remove();
   if (data.conv_id && !CONV){
     CONV = data.conv_id;
