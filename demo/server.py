@@ -5903,7 +5903,26 @@ class Handler(BaseHTTPRequestHandler):
             sess = self._session() or {"tenant_id": "t1"}
             payload = json.loads(raw)
             msg = payload.get("message", "")
+            # "/Role ..." calls that agent; "@Name" loops a teammate in.
+            called = None
+            for a in RELAY_AGENTS:
+                if msg.lower().startswith("/" + a["role"].lower()):
+                    called = a["role"]
+                    msg = msg[1 + len(a["role"]):].strip() or "what needs my yes"
+                    break
+            tagged = [p["name"] for p in people_for(sess["tenant_id"])
+                      if "@" + p["name"].lower() in msg.lower()]
+            for t in tagged:
+                msg = _re.sub("@" + _re.escape(t), t, msg, flags=_re.I)
             res = ask(msg)
+            if called:
+                res["reply"] = (f'<b>{esc(called)}</b> here. '
+                                + res.get("reply", ""))
+            if tagged:
+                res["reply"] = (res.get("reply", "")
+                    + '<span class="rmeta">' + " ".join(
+                        f'{mention(t)} will see this thread.'
+                        for t in tagged) + '</span>')
             res = _polish_reply(msg, res)
             c = CONVS.get(payload.get("conv_id") or "")
             if c is None or c["tenant"] != sess["tenant_id"]:
@@ -6941,6 +6960,16 @@ border-radius:14px;padding:12px 16px}
 .msg.bot{align-self:flex-start;max-width:100%;color:#26293A;padding:2px 2px}
 .msg.bot b{color:var(--ink)}
 .rmeta{display:block;font-size:11px;color:var(--mut);margin-top:8px}
+.mpop{position:absolute;bottom:100%;left:24px;right:24px;max-width:400px;
+  margin:0 auto 8px;background:#fff;border:1px solid var(--hair);
+  border-radius:12px;box-shadow:0 12px 40px rgba(27,31,48,.14);padding:4px;
+  z-index:30}
+.composer{position:relative}
+.mpop-it{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-radius:8px;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.mpop-it:hover,.mpop-it:first-child{background:#F5F5F8}
+.mpop-it b{color:var(--accent)}
+.mpop-it span{margin-left:auto;font-size:11px;color:var(--mut)}
 .cards{align-self:stretch;display:flex;flex-direction:column;gap:8px}
 .mrun,.mcard{background:#fff;border:1px solid var(--hair);border-radius:12px;padding:16px 16px}
 .mhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -7001,8 +7030,10 @@ __SIDEBAR__
     </div>
   </div></main>
   <div class="composer" id="composer">
+  <div class="mpop" id="mpop" hidden></div>
   <form class="hcomposer" onsubmit="event.preventDefault();send(box.value)">
-    <input id="box" placeholder="Ask anything, or tell Relay what to do" value="__SAYVAL__" autofocus autocomplete="off">
+    <input id="box" placeholder="Ask anything, or tell Relay what to do. / calls an agent, @ tags a teammate" value="__SAYVAL__" autofocus autocomplete="off"
+      oninput="mpopScan()" onkeydown="mpopKeys(event)">
     <div class="hrow">
       __MODEUI__
       <button class="sendbtn" aria-label="Send">
@@ -7014,6 +7045,40 @@ __SIDEBAR__
 </div>
 <script>
 let CONV = "__CONVID__";
+const MENT = __MENTIONS__;
+function mpopScan(){
+  const v = box.value;
+  const m = v.match(/(^|\s)([@\/])([\w .]*)$/);
+  const pop = document.getElementById('mpop');
+  if (!m){ pop.hidden = true; return; }
+  const kind = m[2], q = m[3].toLowerCase();
+  const list = (kind === '/' ? MENT.agents : MENT.people)
+    .filter(n => n.toLowerCase().includes(q)).slice(0, 6);
+  if (!list.length){ pop.hidden = true; return; }
+  pop.innerHTML = list.map(n =>
+    '<div class="mpop-it" data-kind="' + kind + '" data-name="' + n + '">'
+    + '<b>' + kind + '</b>' + n
+    + '<span>' + (kind === '/' ? 'agent' : 'teammate') + '</span></div>'
+  ).join('');
+  pop.onclick = ev => {
+    const it = ev.target.closest('.mpop-it');
+    if (it) mpopPick(it.dataset.kind, it.dataset.name);
+  };
+  pop.hidden = false;
+}
+function mpopPick(kind, name){
+  box.value = box.value.replace(/(^|\s)([@\/])([\w .]*)$/, '$1' + kind + name + ' ');
+  document.getElementById('mpop').hidden = true;
+  box.focus();
+}
+function mpopKeys(e){
+  const pop = document.getElementById('mpop');
+  if (pop.hidden) return;
+  if (e.key === 'Enter' || e.key === 'Tab'){
+    e.preventDefault();
+    pop.querySelector('.mpop-it')?.click();
+  } else if (e.key === 'Escape'){ pop.hidden = true; }
+}
 const thread = document.getElementById('thread');
 const box = document.getElementById('box');
 if (CONV) document.getElementById('empty')?.remove();
@@ -7429,6 +7494,9 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__CONVTITLE__", title)
             .replace("__CONVID__", cid)
             .replace("__SAYVAL__", esc(say))
+            .replace("__MENTIONS__", json.dumps({
+                "agents": [a["role"] for a in RELAY_AGENTS],
+                "people": [p["name"] for p in people_for(tid)]}))
             .replace("__SAMPLE__", sample_html)
             .replace("__ROLEPILLS__", role_html)
             .replace("__GREET__", greet)
