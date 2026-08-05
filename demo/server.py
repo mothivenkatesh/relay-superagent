@@ -4074,6 +4074,19 @@ function shstart(){
 </script>""")
 
 
+# ------------------------------------------------------------- people
+# Settings owns a real list, not a painting: the founder can add someone,
+# hand them the yes, take it back, or remove them. Relay's own people are
+# shown but not editable — they are Relay staff, not the founder's to manage.
+PEOPLE: dict[str, list[dict]] = {}
+
+
+def people_for(tid: str) -> list[dict]:
+    return PEOPLE.setdefault(tid, [
+        dict(name=n, role=r, approver=e)
+        for _, n, r, d, e in TEAM if d == BUSINESS])
+
+
 # ------------------------------------------------------------- autonomy
 # Earned, never assumed: the founder starts approving everything, and the
 # option to let small ones send themselves opens only after 20 clean yeses
@@ -4359,10 +4372,12 @@ def memory_content(tid: str) -> str:
 
 
 def settings_content(tid: str, s: str = "team") -> str:
-    # Osvi-style sectioned settings: Team / Connectors / Workspace behind a
-    # tab bar (same component as the agent console) instead of one long scroll.
-    SECTIONS = [("team", "People"), ("connectors", "What it&rsquo;s plugged into"),
-                ("workspace", "Rules")]
+    # Each tab is a job the founder actually comes here to do, named as
+    # that job — not as a module.
+    SECTIONS = [("team", "Who can say yes"),
+                ("connectors", "What it&rsquo;s plugged into"),
+                ("workspace", "The promises"),
+                ("data", "Your data")]
     if s not in {k for k, _ in SECTIONS}:
         s = "team"
     tabs = '<div class="tabbar">' + "".join(
@@ -4370,30 +4385,76 @@ def settings_content(tid: str, s: str = "team") -> str:
         for k, t in SECTIONS) + "</div>"
 
     if s == "team":
-        by_dept: dict[str, list] = {}
-        for tid_, name, role, dept, enrolled in TEAM:
-            by_dept.setdefault(dept, []).append((name, role, enrolled))
-        body = (f'<div class="pagehint">Everyone at {BUSINESS}, and the Relay '
-                f'people who pick up whatever the agents hand over. '
-                f'&ldquo;Says yes or no&rdquo; means this person can approve a '
-                f'reply before it goes out.</div>')
-        for dept, members in by_dept.items():
-            rows = "".join(
-                f'<div class="trow slim"><span class="ico">{ICONS["bot" if enrolled else "bm"]}</span>'
-                f'<span class="tdesc"><b>{esc(name)}</b> <span class="mut">{esc(role)}</span></span>'
-                + ('<span class="st ok">says yes or no</span>' if enrolled else '')
-                + '</div>'
-                for name, role, enrolled in members)
-            body += (f'<h2 class="sec">{dept} ({len(members)})</h2>{rows}')
+        body = (f'<div class="pagehint">Nothing that touches money or a '
+                f'customer goes out without a yes &mdash; this is where you '
+                f'decide whose yes counts. Hand it to someone before a '
+                f'holiday, take it back after. Everyone else still sees '
+                f'everything; they just can&rsquo;t approve.</div>')
+        for i, p in enumerate(people_for(tid)):
+            toggle = (f'<form method="post" action="/api/person_toggle" '
+                      f'style="display:contents"><input type="hidden" '
+                      f'name="i" value="{i}">'
+                      f'<button class="tglbtn {"on" if p["approver"] else ""}" '
+                      f'title="{"Take back the yes" if p["approver"] else "Let them say yes"}">'
+                      f'<i></i></button></form>')
+            body += (f'<div class="trow slim" style="display:flex">{toggle}'
+                     f'<span class="tdesc"><b>{esc(p["name"])}</b> '
+                     f'<span class="mut">{esc(p["role"])}</span></span>'
+                     + ('<span class="st ok">can say yes</span>'
+                        if p["approver"] else
+                        '<span class="st mut">sees everything, '
+                        'approves nothing</span>')
+                     + f'<span class="rtools"><form method="post" '
+                     f'action="/api/person_del" style="display:contents">'
+                     f'<input type="hidden" name="i" value="{i}">'
+                     f'<button class="rtool danger">Remove</button></form>'
+                     f'</span></div>')
+        body += (f'<form class="notebar" method="post" action="/api/person_add" '
+                 f'style="max-width:640px;margin-top:14px;gap:8px">'
+                 f'<input class="jfind notein" name="name" maxlength="60" '
+                 f'placeholder="Name" style="flex:1">'
+                 f'<input class="jfind notein" name="role" maxlength="60" '
+                 f'placeholder="What they do &mdash; e.g. accounts" style="flex:1.4">'
+                 f'<button class="btn primary sm">Add</button></form>')
+        relay_rows = "".join(
+            f'<div class="trow slim"><span class="ico">{ICONS["bot"]}</span>'
+            f'<span class="tdesc"><b>{esc(n)}</b> <span class="mut">{esc(r)}'
+            f'</span></span></div>'
+            for _, n, r, d, _ in TEAM if d != BUSINESS)
+        body += (f'<h2 class="sec">Relay&rsquo;s people</h2>'
+                 f'<div class="pagehint">They pick up whatever the agents '
+                 f'hand over. You don&rsquo;t manage them &mdash; they come '
+                 f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
         body = ('<div class="pagehint">Relay holds every connection itself. '
                 'There is nothing for you to set up and no keys for you to '
                 'find.</div>'
                 + vault_content(tid))
+    elif s == "data":
+        exports = [
+            ("Everything, as a spreadsheet", "/export/impact.csv",
+             "Every dispute your team has touched &mdash; who, what, when, "
+             "how it ended, and for how much."),
+            ("The proof on file", "/export/evidence.csv",
+             "Every piece of proof your replies cite, with what it proves."),
+            ("What your team remembers", "/export/memory.csv",
+             "How you like things said &mdash; every note learned from the "
+             "wording you changed."),
+        ]
+        body = ('<div class="pagehint">It&rsquo;s yours. Take all of it, any '
+                'time, no questions &mdash; each file opens in Excel or '
+                'Google Sheets. Leaving is allowed to be easy; that is what '
+                'makes staying a choice.</div>'
+                + "".join(
+            f'<a class="trow slim" style="display:flex" href="{href}">'
+            f'<span class="ico">{ICONS["ledger"]}</span>'
+            f'<span class="tdesc"><b>{t}</b> <span class="mut">{d}</span>'
+            f'</span><span class="st wait">download &rarr;</span></a>'
+            for t, href, d in exports))
     else:
-        body = ('<div class="pagehint">How your team works. These are not '
-                'settings you can slide around &mdash; each one is a promise '
-                'the software keeps.</div>'
+        body = ('<div class="pagehint">These are not settings you can slide '
+                'around &mdash; each one is a promise the software keeps, '
+                'written here so you can hold it to them.</div>'
                 + "".join(
             f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
             f'<span class="tdesc"><b>{esc(k)}</b> <span class="mut">{v}</span></span></div>'
@@ -4524,6 +4585,40 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/csv; charset=utf-8")
             self.send_header("Content-Disposition",
                              'attachment; filename="impact.csv"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif self.path in ("/export/evidence.csv", "/export/memory.csv"):
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            import csv, io
+            tid = sess["tenant_id"]
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            if self.path.endswith("evidence.csv"):
+                w.writerow(["dispute_reason", "evidence_type",
+                            "what_it_proves", "source_url"])
+                for e in WORLD.d.evidence:
+                    if e.tenant_id == tid:
+                        w.writerow([COMP.get(e.reason_code, e.reason_code),
+                                    EV_TYPE.get(e.evidence_type,
+                                                e.evidence_type),
+                                    e.text, e.source_url])
+                fname = "evidence.csv"
+            else:
+                w.writerow(["what_you_changed", "what_it_taught"])
+                for m in WORLD.d.ledger.memory:
+                    if m.tenant_id == tid and m.superseded_by is None:
+                        b = m.body or {}
+                        w.writerow([b.get("changed") or "a rewording",
+                                    b.get("implies") or "style note"])
+                fname = "memory.csv"
+            data = buf.getvalue().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="{fname}"')
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -4692,6 +4787,32 @@ class Handler(BaseHTTPRequestHandler):
                 AUTONOMY[tid] = "all"
             self.send_response(303)
             self.send_header("Location", "/")
+            self.end_headers(); return
+        if self.path in ("/api/person_add", "/api/person_toggle",
+                         "/api/person_del"):
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            ppl = people_for(sess["tenant_id"])
+            if self.path.endswith("_add"):
+                name = (form.get("name") or [""])[0].strip()[:60]
+                role = (form.get("role") or [""])[0].strip()[:60]
+                if name:
+                    ppl.append(dict(name=name, role=role or "team",
+                                    approver=False))
+            else:
+                try:
+                    i = int((form.get("i") or ["-1"])[0])
+                except ValueError:
+                    i = -1
+                if 0 <= i < len(ppl):
+                    if self.path.endswith("_toggle"):
+                        ppl[i]["approver"] = not ppl[i]["approver"]
+                    else:
+                        ppl.pop(i)
+            self.send_response(303)
+            self.send_header("Location", "/settings?s=team")
             self.end_headers(); return
         if self.path in ("/api/routine_toggle", "/api/routine_del",
                          "/api/routine_edit"):
