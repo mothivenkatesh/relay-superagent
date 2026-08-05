@@ -745,6 +745,126 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
 </body></html>"""
 
 
+# The conversational surface, styled once and shared by both templates: the
+# rail that lists work, the steps that tick off while you watch, the work
+# product that comes out the other end, and the case page it opens into.
+WORK_CSS = """
+.newone{margin-bottom:6px;font-weight:500}
+.railfilter{display:flex;gap:6px;padding:2px 8px 8px}
+.rf{font:inherit;font-size:12.5px;font-weight:500;color:var(--mut,#8A8D9C);
+  background:none;border:1px solid transparent;border-radius:8px;padding:5px 11px;
+  cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.rf:hover{background:#F0F0F5}
+.rf.on{background:#fff;border-color:var(--hair,#E8E9EF);color:var(--ink,#1B1F30)}
+.rf i{font-style:normal;font-size:11px;font-weight:600;color:#4553C8;
+  background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:0 5px}
+.raillist{padding-bottom:8px}
+.rail{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;
+  font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px}
+.rail:hover{background:#F0F0F5}
+.rail.active{background:#ECECF1;color:var(--ink,#1B1F30)}
+.rlabel{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdot{width:7px;height:7px;border-radius:50%;flex:none}
+.cdot.need{background:#E8A33D}
+.cdot.work{background:var(--accent,#5266EB)}
+.cdot.done{background:#1E9E5A}
+.railfoot{display:flex;gap:7px;align-items:center;padding:10px 12px 4px;
+  margin-top:6px;border-top:1px solid #ECECF1;font-size:12.5px;color:var(--mut,#8A8D9C)}
+.railfoot a{color:var(--mut,#8A8D9C)}
+.railfoot a:hover{color:var(--ink,#1B1F30)}
+.cempty{padding:4px 10px;font-size:12.5px;color:var(--mut,#8A8D9C)}
+.navsec.csec{margin-top:16px}
+.steps{align-self:stretch;max-width:100%}
+.btn.scanning{color:#fff;border-color:transparent;
+  background:linear-gradient(100deg,var(--accent,#5266EB) 25%,#B9C2F7 45%,var(--accent,#5266EB) 65%);
+  background-size:200% 100%;animation:btnsheen 1.6s linear infinite}
+@keyframes btnsheen{0%{background-position:130% 0}100%{background-position:-70% 0}}
+
+/* the work, ticking off */
+.wsteps{list-style:none;margin:2px 0 4px;padding:0;max-width:100%}
+.wstep{display:flex;align-items:baseline;gap:10px;padding:7px 0;font-size:13.5px;
+  color:var(--mut,#8A8D9C);opacity:.45;transition:opacity .25s,color .25s}
+.wstep.live,.wstep.done{opacity:1}
+.wstep.live{color:var(--ink,#1B1F30)}
+.wstep.done{color:var(--text,#3A3D4D)}
+.wlabel{flex:0 1 auto}
+.wfound{color:var(--mut,#8A8D9C);font-size:12.5px;opacity:0;transition:opacity .25s}
+.wstep.done .wfound{opacity:1}
+.wtick{width:14px;height:14px;flex:none;border-radius:50%;position:relative;
+  border:1.5px solid #D3D6E0;align-self:center}
+.wstep.live .wtick{border-color:var(--accent,#5266EB);border-top-color:transparent;
+  animation:wspin .7s linear infinite}
+@keyframes wspin{to{transform:rotate(360deg)}}
+.wstep.done .wtick{border-color:#1E9E5A;background:#1E9E5A}
+.wstep.done .wtick::after{content:"";position:absolute;left:4px;top:1px;width:4px;
+  height:8px;border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(43deg)}
+
+/* the work product — a document, not a chat bubble */
+.wp{background:#fff;border:1px solid var(--hair,#E8E9EF);border-radius:12px;
+  box-shadow:0 1px 2px rgba(27,31,48,.04);overflow:hidden;max-width:100%}
+.wp-h{padding:18px 22px 14px;border-bottom:1px solid #F1F1F5}
+.wp-kicker{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--mut,#8A8D9C);margin-bottom:6px}
+.wp-h h3{font-size:15.5px;font-weight:600;color:var(--ink,#1B1F30);line-height:1.35}
+.wp-meta{font-size:12.5px;color:var(--mut,#8A8D9C);margin-top:4px}
+.wp-body{padding:16px 22px 6px}
+.wp-claim{background:#F4F4F7;border-radius:8px;padding:9px 13px;font-size:13px;
+  color:#4A4E63;margin-bottom:14px}
+.wp-p{font-size:14px;line-height:1.7;color:#26293A;margin-bottom:12px}
+.srcchip{display:inline-block;font-size:11px;font-weight:600;color:#4553C8;
+  background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:1px 7px;
+  margin-left:5px;vertical-align:1px;white-space:nowrap}
+.srcchip:hover{background:#DCE0F7}
+.wp-srcs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  padding:12px 22px;background:#FAFAFC;border-top:1px solid #F1F1F5}
+.wp-srch{font-size:11.5px;font-weight:600;color:var(--mut,#8A8D9C);margin-right:2px}
+.wp-acts{display:flex;flex-wrap:wrap;gap:9px;align-items:center;
+  padding:14px 22px;border-top:1px solid #F1F1F5}
+.wp-acts form{display:flex;gap:9px}
+.wp-trust{font-size:12px;color:var(--mut,#8A8D9C);margin-left:auto}
+.wp-edit{padding:0 22px 16px}
+.wp-edit textarea{width:100%;font:inherit;font-size:13.5px;padding:10px 12px;
+  border:1px solid #E3E4EA;border-radius:9px;margin-bottom:9px;color:#26293A;
+  background:#fff;resize:vertical}
+.wp-edit textarea:focus{outline:none;border-color:#98A5F0;
+  box-shadow:0 0 0 3px rgba(82,102,235,.13)}
+.wp-open{display:block;padding:11px 22px;border-top:1px solid #F1F1F5;
+  font-size:12.5px;font-weight:500;color:var(--accent,#5266EB);background:#FCFCFD}
+.wp-open:hover{background:#F5F6FB}
+
+/* the case page */
+.casehead{display:flex;align-items:flex-start;gap:16px;margin:2px 0 20px;flex-wrap:wrap}
+.casename{display:flex;align-items:center;gap:10px;margin:2px 0 5px;font-size:26px}
+.casemeta{font-size:13px;color:var(--mut,#8A8D9C)}
+.casest{font-size:12.5px;font-weight:600;border-radius:999px;padding:5px 13px;
+  margin-left:auto;flex:none;white-space:nowrap}
+.casest.need{background:#FCEED8;color:#9A6215}
+.casest.work{background:var(--accent-soft,#E9EBF8);color:#4553C8}
+.casest.done{background:#E5F4EC;color:#177245}
+.casegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:12px 34px;align-items:start}
+@media (max-width:900px){.casegrid{grid-template-columns:minmax(0,1fr)}}
+.ctimeline{list-style:none;margin:8px 0 0;padding:0}
+.cstep{display:flex;align-items:baseline;gap:12px;padding:9px 0 9px 16px;
+  position:relative;font-size:13.5px;opacity:0;animation:wfadein .45s ease forwards}
+.cstep:not(:last-child)::before{content:"";position:absolute;left:3px;top:16px;
+  bottom:-9px;width:1px;background:#E7E8EE}
+.cdot2{position:absolute;left:0;top:12px;width:7px;height:7px;border-radius:50%;
+  background:#C6C9D4}
+.clab{flex:1;color:var(--ink,#1B1F30);min-width:0}
+.csub{display:block;font-size:12.5px;color:var(--mut,#8A8D9C);margin-top:1px;
+  overflow-wrap:anywhere}
+.cwhen{color:var(--mut,#8A8D9C);font-size:12px;flex:none}
+.cdecide{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.pcard{background:#fff;border:1px solid var(--hair,#E8E9EF);border-radius:12px;
+  padding:6px 16px;margin-top:10px}
+.prow{padding:11px 0;border-bottom:1px solid #F1F1F5;font-size:13.5px}
+.prow:last-child{border-bottom:none}
+.prow b{display:block;color:var(--ink,#1B1F30);font-size:13px;margin-bottom:2px}
+.prow span{color:var(--mut,#8A8D9C);font-size:12.5px;overflow-wrap:anywhere}
+@keyframes wfadein{to{opacity:1}}
+"""
+
 # One button system for every surface (decisions: consistency over variety).
 BTN_CSS = """
 .btn{font:inherit;font-size:13px;font-weight:500;border-radius:9px;padding:8px 15px;
@@ -882,27 +1002,76 @@ def _working_since(tid: str) -> tuple[str, int]:
     return (min(r.occurred_at for r in mine).strftime("%-d %B"), len(mine))
 
 
-def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
+def rail_cases(tid: str, limit: int = 18) -> list[dict]:
+    """The work, newest first: one row per order anyone has touched. One
+    order is one case, so repeat disputes on the same order collapse into
+    the row that already exists rather than piling up as separate items."""
     led = WORLD.d.ledger
-    n_wait = sum(1 for r in led.runs.values()
-                 if r.state is RunState.AWAITING_GATE and r.tenant_id == tid)
-    def nav(href, icon, label, extra="", key=""):
-        cls = "nav active" if key == active else "nav"
-        return f'<a class="{cls}" href="{href}">{ICONS[icon]}<span>{label}</span>{extra}</a>'
+    by_order: dict[str, list] = {}
+    for r in led.runs.values():
+        if r.tenant_id != tid or not r.order_id:
+            continue
+        by_order.setdefault(r.order_id, []).append(r)
+    out = []
+    for order, runs in by_order.items():
+        runs.sort(key=lambda r: r.occurred_at)
+        key, word = case_status(runs)
+        out.append({
+            "order": order, "key": key, "word": word,
+            "last": max(r.occurred_at for r in runs),
+            "label": f"{customer_of(order)} · {bought(order)}"})
+    out.sort(key=lambda c: c["last"], reverse=True)
+    return out[:limit]
+
+
+def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
+    """ChatGPT's rail, Harvey's matter list: what is going on, not where to
+    click. Cases and conversations in one stream, newest first, each with a
+    dot saying where it stands. "Needs you" filters this list in place —
+    it was never a place of its own."""
+    cases = rail_cases(tid)
+    n_need = sum(1 for c in cases if c["key"] == "need")
+    rows = "".join(
+        f'<a class="rail{" active" if active == c["order"] else ""}" '
+        f'data-st="{c["key"]}" href="/cases/{esc(c["order"])}" '
+        f'title="{esc(c["label"])} — {c["word"]}">'
+        f'<span class="cdot {c["key"]}"></span>'
+        f'<span class="rlabel">{esc(c["label"])}</span></a>'
+        for c in cases) or (
+        '<div class="cempty">Cases appear here as they come in.</div>')
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
       <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
-    {nav("/", "home", "Home", key="cmd")}
-    {nav("/approvals", "tasks", "Needs you", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
-    {nav("/journeys", "bolt", "History", key="journeys")}
-    <hr class="side">
-    {nav("/agents", "bot", "Your team", key="agents")}
-    <hr class="side">
-    {nav("/settings", "gear", "Settings", key="settings")}
-    <hr class="side">
-    {convs if convs is not None else ''}
-  </aside>"""
+    <a class="nav newone" href="/">{ICONS["home"]}<span>New message</span></a>
+    <div class="railfilter">
+      <button class="rf on" data-f="all" onclick="railFilter(this)">All</button>
+      <button class="rf" data-f="need" onclick="railFilter(this)">Needs you
+        {f'<i>{n_need}</i>' if n_need else ''}</button>
+    </div>
+    <div class="raillist" id="raillist">
+      <div class="navsec" data-st="need">Cases</div>
+      {rows}
+      {convs if convs is not None else ''}
+    </div>
+    <div class="railfoot">
+      <a href="/agents">Your team</a><span>&middot;</span>
+      <a href="/journeys">History</a><span>&middot;</span>
+      <a href="/settings">Settings</a>
+    </div>
+  </aside>
+  <script>
+  function railFilter(b){{
+    document.querySelectorAll('.rf').forEach(x => x.classList.toggle('on', x === b));
+    const need = b.dataset.f === 'need';
+    document.querySelectorAll('#raillist [data-st]')
+      .forEach(el => {{ el.hidden = need && el.dataset.st !== 'need'; }});
+  }}
+  </script>"""
+
+
+def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
+    return rail_html(tid, active, convs)
 
 
 def _identicon(seed: str, size: int = 34) -> str:
@@ -997,8 +1166,10 @@ def task_row(r) -> str:
   <div class="trow">
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
-    <span class="tdesc">Reply to the bank for <b>{customer}</b> &mdash;
+    <span class="tdesc">Reply to the bank for
+      <a href="/cases/{esc(r.order_id or "")}"><b>{customer}</b></a> &mdash;
       {esc(bought(r.order_id))}. {plain}.
+      <a class="mut" href="/cases/{esc(r.order_id or "")}">{esc(case_no(r.order_id))} &rarr;</a>
       <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span></span>
     <span class="tacts">
       <form method="post" action="/act"><input type="hidden" name="run" value="{rid}">
@@ -1045,6 +1216,416 @@ def ledger_row(r) -> str:
             f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>')
 
 
+# =========================================================================
+# The case — one order is one case is one record.
+#
+# Everything below is the shared vocabulary for the conversational surface:
+# the case number, the money on it, the date the bank gave you, the proof
+# it stands on, the steps the team took to build it, and the finished reply
+# that comes out the other end. Home, the thread, the queue and the case
+# page all read from these, so a case says the same thing everywhere.
+#
+# All display-only and deterministic: prices key off the SKU, case numbers
+# off the order id, so the same order renders the same on every boot.
+# =========================================================================
+
+SKU_PRICE = {                                # paise, display only
+    "A2 Desi Ghee 500ml": 124_900,
+    "Ashwagandha Gold capsules": 89_900,
+    "Aloe Vera Juice 1L": 49_900,
+    "Shilajit Resin 20g": 189_900,
+    "Amla Juice 1L": 44_900,
+    "Triphala tablets": 39_900,
+    "Karela Jamun Juice 1L": 54_900,
+    "Moringa capsules": 74_900,
+    "Wild Turmeric powder": 59_900,
+}
+
+
+def case_no(order_id: str | None) -> str:
+    """The number the owner says out loud. Derived, never stored."""
+    tail = (order_id or "").rsplit("_", 1)[-1]
+    if tail.isdigit():
+        return f"OJW-{4600 + 13 * int(tail)}"
+    seed = int(_hashlib.sha256((order_id or "?").encode()).hexdigest()[:6], 16)
+    return f"OJW-{4000 + seed % 900}"
+
+
+def price_of(order_id: str | None) -> int:
+    p = SKU_PRICE.get(bought(order_id))
+    if p:
+        return p
+    return 40_000 + (sum((order_id or "x").encode()) % 120) * 500
+
+
+def due_on(r) -> datetime:
+    """The date the bank wants an answer by. Real processors send it on the
+    notice; nothing in this seed carries one, so it falls back to the usual
+    week from the day it landed."""
+    return r.deadline_at or (r.occurred_at + timedelta(days=7))
+
+
+def _days_left(r) -> int:
+    return (due_on(r) - datetime.now()).days
+
+
+# Proof, said in two words — what goes on the chip in the reply, and what
+# the owner sees in the list underneath it.
+EV_LABEL = {
+    "ev_pod": "Delivery proof", "ev_wa": "WhatsApp",
+    "ev_inv": "Invoice", "ev_bank": "Bank statement",
+    "ev_listing": "Product page", "ev_returnphotos": "Buyer photos",
+    "ev_subs": "Refill log", "ev_policy": "Policy page",
+    "ev_device": "Device match", "ev_otp": "One-time password",
+}
+
+# Which sentence each piece of proof belongs to. Plain substring matching on
+# the drafted reply, so a chip only ever lands on a line it actually backs.
+EV_MATCH = {
+    "ev_pod": ("proof-of-delivery", "delivery proof", "courier", "gps",
+               "scan", "delivered", "delivery record", "signed"),
+    "ev_wa": ("whatsapp", "buyer's own", "thanking", "confirmation",
+              "acknowledging", "message"),
+    "ev_inv": ("invoice", "payment reference", "one reference", "reference"),
+    "ev_bank": ("settlement", "debit", "statement", "bank", "hold"),
+    "ev_listing": ("product page", "listing", "batch", "seal that shipped"),
+    "ev_returnphotos": ("return-request photos", "return request", "photos"),
+    "ev_subs": ("refill log", "subscription", "cancellation", "cancelled",
+                "timestamp"),
+    "ev_policy": ("policy", "next cycle", "credits"),
+    "ev_device": ("device", "phone", "address", "earlier orders"),
+    "ev_otp": ("one-time password", "checkout"),
+}
+
+# What the team says while it is checking each piece, and what it found.
+EV_STEP = {
+    "ev_pod": ("Checking the delivery proof", "found, signed {del_date}"),
+    "ev_wa": ("Checking the WhatsApp thread", "buyer confirmed the address"),
+    "ev_inv": ("Opening the invoice", "one payment reference on this order"),
+    "ev_bank": ("Reading the bank statement", "one debit cleared, not two"),
+    "ev_listing": ("Pulling the product page from the order date",
+                   "batch and seal match what shipped"),
+    "ev_returnphotos": ("Looking at the buyer's own return photos",
+                        "seal intact in every shot"),
+    "ev_subs": ("Reading the refill log",
+                "cancelled after the parcel left the warehouse"),
+    "ev_policy": ("Checking the refill policy as it read that day",
+                  "the next cycle is credited, not this one"),
+    "ev_device": ("Matching the device, phone and address",
+                  "same as three earlier orders"),
+    "ev_otp": ("Checking the one-time password at checkout",
+               "confirmed on the buyer's own number"),
+}
+
+
+def _ev_base(eid: str) -> str:
+    """Sample tenants get suffixed copies of the same proof; both read as
+    the same piece on screen."""
+    return next((k for k in EV_LABEL if eid.startswith(k)), eid)
+
+
+def cited_proof(r) -> list[str]:
+    seen, out = set(), []
+    for eid in (r.decision or {}).get("cited_evidence_ids", []):
+        b = _ev_base(eid)
+        if b in EV_LABEL and b not in seen:
+            seen.add(b)
+            out.append(b)
+    return out
+
+
+def _src_chip(eid: str, order_id: str | None) -> str:
+    return (f'<a class="srcchip" href="/cases/{esc(order_id or "")}#proof">'
+            f'{EV_LABEL[eid]}</a>')
+
+
+def sourced_draft(text: str, proof: list[str], order_id: str | None) -> str:
+    """The drafted reply with every claim carrying the proof it stands on.
+    A chip lands on the sentence whose words it matches; anything left over
+    rides on the last line, so no proof is silently dropped."""
+    if not text:
+        return '<p class="wp-p">Nothing written yet.</p>'
+    parts = [s for s in _re.split(r"(?<=[.!?])\s+", text.strip()) if s]
+    used: set[str] = set()
+    lines = []
+    for s in parts:
+        low = s.lower()
+        chips = [e for e in proof
+                 if e not in used and any(k in low for k in EV_MATCH[e])]
+        used.update(chips)
+        lines.append((s, chips))
+    left = [e for e in proof if e not in used]
+    if lines and left:
+        lines[-1] = (lines[-1][0], lines[-1][1] + left)
+    return "".join(
+        f'<p class="wp-p">{esc(s)}'
+        + "".join(_src_chip(e, order_id) for e in chips) + "</p>"
+        for s, chips in lines)
+
+
+def case_steps(r) -> list[tuple[str, str]]:
+    """What the team actually did on this case, one line each, in order.
+    Every line names something real off the record — the order, the SKU,
+    the buyer, the proof it opened, the date the bank set."""
+    order = r.order_id
+    plain = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
+    del_date = (r.occurred_at - timedelta(days=3)).strftime("%-d %B")
+    steps = [
+        ("Reading the dispute from the bank",
+         f"{plain[0].lower() + plain[1:]}, filed {r.occurred_at.strftime('%-d %B')}"),
+        (f"Pulling order {case_no(order)} &middot; {esc(bought(order))} "
+         f"&middot; {esc(customer_of(order))}",
+         f"&#8377;{inr(price_of(order))} &middot; {esc(channel_of(order))}"),
+    ]
+    for eid in cited_proof(r)[:3]:
+        label, found = EV_STEP[eid]
+        steps.append((label, found.replace("{del_date}", del_date)))
+    left = _days_left(r)
+    steps.append(("Checking the date the bank gave you",
+                  f"reply due {due_on(r).strftime('%-d %B')}"
+                  + (f", {left} day{'s' if left != 1 else ''} left" if left >= 0
+                     else ", already answered")))
+    n = len(cited_proof(r))
+    steps.append(("Writing the reply",
+                  f"{n} piece{'s' if n != 1 else ''} of proof attached"))
+    return steps
+
+
+def steps_html(steps: list[tuple[str, str]], done: bool = True) -> str:
+    """The work, visible. Done rows render ticked; a live thread hands the
+    same markup to the browser and lets it tick them off one at a time."""
+    if not steps:
+        return ""
+    rows = "".join(
+        f'<li class="wstep{" done" if done else ""}">'
+        f'<span class="wtick"></span>'
+        f'<span class="wlabel">{label}</span>'
+        f'<span class="wfound">{found}</span></li>'
+        for label, found in steps)
+    return f'<ol class="wsteps">{rows}</ol>'
+
+
+def work_product(r, mode: str = "thread") -> str:
+    """The thing a manager would forward: the finished reply to the bank,
+    every line carrying its proof, with the three decisions underneath it.
+
+    `mode="thread"` wires the buttons to the chat's confirm path;
+    `mode="page"` posts the same decisions through the ordinary form. Both
+    end up in the one approve/edit/dismiss the workspace has always used."""
+    order = r.order_id
+    text = (r.decision or {}).get("counter_text", "")
+    proof = cited_proof(r)
+    label, cls = STATE_META.get(r.state, (r.state.value, "mut"))
+    left = _days_left(r)
+    due = (f'reply due {due_on(r).strftime("%-d %B")}'
+           + (f' &middot; {left} day{"s" if left != 1 else ""} left'
+              if left >= 0 else ""))
+    srcs = "".join(_src_chip(e, order) for e in proof) or (
+        '<span class="mut">nothing attached</span>')
+    acts = ""
+    if r.state is RunState.AWAITING_GATE:
+        if mode == "thread":
+            pid = str(_uuid.uuid4())
+            PROPOSALS[pid] = {"run_id": r.run_id, "action": None}
+            acts = (
+                f'<div class="wp-acts" id="prop-{pid}">'
+                f'<button class="btn primary" onclick="wpAct(\'{pid}\',\'approve\',this)">'
+                f'Approve</button>'
+                f'<button class="btn ghost" onclick="wpEdit(\'{pid}\')">Edit</button>'
+                f'<button class="btn ghost" onclick="wpAct(\'{pid}\',\'reject\',this)">'
+                f'Not this time</button>'
+                f'<span class="wp-trust">You approve before anything sends.</span>'
+                f'</div>'
+                f'<div class="wp-edit" id="wpe-{pid}" hidden>'
+                f'<textarea id="wpt-{pid}" rows="6">{esc(text)}</textarea>'
+                f'<button class="btn primary" onclick="wpAct(\'{pid}\',\'edit\',this)">'
+                f'Send my version</button></div>')
+        else:
+            acts = (
+                f'<div class="wp-acts">'
+                f'<form method="post" action="/act">'
+                f'<input type="hidden" name="run" value="{r.run_id}">'
+                f'<button class="btn primary" name="action" value="approve">Approve</button>'
+                f'<button class="btn ghost" name="action" value="reject">Not this time</button>'
+                f'</form>'
+                f'<button class="btn ghost" onclick="toggleEdit(\'wpe-{r.run_id}\')">Edit</button>'
+                f'<span class="wp-trust">You approve before anything sends.</span></div>'
+                f'<div class="wp-edit" id="wpe-{r.run_id}" hidden>'
+                f'<form method="post" action="/act">'
+                f'<input type="hidden" name="run" value="{r.run_id}">'
+                f'<textarea name="text" rows="6">{esc(text)}</textarea>'
+                f'<button class="btn primary" name="action" value="edit">'
+                f'Send my version</button></form></div>')
+    else:
+        acts = (f'<div class="wp-acts"><span class="st {cls}">{label}</span>'
+                f'<span class="wp-trust">Already decided &mdash; nothing here '
+                f'can be sent twice.</span></div>')
+    return (
+        f'<article class="wp">'
+        f'<div class="wp-h"><div class="wp-kicker">Reply to the bank</div>'
+        f'<h3>{esc(case_no(order))} &middot; {esc(customer_of(order))} '
+        f'&middot; {esc(bought(order))}</h3>'
+        f'<div class="wp-meta">&#8377;{inr(price_of(order))} &middot; '
+        f'{esc(channel_of(order))} &middot; {due}</div></div>'
+        f'<div class="wp-body">'
+        f'<div class="wp-claim">The buyer says: &ldquo;{esc(r.claim_text or "&mdash;")}&rdquo;</div>'
+        f'{sourced_draft(text, proof, order)}</div>'
+        f'<div class="wp-srcs"><span class="wp-srch">Proof attached</span>{srcs}</div>'
+        f'{acts}'
+        f'<a class="wp-open" href="/cases/{esc(order or "")}">Open the case &rarr;</a>'
+        f'</article>')
+
+
+# The case timeline reads as one shared history, so the internals of the
+# engine — agent slugs, actor ids, source names, citation counts — get said
+# in the words the owner would use. Display only; the record keeps its own.
+SOURCE_WORDS = {"bank_webhook": "straight from the bank",
+                "email_forward": "forwarded to you by email",
+                "gateway_webhook": "from the payment gateway",
+                "sample": "a made-up one, for trying it out"}
+
+
+def _who(actor: str | None) -> str:
+    a = (actor or "").strip()
+    if not a or a in (BUSINESS_ID, UNLINKED_CHANNEL_ID, "workspace", "ask"):
+        return "you"
+    return esc(a.split("@")[0])
+
+
+def plain_step(e: dict, r) -> tuple[str, str]:
+    """(what happened, what came of it) — one line of the case's history."""
+    agent, kind, d = e["agent"], e["kind"], (e.get("detail") or "")
+    reason = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
+    if agent == "detection-agent":
+        if kind == "signal":
+            src = next((v for k, v in SOURCE_WORDS.items() if k in d), "")
+            return ("The dispute came in", f"{reason} &mdash; {src}" if src else reason)
+        if kind == "confirmed":
+            return ("Read what the buyer is claiming",
+                    esc(d) or (esc(r.claim_text or "")))
+        return ("Decided it is not really a dispute", plain_detail(d))
+    if agent == "eligibility-agent":
+        if kind == "qualified":
+            return ("Checked it is worth answering", "nothing in the way")
+        return ("Set it aside", plain_detail(r.suppressed_reason or d))
+    if agent == "response-agent":
+        n = len(cited_proof(r))
+        return ("Wrote the reply",
+                f"{n} piece{'s' if n != 1 else ''} of proof attached")
+    if agent == "compliance-agent":
+        if kind == "passed":
+            return ("Checked it against your rules", "nothing broken")
+        return ("Held it back", plain_detail(d))
+    if agent == "gate":
+        if kind == "surfaced":
+            return ("Put it in front of you", "waiting on your yes")
+        if kind == "approved":
+            return (f"{_who(d.removeprefix('by ')).capitalize()} said yes",
+                    "sent as written")
+        if kind == "edited":
+            return ("You changed the wording",
+                    "you fixed a fact" if r.gate_is_material else "just the wording")
+        return ("You said no", "nothing was sent")
+    if agent == "filing-agent":
+        return ("Sent it to the bank", f"before {due_on(r).strftime('%-d %B')}")
+    if agent == "reporting-agent":
+        return ("How it ended", esc(d) or "written down")
+    if agent == "escalation-agent":
+        return ("Handed it to a person", plain_detail(d))
+    if agent == "note":
+        return ("Note from your team", esc(d))
+    return (esc(kind.replace("_", " ").capitalize()), plain_detail(d))
+
+
+def case_runs(tid: str, order_id: str) -> list:
+    led = WORLD.d.ledger
+    return sorted((r for r in led.runs.values()
+                   if r.tenant_id == tid and r.order_id == order_id),
+                  key=lambda r: r.occurred_at)
+
+
+def case_status(runs: list) -> tuple[str, str]:
+    """(key, words) — the one line that says where a case stands."""
+    if any(r.state is RunState.AWAITING_GATE for r in runs):
+        return ("need", "Needs your yes")
+    if any(r.state in (RunState.TIMED_OUT, RunState.FAILED) for r in runs):
+        return ("need", "Needs a person")
+    if any(not r.state.terminal for r in runs):
+        return ("work", "Working")
+    return ("done", "Done")
+
+
+def case_content(tid: str, order_id: str) -> str:
+    """One order, one case, one shared history. Every agent that touched
+    this order writes into the same timeline, in the order it happened —
+    not a log per agent."""
+    led = WORLD.d.ledger
+    runs = case_runs(tid, order_id)
+    if not runs:
+        return ('<h1 class="page">Nothing here</h1>'
+                '<div class="pagehint">No case on that order.</div>')
+    latest = runs[-1]
+    who = customer_of(order_id)
+    skey, sword = case_status(runs)
+    kept = 0
+    for r in runs:
+        out = led.outcome_for(r.run_id)
+        if out and (out.outcome_value or {}).get("won"):
+            kept += (out.outcome_value or {}).get("amount_paise") or 0
+
+    # the shared history: every step every agent took, oldest first
+    marks = []
+    for r in runs:
+        for e in led.trace_for(r.run_id):
+            marks.append((e["ts"], e, r))
+    marks.sort(key=lambda m: m[0])
+    tl = "".join(
+        f'<li class="cstep" style="animation-delay:{min(i, 14) * 60}ms">'
+        f'<span class="cdot2"></span>'
+        f'<span class="clab">{plain_step(e, er)[0]}'
+        f'<span class="csub">{plain_step(e, er)[1]}</span></span>'
+        f'<span class="cwhen">{e["ts"].strftime("%-d %b, %H:%M")}</span></li>'
+        for i, (_, e, er) in enumerate(marks)) or (
+        '<li class="cstep"><span class="cdot2"></span>'
+        '<span class="clab">Nothing written down yet</span></li>')
+
+    proof = cited_proof(latest)
+    ev_by_id = {e.evidence_id: e for e in WORLD.d.evidence}
+    prows = "".join(
+        f'<div class="prow"><b>{EV_LABEL[e]}</b>'
+        f'<span>{esc((ev_by_id.get(e).text if ev_by_id.get(e) else ""))}</span></div>'
+        for e in proof) or '<div class="prow"><span class="mut">Nothing attached to this one.</span></div>'
+
+    decided = []
+    for r in runs:
+        lbl, cls = STATE_META.get(r.state, (r.state.value, "mut"))
+        decided.append(f'<span class="st {cls}">{lbl}</span>')
+
+    left = _days_left(latest)
+    meta = (f'&#8377;{inr(price_of(order_id))} &middot; '
+            f'{esc(bought(order_id))} &middot; {esc(channel_of(order_id))} '
+            f'&middot; reply due {due_on(latest).strftime("%-d %B")}'
+            + (f' ({left} day{"s" if left != 1 else ""} left)' if left >= 0 else "")
+            + (f' &middot; &#8377;{inr(kept)} kept' if kept else ""))
+    return (
+        f'<a class="jback" href="/">&lsaquo; Back</a>'
+        f'<div class="casehead"><div>'
+        f'<div class="wp-kicker">Case {esc(case_no(order_id))}</div>'
+        f'<h1 class="page casename">{_logo(who, 26)}{esc(who)}</h1>'
+        f'<div class="casemeta">{meta}</div></div>'
+        f'<span class="casest {skey}">{sword}</span></div>'
+        f'<div class="casegrid">'
+        f'<div><h2 class="sec">What happened, start to finish</h2>'
+        f'<ol class="ctimeline">{tl}</ol></div>'
+        f'<div><h2 class="sec">Where it stands</h2>'
+        f'<div class="cdecide">{"".join(decided)}</div>'
+        f'<h2 class="sec" id="proof">The proof on file</h2>'
+        f'<div class="pcard">{prows}</div>'
+        f'<h2 class="sec">Everything, one by one</h2>'
+        + "".join(ledger_row(r) for r in reversed(runs))
+        + '</div></div>'
+        f'<h2 class="sec">The reply</h2>{work_product(latest, mode="page")}')
+
 
 HOME_CONTENT = """
     <h1 class="page" id="tasks">Needs you</h1>
@@ -1071,7 +1652,8 @@ def render(tid: str = "t1", email: str = "") -> str:
         '<div class="empty">All clear &mdash; nothing needs review.</div>')
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
-            .replace("__SIDEBAR__", sidebar_html("tasks", tid))
+            .replace("__SIDEBAR__", sidebar_html("tasks", tid,
+                                                 convs=conv_list_html(tid)))
             .replace("__BIZ__", BUSINESS)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0]))
@@ -1159,7 +1741,7 @@ font-size:14.5px;color:#26293A;flex-wrap:wrap}
 .tacts{display:flex;gap:7px;align-items:center;flex:none;opacity:.92;margin-left:auto}
 .tacts form{display:flex;gap:7px}
 .when{color:#5A5D6D;font-size:13.5px;flex:none;width:52px;text-align:right}
-""" + BTN_CSS + """
+""" + BTN_CSS + WORK_CSS + """
 .bulkbar{display:flex;gap:10px;align-items:center;margin:14px 0 2px;
 padding:10px 14px;border:1px solid #DFDBFA;background:#F4F3FE;border-radius:10px}
 .taskwrap.kfocus{background:#FAFAFE;box-shadow:inset 3px 0 0 var(--accent)}
@@ -1584,7 +2166,8 @@ if (location.search.includes('audit=1')) {
 def _shell(content: str, active: str, tid: str, email: str) -> str:
     return (TEMPLATE
             .replace("__CONTENT__", content)
-            .replace("__SIDEBAR__", sidebar_html(active, tid))
+            .replace("__SIDEBAR__", sidebar_html(active, tid,
+                                                 convs=conv_list_html(tid)))
             .replace("__BIZ__", BUSINESS)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0])))
@@ -3287,6 +3870,18 @@ class Handler(BaseHTTPRequestHandler):
             self._html(_shell(account_journey_content(sess["tenant_id"],
                                                       self.path.rsplit("/", 1)[-1]),
                               "projects", sess["tenant_id"], sess.get("email", "")))
+        elif self.path.startswith("/cases/"):
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            ref = self.path.split("?")[0].split("#")[0].rsplit("/", 1)[-1]
+            # a case is keyed by the order; anything else that names one row
+            # of it (a single job id) redirects to the case that holds it
+            row = WORLD.d.ledger.runs.get(ref)
+            if row is not None and row.order_id:
+                return self._redirect(f"/cases/{row.order_id}")
+            self._html(_shell(case_content(sess["tenant_id"], ref), ref,
+                              sess["tenant_id"], sess.get("email", "")))
         elif self.path.startswith("/runs/"):
             sess = self._session()
             if not sess:
@@ -3363,11 +3958,17 @@ class Handler(BaseHTTPRequestHandler):
             if c is None or c["tenant"] != sess["tenant_id"]:
                 c = _new_conv(sess["tenant_id"], msg)
             c["msgs"].append({"who": "msg user", "html": esc(msg)})
+            # the steps are kept ticked-off, so reopening the thread shows
+            # the work that was done rather than replaying the animation
+            if res.get("steps"):
+                c["msgs"].append({"who": "steps",
+                                  "html": steps_html(res["steps"], done=True)})
             c["msgs"].append({"who": "msg bot", "html": res.get("reply", "")})
-            if res.get("cards"):
-                c["msgs"].append({"who": "cards", "html": res["cards"]})
-                if 'id="prop-' in res["cards"]:
-                    c["pending"] = res["cards"].split('id="prop-')[1].split('"')[0]
+            for key in ("product", "cards"):
+                if res.get(key):
+                    c["msgs"].append({"who": "cards", "html": res[key]})
+                    if 'id="prop-' in res[key]:
+                        c["pending"] = res[key].split('id="prop-')[1].split('"')[0]
             _touch(c)
             return self._json({**res, "conv_id": c["id"], "title": c["title"]})
         if self.path == "/api/sample":
@@ -3409,16 +4010,24 @@ class Handler(BaseHTTPRequestHandler):
             sess = self._session() or {"tenant_id": "t1"}
             payload = json.loads(raw)
             pid = payload.get("proposal", "")
-            action = (PROPOSALS.get(pid) or {}).get("action")
-            res = confirm(pid)
+            action = (payload.get("action")
+                      or (PROPOSALS.get(pid) or {}).get("action"))
+            # the run belongs to a tenant; a session only ever decides its own
+            prop = PROPOSALS.get(pid) or {}
+            run = WORLD.d.ledger.runs.get(prop.get("run_id", ""))
+            if run is not None and run.tenant_id != sess["tenant_id"]:
+                return self.send_error(403)
+            res = confirm(pid, action, payload.get("text", "")[:4000],
+                          sess.get("email", "workspace"))
             c = CONVS.get(payload.get("conv_id") or "")
             if c is not None and c["tenant"] == sess["tenant_id"]:
                 c["msgs"].append({"who": "msg bot", "html": res.get("reply", "")})
-                if res.get("cards"):
-                    c["msgs"].append({"who": "cards", "html": res["cards"]})
+                for key in ("product", "cards"):
+                    if res.get(key):
+                        c["msgs"].append({"who": "cards", "html": res[key]})
                 if c.get("pending") == pid:
                     c["pending"] = None
-                    c["outcome"] = ("approved" if action == "approve"
+                    c["outcome"] = ("approved" if action in ("approve", "edit")
                                     else "dismissed" if action else c["outcome"])
                 _touch(c)
             return self._json(res)
@@ -3730,19 +4339,72 @@ def _find_awaiting(comp):
 
 
 def _t_action(args, action):
+    """The three decisions now live on the work product itself, which is
+    where the owner is already reading the reply. This only says what it
+    found; the card underneath carries the buttons."""
     run = _find_awaiting((args or {}).get("competitor"))
     if run is None:
         return "Nothing like that is waiting on your yes.", "", None
-    pid = str(_uuid.uuid4())
-    PROPOSALS[pid] = {"run_id": run.run_id, "action": action}
-    verb = "Yes, send it to the bank" if action == "approve" else "No, don't send it"
-    card = (f'{_mini_run(run)}'
-            f'<div class="proposal" id="prop-{pid}">'
-            f'<button class="btn primary" onclick="confirmProposal(\'{pid}\')">{verb}</button>'
-            f'<button class="btn ghost" onclick="cancelProposal(\'{pid}\')">Cancel</button></div>')
-    return (f"Here is the reply. {PLAIN_REASON.get(run.reason_code, 'A buyer '
-            'is disputing a payment')}. Nothing happens until you say so.",
-            card, pid)
+    return (f"Here is the reply, with the proof it stands on. "
+            f"{PLAIN_REASON.get(run.reason_code, 'A buyer is disputing a payment')}. "
+            f"Nothing goes to the bank until you say so.", "", None)
+
+
+# ------------------------------------------------------------- work, visible
+# "Make it visibly work." Instant resolution reads as though nothing was
+# really checked, so every answer shows the steps it took, each one naming
+# something real off the record.
+
+def _target_run(tool: str, args: dict | None):
+    """Which case this answer is about, if it is about one."""
+    if tool in ("approve", "dismiss", "queue"):
+        return _find_awaiting((args or {}).get("competitor"))
+    if tool == "runs":
+        comp = (args or {}).get("competitor")
+        runs = [r for r in WORLD.d.ledger.runs.values()
+                if r.decision and (not comp or r.reason_code == comp)]
+        waiting = [r for r in runs if r.state is RunState.AWAITING_GATE]
+        pool = waiting or runs
+        return max(pool, key=lambda r: r.occurred_at) if pool else None
+    return None
+
+
+def steps_for(tool: str, run) -> list[tuple[str, str]]:
+    led = WORLD.d.ledger
+    if run is not None:
+        return case_steps(run)
+    mine = [r for r in led.runs.values() if r.tenant_id == "t1"]
+    if tool == "metrics":
+        return [("Opening your own record",
+                 f"{len(mine)} things your team worked"),
+                ("Counting the ones you had to fix",
+                 fmt_pct(correction_rate(led, "t1"))),
+                ("Counting the ones sent as written",
+                 fmt_pct(counter_usage_rate(led, "t1"))),
+                ("Working out how long you take to decide",
+                 _fmt_latency(gate_latency_p95_ms(led, "t1")))]
+    if tool == "evidence":
+        ev = [e for e in WORLD.d.evidence if e.tenant_id == "t1"]
+        cited = sum(len((r.decision or {}).get("cited_evidence_ids", []))
+                    for r in mine)
+        return [("Listing every piece of proof you have",
+                 f"{len(ev)} pieces on file"),
+                ("Counting where each one was used",
+                 f"{cited} times across your replies"),
+                ("Checking which ones settled",
+                 f"{sum(1 for r in mine if led.outcome_for(r.run_id))} closed so far")]
+    if tool == "escalations":
+        return [("Looking for anything stuck",
+                 f"{len(WORLD.d.slack.channel_posts)} handed over"),
+                ("Checking who has each one now", "Relay&rsquo;s people")]
+    if tool == "shadow":
+        return [("Reading back your last 30 days",
+                 f"{len(SHADOW_ROWS)} disputes"),
+                ("Working out which were worth answering",
+                 f"{sum(1 for x in SHADOW_ROWS if x[4] != 'skip')} of them"),
+                ("Writing what the reply would have been",
+                 f"{sum(1 for x in SHADOW_ROWS if x[4] == 'send')} replies, none sent")]
+    return []
 
 
 HELP = ("Everything I say comes from your own record, never from memory. "
@@ -3834,34 +4496,59 @@ def _llm_route(text: str):
 
 
 def ask(message: str) -> dict:
+    """One answer is: the steps the team took, then the thing it produced."""
     routed = _llm_route(message)
     tool, args = routed or _keyword_route(message)
     meta = {"_routed_model": routed is not None, "_tool": tool}
+    run = _target_run(tool, args)
+    steps = steps_for(tool, run)
+    product = work_product(run) if run is not None else ""
     if tool in ("approve", "dismiss"):
         reply, cards, pid = _t_action(args, tool)
-        return {"reply": reply, "cards": cards, "proposal": pid, **meta}
+        return {"reply": reply, "cards": cards, "proposal": pid,
+                "steps": steps, "product": product,
+                "case": (run.order_id if run else ""), **meta}
     handler = {"queue": _t_queue, "metrics": _t_metrics, "runs": _t_runs,
                "evidence": _t_evidence, "escalations": _t_escalations,
                "shadow": _t_shadow}.get(tool)
     if handler is None:
-        return {"reply": HELP, "cards": "", "proposal": None, **meta}
+        return {"reply": HELP, "cards": "", "proposal": None,
+                "steps": [], "product": "", "case": "", **meta}
     reply, cards = handler(args)
-    return {"reply": reply, "cards": cards, "proposal": None, **meta}
+    return {"reply": reply, "cards": cards, "proposal": None,
+            "steps": steps, "product": product,
+            "case": (run.order_id if run else ""), **meta}
 
 
-def confirm(pid: str) -> dict:
+def confirm(pid: str, action: str | None = None, text: str = "",
+            actor: str = "you") -> dict:
+    """The one decision path. Whether the yes came from the queue, from
+    Slack or from the thread, it lands on the same approve / edit / reject
+    and writes exactly once."""
     prop = PROPOSALS.pop(pid, None)
     if prop is None:
-        return {"reply": "That one is gone — it may already be settled.", "cards": ""}
+        return {"reply": "That one is gone — it may already be settled.",
+                "cards": "", "product": ""}
     run = WORLD.d.ledger.runs.get(prop["run_id"])
     if run is None or run.state is not RunState.AWAITING_GATE:
-        return {"reply": "That one is no longer waiting on you.", "cards": ""}
-    if prop["action"] == "approve":
-        WORLD.approve(run, "ask")
-        return {"reply": "Sent. The bank has the reply and it is written down "
-                         "in your history.", "cards": _mini_run(run)}
-    WORLD.reject(run, "ask")
-    return {"reply": "Not sent, and written down.", "cards": _mini_run(run)}
+        return {"reply": "That one is no longer waiting on you.",
+                "cards": "", "product": ""}
+    act = action or prop.get("action") or "approve"
+    pipe = pipeline_for(run.tenant_id)
+    if act == "approve":
+        pipe.approve(run, actor)
+        reply = ("Sent. The bank has the reply, and the whole case is "
+                 "written down in your history.")
+    elif act == "edit":
+        pipe.edit(run, actor, text or (run.decision or {}).get("counter_text", ""))
+        reply = ("Sent in your words. What you changed is kept, so the next "
+                 "reply starts from it.")
+    else:
+        pipe.reject(run, actor)
+        reply = "Not sent, and written down."
+    return {"reply": reply, "cards": "", "product": work_product(run),
+            "case": run.order_id or "",
+            "case_key": case_status(case_runs(run.tenant_id, run.order_id))[0]}
 
 
 # ------------------------------------------------------------- sample data
@@ -3994,18 +4681,22 @@ def conv_list_html(tid: str, active: str = "") -> str:
                  if c.get("outcome") == "dismissed" else
                  '<span class="cbadge pend" title="Decision pending">&#9679;</span>'
                  if c.get("pending") else "")
-        return (f'<a class="{cls}" href="/?c={c["id"]}"><span class="dot"></span>'
+        return (f'<a class="{cls}" data-st="chat" href="/?c={c["id"]}">'
+                f'<span class="dot"></span>'
                 f'<span class="ctitle">{esc(c["title"])}</span>{badge}'
                 f'<span class="kebab" onclick="convMenu(event, \'{c["id"]}\', {str(bool(c["pinned"])).lower()})" '
                 f'title="Options">&#8942;</span></a>')
 
     out = ""
     if pinned:
-        out += '<div class="navsec">Pinned</div>' + "".join(row(c) for c in pinned)
+        out += ('<div class="navsec csec" data-st="chat">Pinned</div>'
+                + "".join(row(c) for c in pinned))
     if recents:
-        out += '<div class="navsec csec">Recents</div>' + "".join(row(c) for c in recents)
+        out += ('<div class="navsec csec" data-st="chat">Conversations</div>'
+                + "".join(row(c) for c in recents))
     if not out:
-        out = '<div class="navsec">Recents</div><div class="cempty">Conversations appear here.</div>'
+        out = ('<div class="navsec csec" data-st="chat">Conversations</div>'
+               '<div class="cempty" data-st="chat">Conversations appear here.</div>')
     return out
 
 
@@ -4294,7 +4985,7 @@ font-size:13.5px}
 .mrow span{flex:1;color:#26293A}
 .mrow i{font-style:normal;color:var(--mut);font-size:12px}
 .proposal{display:flex;gap:9px;padding:4px 2px}
-""" + BTN_CSS + """
+""" + BTN_CSS + WORK_CSS + """
 .composer{flex:none;padding:10px 24px 26px}
 .composer .hcomposer{max-width:740px;margin:0 auto}
 .composer .hcomposer input{padding:13px 16px 15px}
@@ -4407,12 +5098,31 @@ function bubble(cls, html){
   const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
   thread.appendChild(d); d.scrollIntoView({behavior:'smooth', block:'end'}); return d;
 }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+// fixed beats, never random: the work has to look like work, and it has to
+// look the same every time this is demonstrated
+const STEP_IN = 240, STEP_WORK = 620;
+async function runSteps(steps){
+  if(!steps || !steps.length) return;
+  const wrap = bubble('steps', '<ol class="wsteps"></ol>');
+  const ol = wrap.querySelector('.wsteps');
+  for(const [label, found] of steps){
+    const li = document.createElement('li');
+    li.className = 'wstep live';
+    li.innerHTML = '<span class="wtick"></span><span class="wlabel">'
+      + label + '</span><span class="wfound">' + (found || '') + '</span>';
+    ol.appendChild(li);
+    wrap.scrollIntoView({behavior:'smooth', block:'end'});
+    await wait(STEP_WORK);
+    li.className = 'wstep done';
+    await wait(STEP_IN);
+  }
+}
 async function send(text){
   text = (text || '').trim(); if(!text) return;
   document.getElementById('empty')?.remove();
   document.getElementById('composer').style.display = '';
   bubble('msg user', text.replace(/</g,'&lt;')); box.value = '';
-  const typing = bubble('msg bot', '&hellip;');
   const res = await fetch('/api/chat', {method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({message:text, conv_id: CONV})});
@@ -4425,17 +5135,39 @@ async function send(text){
     document.getElementById('newchat').style.visibility = '';
     history.replaceState(null, '', '/?c=' + CONV);
   }
-  typing.innerHTML = data.reply;
+  await runSteps(data.steps);
+  bubble('msg bot', data.reply);
+  if(data.product) bubble('cards', data.product);
   if(data.cards) bubble('cards', data.cards);
 }
-async function confirmProposal(pid){
+function wpEdit(pid){
+  document.getElementById('wpe-'+pid)?.toggleAttribute('hidden');
+}
+async function wpAct(pid, action, btn){
+  const t = document.getElementById('wpt-'+pid);
+  document.querySelectorAll('#prop-'+pid+' .btn, #wpe-'+pid+' .btn')
+    .forEach(b => b.disabled = true);
+  if (btn) { btn.classList.add('scanning');
+    btn.textContent = action === 'reject' ? 'Writing it down…' : 'Sending…'; }
   const res = await fetch('/api/confirm', {method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({proposal: pid, conv_id: CONV})});
+    body: JSON.stringify({proposal: pid, action, conv_id: CONV,
+                          text: t ? t.value : ''})});
   const data = await res.json();
   document.getElementById('prop-'+pid)?.remove();
+  document.getElementById('wpe-'+pid)?.remove();
   bubble('msg bot', data.reply);
-  if(data.cards) bubble('cards', data.cards);
+  if(data.product) bubble('cards', data.product);
+  // the rail carries the same case; move its dot rather than reload the page
+  if (data.case && data.case_key){
+    const row = document.querySelector('.rail[href="/cases/' + data.case + '"]');
+    if (row){ row.dataset.st = data.case_key;
+      const d = row.querySelector('.cdot');
+      if (d) d.className = 'cdot ' + data.case_key; }
+  }
+}
+async function confirmProposal(pid){
+  return wpAct(pid, 'approve', null);
 }
 function cancelProposal(pid){
   document.getElementById('prop-'+pid)?.remove();
@@ -4579,7 +5311,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
                       if r.tenant_id == tid and r.state is RunState.AWAITING_GATE),
                      key=lambda r: r.occurred_at, reverse=True)[:5]
     rows = "".join(
-        f'<a class="arow" href="/approvals">{ICONS["bolt"]}'
+        f'<a class="arow" href="/cases/{esc(r.order_id or "")}">{ICONS["bolt"]}'
         f'<span>Wrote the reply to the bank for '
         f'{esc(_account_label(r))} &mdash; {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
