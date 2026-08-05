@@ -2106,8 +2106,9 @@ def render(tid: str = "t1", email: str = "") -> str:
             .replace("__SIDEBAR__", sidebar_html("tasks", tid,
                                                  convs=conv_list_html(tid)))
             .replace("__BIZ__", BUSINESS)
+            .replace("__NAME__", esc(user_name(email)))
             .replace("__USER__", esc(email))
-            .replace("__INITIAL__", esc((email or "?")[0]))
+            .replace("__INITIAL__", esc(user_name(email)[0]))
             .replace("__NWAIT__", str(len(waiting) + cash_waiting(tid)))
             .replace("__TASKS__", tasks)
             .replace("__PROPS__", props)
@@ -2173,7 +2174,8 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
   z-index:40;text-align:left}
 .acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13.5px}
-.acct-mail{color:var(--mut);padding:0 12px 8px;font-size:12.5px;
+.acct-mail{color:var(--mut);padding:0 12px;font-size:12.5px}
+.acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:12px;
   border-bottom:1px solid var(--hair);margin-bottom:4px}
 .acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
   font-size:13.5px;text-decoration:none}
@@ -2621,8 +2623,9 @@ __SIDEBAR__
     <span></span>
     <div class="right"><details class="acct"><summary class="avatar">__INITIAL__</summary>
       <div class="acctmenu">
-        <div class="acct-biz">__BIZ__</div>
+        <div class="acct-biz">__NAME__</div>
         <div class="acct-mail">__USER__</div>
+        <div class="acct-shop">__BIZ__</div>
         <a class="acct-out" href="/logout">Log out</a>
       </div></details></div>
   </div>
@@ -2813,14 +2816,24 @@ if (location.search.includes('audit=1')) {
 
 
 # ---------------------------------------------------------------- side pages
+def user_name(email: str) -> str:
+    """The person, not the login. The demo founder is Mothi; anyone else
+    gets a readable name derived from their address."""
+    if (email or "").lower() == "demo@local":
+        return "Mothi"
+    stem = (email or "").split("@")[0].replace(".", " ").replace("_", " ").strip()
+    return stem.title() if stem else "there"
+
+
 def _shell(content: str, active: str, tid: str, email: str) -> str:
     return (TEMPLATE
             .replace("__CONTENT__", content)
             .replace("__SIDEBAR__", sidebar_html(active, tid,
                                                  convs=conv_list_html(tid)))
             .replace("__BIZ__", BUSINESS)
+            .replace("__NAME__", esc(user_name(email)))
             .replace("__USER__", esc(email))
-            .replace("__INITIAL__", esc((email or "?")[0])))
+            .replace("__INITIAL__", esc(user_name(email)[0])))
 
 
 def _card(title: str, sub: str, right: str = "") -> str:
@@ -8114,7 +8127,8 @@ color:var(--mut)}
   box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
   z-index:40;text-align:left;font-weight:400}
 .acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13.5px}
-.acct-mail{color:var(--mut);padding:0 12px 8px;font-size:12.5px;
+.acct-mail{color:var(--mut);padding:0 12px;font-size:12.5px}
+.acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:12px;
   border-bottom:1px solid var(--hair);margin-bottom:4px}
 .acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
   font-size:13.5px}
@@ -8355,8 +8369,9 @@ __SIDEBAR__
   <div class="convhead" id="convhead"><span id="ctitle">__CONVTITLE__</span>
     <span class="uwrap"><details class="acct"><summary class="avatar">__INITIAL__</summary>
       <div class="acctmenu">
-        <div class="acct-biz">__BIZ__</div>
+        <div class="acct-biz">__NAME__</div>
         <div class="acct-mail">__USER__</div>
+        <div class="acct-shop">__BIZ__</div>
         <a class="acct-out" href="/logout">Log out</a>
       </div></details></span></div>
   <main id="main"><div class="thread" id="thread">__THREAD__
@@ -8937,6 +8952,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         thread = "".join(f'<div class="{m["who"]}">{m["html"]}</div>' for m in c["msgs"])
         title, cid = esc(c["title"]), c["id"]
     greet, brief, chips = _briefing(tid, persona)
+    greet = f"{greet}, {esc(user_name(email))}"
     role_html = ""
     name = (CONVS and "") or ""
     chips_html = "".join(
@@ -9019,8 +9035,9 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__CHIPS__", chips_html)
             .replace("__ACTIVE__", active)
             .replace("__BIZ__", BUSINESS)
+            .replace("__NAME__", esc(user_name(email)))
             .replace("__USER__", esc(email))
-            .replace("__INITIAL__", esc((email or "?")[0]))
+            .replace("__INITIAL__", esc(user_name(email)[0]))
             .replace("__THREAD__", thread))
     return page
 
