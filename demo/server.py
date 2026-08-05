@@ -9,6 +9,7 @@ CounterCard, DiffView, metrics strip) before AG-UI streaming lands.
 """
 
 from __future__ import annotations
+import hashlib as _hashlib
 
 import html
 import json
@@ -829,6 +830,32 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
     <hr class="side">
     {convs if convs is not None else ''}
   </aside>"""
+
+
+def _identicon(seed: str, size: int = 34) -> str:
+    """A Gravatar-style identicon, generated inline and deterministically.
+
+    Each agent gets a face of its own so the roster reads as staff rather
+    than a feature list. 5x5 grid mirrored down the middle (the GitHub
+    identicon trick), hue taken from the same hash, so the same agent always
+    renders the same and no network request is involved."""
+    h = _hashlib.sha256(seed.encode()).digest()
+    hue = h[0] * 360 // 256
+    fg = f"hsl({hue} 58% 45%)"
+    bg = f"hsl({hue} 58% 94%)"
+    cell = size / 5
+    blocks = []
+    for col in range(3):                      # left half + centre, then mirror
+        for row in range(5):
+            if h[col * 5 + row + 1] & 1:
+                for c in {col, 4 - col}:
+                    blocks.append(
+                        f'<rect x="{c * cell:.2f}" y="{row * cell:.2f}" '
+                        f'width="{cell:.2f}" height="{cell:.2f}" fill="{fg}"/>')
+    return (f'<svg class="ident" width="{size}" height="{size}" '
+            f'viewBox="0 0 {size} {size}" aria-hidden="true">'
+            f'<rect width="{size}" height="{size}" rx="9" fill="{bg}"/>'
+            f'{"".join(blocks)}</svg>')
 
 
 _LOGO_COLORS = ["#5266EB", "#E8590C", "#0CA678", "#B33AB3", "#E0A800",
@@ -2197,7 +2224,7 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
         switch = '<span class="st mut">Off</span>'
     inner = (f'<div class="aname" style="margin-bottom:8px;flex-wrap:wrap;'
              f'row-gap:6px">'
-             f'<span class="tile">{ICONS[a["icon"]]}</span>'
+             f'{_identicon(a["slug"])}'
              f'<span class="dot2 {"on" if live else "off"}"></span>'
              f'<b style="font-size:15px">{a["role"]}</b>'
              f'<span class="st mut" style="flex:none">{a["name"]}</span>'
@@ -3985,6 +4012,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 14px}
 .needs:hover{background:#F7F8FE}
 .needs svg{width:18px;height:18px;flex:none;color:var(--accent)}
 .repl{font-size:12px;color:var(--mut);margin:0 0 10px}
+.ident{flex:none;border-radius:9px;vertical-align:middle}
 .needs .go{margin-left:auto;color:var(--accent);font-size:18px}
 .needs.calm{border-color:var(--hair);color:var(--mut);font-weight:400}
 .needs.calm svg{color:var(--mut)}
@@ -4344,15 +4372,28 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
 
     n_wait = sum(1 for r in WORLD.d.ledger.runs.values()
                  if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
+    # Lead with what the team handled, not with what the owner owes. In a
+    # five-person business nobody is sitting waiting to work a queue, so a
+    # screen that opens with "7 chores for you" has handed the owner a job.
+    # The team's output is the headline; the sliver that needed a human is
+    # the footnote.
+    handled = sum(1 for r in WORLD.d.ledger.runs.values()
+                  if r.tenant_id == tid
+                  and r.state in (RunState.ACTED, RunState.RESOLVED,
+                                  RunState.SUPPRESSED))
     if n_wait:
         needs = (f'<a class="needs" href="/approvals">{ICONS["tasks"]}'
-                 f'<span><b>{n_wait}</b> thing{"s" if n_wait != 1 else ""} '
-                 f'need{"" if n_wait != 1 else "s"} your yes</span>'
+                 f'<span>Your team handled <b>{handled}</b> '
+                 f'thing{"s" if handled != 1 else ""} on its own. '
+                 f'<b>{n_wait}</b> need{"" if n_wait != 1 else "s"} '
+                 f'your yes.</span>'
                  f'<span class="go">&rarr;</span></a>')
     else:
-        needs = ('<a class="needs calm" href="/approvals">'
-                 + ICONS["tasks"] + '<span>Nothing needs your yes right now'
-                 '</span><span class="go">&rarr;</span></a>')
+        needs = (f'<a class="needs calm" href="/approvals">{ICONS["tasks"]}'
+                 f'<span>Your team handled <b>{handled}</b> '
+                 f'thing{"s" if handled != 1 else ""} on its own. Nothing '
+                 f'needs your yes.</span>'
+                 f'<span class="go">&rarr;</span></a>')
 
     waiting = sorted((r for r in WORLD.d.ledger.runs.values()
                       if r.tenant_id == tid and r.state is RunState.AWAITING_GATE),

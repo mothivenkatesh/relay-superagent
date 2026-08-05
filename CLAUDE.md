@@ -72,6 +72,29 @@ Agent copy source: Mothi's Relay Intro deck (~/Downloads/Relay Intro (4).html);
 the `today:` labor line on each agent card is the arbitrage frame and is the
 new product-visible expression of the thesis.
 
+## Lassie principles (captain: "think like lassie", 2026-08-05)
+Source: the lassie.ai a16z interview. Governing lessons for this build.
+- **Lead with work done, not chores owed.** "In SMBs there's nobody to
+  use the tools." A screen that opens with a queue for the owner has
+  handed the owner a job. Headline = what the team handled alone.
+- **Ship at ~95%, one job at a time.** Take a job over completely, then
+  move to the next. Never half-build the whole roster. (1 of 14 wired is
+  correct, not a gap.)
+- **The labour often cannot be hired at all**, not merely expensive —
+  "in many cases you can't find somebody." Sharper than a salary figure.
+- **Price from the labour budget**, not per run. OPEN TENSION: Cashfree
+  Relay's recorded price is ~Rs 1/run, which is a software price.
+- **Onboarding must be Stripe/Coinbase-simple and self-serve.** Not built.
+- **Distribution:** these owners are not on LinkedIn/Apollo. A job ad for
+  an accounts executive or telecaller is a buying signal for the agent
+  that replaces it.
+- **OPEN TENSION — autonomy vs the gate.** Lassie deliberately has no
+  human in the loop; our trust line is "you approve before anything
+  sends." Default today is approve-everything with an earned-autonomy
+  ladder. Lassie's read says invert it: agent acts, human gets a digest,
+  gate reserved for large/novel. Captain's call, not to be changed
+  unilaterally — it trades compliance-trust for owner time.
+
 ## Origin + rebuild history
 Forked from [CoMarketer](https://github.com/mothivenkatesh/comarketer)
 2026-08-04 for the domain-agnostic harness (run state-machine, ports+fakes,

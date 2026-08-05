@@ -350,3 +350,52 @@ go stale as the roster grows.
 rule, so the tick icon expanded to fill the flex container. Added
 `.needs svg{width:18px;height:18px;flex:none}`. A programmatic sweep for
 horizontal overflow and oversized SVGs across the app now reports clean.
+
+## D25 — Lassie principles: lead with work done, not chores owed (2026-08-05)
+
+Captain re-sent the Lassie (lassie.ai) a16z interview with "think like
+lassie". Applied, plus the tensions it exposes.
+
+**Applied now.** Home led with "7 things need your yes". That is the
+anti-pattern the interview names: "in SMBs there's nobody to use the
+tools" — a screen opening with seven chores has handed the owner a job,
+and the owner is the same person treating patients / packing orders.
+Flipped: the headline is what the team handled on its own, the sliver
+that needed a human is the footnote. Also gave every agent a generated
+identicon so the roster reads as staff, not features (deterministic from
+the slug, inline SVG, no network).
+
+**The live tension, unresolved and worth a decision.** Lassie is explicit
+that they did NOT want a human in the loop: "it runs the business for Dr.
+Sloop." Our standing trust line is "you approve before anything sends."
+Both cannot be maximised. Today the demo defaults to approve-everything
+with an earned-autonomy ladder behind it. The Lassie read says the
+default should invert: agent acts, human sees a digest, gate reserved for
+large amounts and novel cases. Not changed unilaterally — this is the
+captain's call, because it trades the compliance-lead trust story for
+owner time.
+
+**Pricing tension, flagged not resolved.** Lassie charges five figures
+(USD) a month for one agent covering ~30 of 200 monthly labour hours,
+because it comes out of the labour budget. Cashfree Relay's recorded
+pricing is about Rs 1 per execution run — a software price, not a labour
+price. If Relay is sold as labour, per-run pricing leaves most of the
+value on the table. Recorded in the Arivu wiki as the AM-session number;
+worth revisiting before any pricing work.
+
+**Not yet applied, deliberately.**
+- *Service-first build method:* the founders did the work by hand in the
+  office, then automated themselves out ("initially we were the humans in
+  the loop; we automated away our own problems"). The equivalent here is
+  running disputes manually for the first merchants before shipping
+  self-serve. That is a GTM decision, not a code change.
+- *Finish one job before starting the next:* "as soon as we can take over
+  a job we take it over and then we move to the next one", shipping at
+  ~95% rather than waiting for 100%. This repo already matches by
+  accident — 1 of 14 wired. Keep it that way; do not half-build fourteen.
+- *"You can't find somebody":* the sharper version of our cost framing is
+  that often the labour is unavailable at any price, not merely
+  expensive. Some `replaces` lines should say that instead of a salary.
+- *Distribution:* these owners are not in Apollo/Clay and often not on
+  LinkedIn. A job posting for an accounts executive or telecaller is a
+  direct buying signal for the agent that replaces it.
