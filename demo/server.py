@@ -907,6 +907,16 @@ WORK_CSS = """
 .prow:last-child{border-bottom:none}
 .prow b{display:block;color:var(--ink,#1B1F30);font-size:13px;margin-bottom:2px}
 .prow span{color:var(--mut,#8A8D9C);font-size:12.5px;overflow-wrap:anywhere}
+.agchip2{display:inline-block;background:var(--accent-soft,#E9EBF8);
+  color:#3A46A8;border-radius:8px;padding:1px 8px;font-weight:600;
+  font-size:.95em;white-space:nowrap}
+.agchip2:hover{background:#DDE1F6}
+.onemem{display:flex;align-items:center;gap:12px;background:#fff;
+  border:1px solid var(--hair);border-radius:14px;padding:14px 20px;
+  margin:0 0 16px;max-width:880px;font-size:13.5px}
+.onemem svg{width:18px;height:18px;color:#3A46A8;flex:none}
+.onemem span{flex:1}
+.onemem a{color:var(--accent);font-size:12.5px;flex:none}
 .mention{display:inline-block;border-radius:8px;padding:0 6px;
   font-weight:600;font-size:.95em;white-space:nowrap;line-height:1.5}
 @keyframes wfadein{to{opacity:1}}
@@ -3615,6 +3625,128 @@ def agent_settings_content(tid: str, a: dict) -> str:
     return instr + tools + mem + guards + ev
 
 
+# The moat, made visible: one order record that every agent reads and
+# writes. AGENT_LINKS is the edge list: what each agent hands the others
+# and what it borrows, all keyed off the same order.
+AGENT_LINKS = {
+    "three_way_recon": dict(
+        gives=[("cashflow_forecast", "what actually landed each day"),
+               ("daily_mis", "clean, tied-out numbers")],
+        uses=[("payouts_desk", "every payment against its bill")]),
+    "settlement_insights": dict(
+        gives=[("cashflow_forecast", "what is landing this week")],
+        uses=[("three_way_recon", "the tie-out it trusts")]),
+    "cashflow_forecast": dict(
+        gives=[("payouts_desk", "which day is safe to pay")],
+        uses=[("settlement_insights", "what is landing"),
+              ("gst_compliance", "what the tax debit will take")]),
+    "payouts_desk": dict(
+        gives=[("three_way_recon", "every payment, filed against its bill")],
+        uses=[("cashflow_forecast", "the safe day to pay")]),
+    "payment_forms": dict(
+        gives=[("kyc_desk", "the order that needs checks")],
+        uses=[("payment_rescue", "which payment rails work for this buyer")]),
+    "stock_watch": dict(
+        gives=[("cart_rescue", "what is actually in stock to sell"),
+               ("cod_guard", "what is worth shipping")],
+        uses=[("returns_desk", "what is coming back sellable")]),
+    "refund_shield": dict(
+        gives=[("dispute_defender", "claim patterns and reused photos")],
+        uses=[("returns_desk", "the warehouse seal check"),
+              ("cod_guard", "the address history")]),
+    "gst_compliance": dict(
+        gives=[("daily_mis", "what the filing changed")],
+        uses=[("three_way_recon", "numbers already tied out")]),
+    "kyc_desk": dict(
+        gives=[("payment_forms", "the checks built into the form")],
+        uses=[("refund_shield", "risk signals on the buyer")]),
+    "dispute_defender": dict(
+        gives=[("refund_shield", "which proof banks actually accept")],
+        uses=[("cod_guard", "the confirmation call, as proof"),
+              ("returns_desk", "delivery and return scans")]),
+    "returns_desk": dict(
+        gives=[("refund_shield", "the seal check"),
+               ("stock_watch", "which returns come back sellable")],
+        uses=[("dispute_defender", "which buyers dispute after returning")]),
+    "cart_rescue": dict(
+        gives=[("payment_rescue", "buyers who got stuck mid-payment")],
+        uses=[("stock_watch", "never offers what is out of stock"),
+              ("cod_guard", "which pincodes to offer prepaid instead")]),
+    "payment_rescue": dict(
+        gives=[("payment_forms", "which rails work per buyer")],
+        uses=[("cart_rescue", "what the buyer wanted in the first place")]),
+    "cod_guard": dict(
+        gives=[("cart_rescue", "the pincode truth"),
+               ("dispute_defender", "confirmation calls, kept as proof")],
+        uses=[("stock_watch", "what to hold back from risky addresses")]),
+    "daily_mis": dict(
+        gives=[],
+        uses=[("three_way_recon", "the books"),
+              ("stock_watch", "the stock picture"),
+              ("dispute_defender", "what was won and lost")]),
+}
+
+# What one agent learned and another now uses: the exchange itself,
+# written as rows a founder can read.
+TEACHINGS = [
+    ("cod_guard", "Pincode 400013 bounces 2 of every 5 COD parcels",
+     ["cart_rescue"], "offers those buyers prepaid with a discount instead"),
+    ("returns_desk", "This buyer&rsquo;s returns come back with seals broken",
+     ["refund_shield"], "holds their next cash refund for a person"),
+    ("dispute_defender", "Banks accept the courier scan plus the WhatsApp "
+     "thread, and little else",
+     ["refund_shield"], "asks for exactly that proof, first"),
+    ("payment_rescue", "This buyer&rsquo;s card fails but UPI works",
+     ["payment_forms"], "builds their forms with UPI first"),
+    ("cashflow_forecast", "Vendor day and the GST debit collide on Thursdays",
+     ["payouts_desk"], "queues payments around it without being told"),
+    ("stock_watch", "Amla Juice sells 3x faster after a festival week",
+     ["cart_rescue"], "calls those carts first while stock lasts"),
+]
+
+
+def role_of(slug: str) -> str:
+    return next((a["role"] for a in RELAY_AGENTS if a["slug"] == slug), slug)
+
+
+def agent_chip(slug: str) -> str:
+    return (f'<a class="agchip2" href="/agents/{slug}">'
+            f'{esc(role_of(slug))}</a>')
+
+
+def teamwork_html(slug: str) -> str:
+    links = AGENT_LINKS.get(slug)
+    if not links:
+        return ""
+    rows = ""
+    for to, what in links["gives"]:
+        rows += (f'<div class="trow slim"><span class="ico">{ICONS["send"]}'
+                 f'</span><span class="tdesc">Hands {agent_chip(to)} '
+                 f'<span class="mut">{what}</span></span></div>')
+    for frm, what in links["uses"]:
+        rows += (f'<div class="trow slim"><span class="ico">{ICONS["book"]}'
+                 f'</span><span class="tdesc">Borrows from {agent_chip(frm)} '
+                 f'<span class="mut">{what}</span></span></div>')
+    return (f'<h2 class="sec">How it works with the team</h2>'
+            f'<div class="pagehint">Everyone reads and writes the same '
+            f'order record. Nothing is emailed around; the record is the '
+            f'conversation.</div>{rows}')
+
+
+def teachings_html() -> str:
+    rows = "".join(
+        f'<div class="trow slim"><span class="ico">{ICONS["bolt"]}</span>'
+        f'<span class="tdesc">{agent_chip(frm)} learned '
+        f'<b>{fact}</b>, so '
+        + " and ".join(agent_chip(t) for t in tos)
+        + f' now {effect}.</span></div>'
+        for frm, fact, tos, effect in TEACHINGS)
+    return (f'<h2 class="sec" id="teach">What they teach each other</h2>'
+            f'<div class="pagehint">One agent learns it once; the whole '
+            f'team uses it the same day. This is why the fifteenth hire '
+            f'is better than the first.</div>{rows}')
+
+
 def latest_run_html(tid: str, slug: str) -> str:
     """Paperclip's Latest Run strip, in plain words: what this agent last
     did and when, with a fortnight of activity beside it."""
@@ -3810,7 +3942,8 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
         + f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
-        f'<h2 class="sec">When a person takes over</h2>{handoff}'
+        + teamwork_html(slug)
+        + f'<h2 class="sec">When a person takes over</h2>{handoff}'
         f'{helpers}')
 
     tabbar = ('<div class="tabbar">'
@@ -4341,6 +4474,12 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
             f'<div class="pagehint">The people you would hire, as '
             f'agents. Nothing goes out without your yes.</div>'
             f'{tiles}'
+            f'<div class="onemem">{ICONS["book"]}<span><b>One memory, '
+            f'fifteen hands.</b> Every agent reads and writes the same '
+            f'order record, so each one you switch on makes the rest '
+            f'sharper.</span>'
+            f'<a href="/memory#teach">see what they teach each other '
+            f'&rarr;</a></div>'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span></div>'
@@ -5504,6 +5643,7 @@ def memory_content(tid: str) -> str:
             f'at, checked for freshness every Monday. '
             f'<a href="/knowledge"><b>See all of it &rarr;</b></a></div>'
             f'{proof_rows}'
+            + teachings_html() +
             f'<h2 class="sec">How things turned out</h2>'
             f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
             f'<span class="tdesc"><b>{n_ended} finished '
@@ -7731,6 +7871,8 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
     for slug, icon, text in desk_beats:
         if DEMO_ON.get(slug):
             lines.append((icon, text))
+    lines.append(("bot", "Teamwork: COD Guard&rsquo;s pincode note saved "
+                  "Cart Rescue three dead calls yesterday."))
     return lines
 
 
