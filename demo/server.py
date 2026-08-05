@@ -1101,6 +1101,10 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     STAFF. One row per agent, unread-bold when it needs your yes, and the
     work aggregates under the agent responsible: 7 disputes are one
     Disputes Officer row carrying a 7, not seven rows."""
+    # A chat list, not a contact book: only agents with something live
+    # appear here: a pending yes, or a call you decided today. The full
+    # roster is one tap away under Your team. (WhatsApp shows chats with
+    # activity; the address book is a different screen.)
     rows_data = []
     n_need = 0
     for a in RELAY_AGENTS:
@@ -1108,10 +1112,12 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
         preview, need, badge = agent_rail_state(tid, a)
         if need:
             n_need += badge
-        rows_data.append((a, on, preview, need, badge))
-    # Needs-you first, then working, then the rest: the phone-at-9-PM sort.
-    rows_data.sort(key=lambda t: (not t[3], t[0]["status"] != "live",
-                                  not t[1]))
+        decided_today = (a["slug"] in PROPS_DEF and
+                         prop_state(tid, a["slug"])["state"] != "waiting")
+        if need or decided_today:
+            rows_data.append((a, on, preview, need, badge))
+    # Needs-you first, then the rest: the phone-at-9-PM sort.
+    rows_data.sort(key=lambda t: (not t[3], t[0]["status"] != "live"))
 
     def agent_row(a, on, preview, need, badge):
         slug = a["slug"]
@@ -1122,7 +1128,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
         return (
             f'<a class="rail{" active" if active == slug else ""}'
             f'{" unread" if need else ""}" '
-            f'data-st="{"need" if need else "work"}" '
+            f'data-st="{"need" if need else "done"}" '
             f'href="/agents/{slug}" title="{esc(a["role"])}">'
             f'{_identicon(slug, 30)}'
             f'<span class="rbody"><span class="rtop"><span class="rname">'
@@ -1131,7 +1137,9 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
             f'<span class="rsub"><span class="rprev">{preview}</span>'
             f'{badge_html}</span></span></a>')
 
-    rows = "".join(agent_row(*t) for t in rows_data)
+    rows = "".join(agent_row(*t) for t in rows_data) or (
+        '<div class="cempty">All quiet. Your team is working; anything '
+        'that needs you lands here.</div>')
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
