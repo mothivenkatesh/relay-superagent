@@ -1065,7 +1065,21 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     dot saying where it stands. "Needs you" filters this list in place.
     it was never a place of its own."""
     cases = rail_cases(tid)
-    n_need = sum(1 for c in cases if c["key"] == "need")
+    n_need = sum(1 for c in cases if c["key"] == "need") + cash_waiting(tid)
+    # The planner's cash call sits in the same list as everything else
+    # that needs a yes: one queue, no side doors.
+    cash_row = ""
+    if cash_waiting(tid):
+        cash_row = (
+            f'<a class="rail unread" data-st="need" '
+            f'href="/agents/cashflow_forecast#cashcard" '
+            f'title="Cashflow Planner: a payout move needs your yes">'
+            f'{_identicon("cashflow_forecast", 30)}'
+            f'<span class="rbody"><span class="rtop"><span class="rname">'
+            f'Cashflow Planner</span><span class="rwhen">today</span></span>'
+            f'<span class="rsub"><span class="rprev">Payout move &middot; '
+            f'Needs your yes</span><span class="cdot need"></span>'
+            f'</span></span></a>')
 
     def case_row(c):
         # WhatsApp's chat-row grammar: avatar, name (bold when it needs
@@ -1094,11 +1108,12 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
               ("Previous 7 days", [c for c in cases
                                    if week_ago <= c["last"].date() < today]),
               ("Older", [c for c in cases if c["last"].date() < week_ago])]
-    rows = "".join(
+    rows = cash_row + ("".join(
         (f'<div class="navsec csec" data-st="hdr">{label}</div>'
          + "".join(case_row(c) for c in cs))
         for label, cs in groups if cs) or (
-        '<div class="cempty">Chats appear here as work comes in.</div>')
+        '' if cash_row else
+        '<div class="cempty">Chats appear here as work comes in.</div>'))
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
@@ -1825,8 +1840,12 @@ def render(tid: str = "t1", email: str = "") -> str:
     runs = sorted((r for r in led.runs.values() if r.tenant_id == tid),
                   key=lambda r: r.occurred_at, reverse=True)
     waiting = [r for r in runs if r.state is RunState.AWAITING_GATE]
-    tasks = "\n".join(task_row(r) for r in waiting) or (
-        '<div class="empty">All clear: nothing needs review.</div>')
+    # The planner's cash call queues with the dispute replies: one list of
+    # yeses, whatever kind of work produced them.
+    cash = cashflow_card(tid) if cash_waiting(tid) else ""
+    tasks = cash + ("\n".join(task_row(r) for r in waiting) or (
+        '' if cash else
+        '<div class="empty">All clear: nothing needs review.</div>'))
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
             .replace("__SIDEBAR__", sidebar_html("tasks", tid,
@@ -1834,7 +1853,7 @@ def render(tid: str = "t1", email: str = "") -> str:
             .replace("__BIZ__", BUSINESS)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0]))
-            .replace("__NWAIT__", str(len(waiting)))
+            .replace("__NWAIT__", str(len(waiting) + cash_waiting(tid)))
             .replace("__TASKS__", tasks))
 
 
@@ -2071,6 +2090,20 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 2px}
 .tierh b{font-size:14px}
 .tierh .st{margin-left:auto}
 .tier p{margin:0;font-size:13px;color:var(--text);line-height:1.55}
+.cashcard{max-width:640px;background:#fff;border:1.5px solid #C7CDF3;
+  border-radius:16px;padding:20px 24px;margin:4px 0 8px}
+.cashcard h3{font-size:17px;color:var(--ink);margin:4px 0 8px}
+.cashwhy{font-size:13.5px;line-height:1.6;margin-bottom:12px}
+.cashrow{display:flex;gap:12px;font-size:13.5px;line-height:1.6;
+  padding:8px 0;border-top:1px solid #F1F1F5}
+.cashrow span:first-child{flex:none;width:88px;font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--mut);
+  padding-top:2px}
+.wpbtns{display:flex;gap:8px;align-items:center;margin-top:12px;
+  flex-wrap:wrap}
+.cashdone{margin-top:12px;background:#FAFAFC;border-radius:12px;
+  padding:12px 16px;font-size:13.5px;color:var(--text)}
+.cashdone.ok{background:#E9F7EF;color:#177245;font-weight:500}
 .assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:8px 8px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:16px 0 24px}
@@ -3450,7 +3483,11 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
         f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
-        f'{thread_html(a["slug"]) or day_html(a["slug"])}'
+        + (f'<h2 class="sec">'
+           f'{"Waiting on your yes" if cash_waiting(tid) else "The cash call"}'
+           f'</h2>{cashflow_card(tid)}'
+           if a["slug"] == "cashflow_forecast" else "")
+        + f'{thread_html(a["slug"]) or day_html(a["slug"])}'
         f'{risk_ladder_html() if a["slug"] == "kyc_desk" else ""}'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
         f'<h2 class="sec">When a person takes over</h2>{handoff}'
@@ -4549,6 +4586,62 @@ function shstart(){
 </script>""")
 
 
+# ------------------------------------------------------------- cash calls
+# Cashflow Planner's proposal, wired like a dispute reply: one card, one
+# yes, and the decision written down. The store is per tenant; the seeded
+# proposal is the Thursday collision the brief has been warning about.
+CASH_PROPS: dict[str, dict] = {}
+
+
+def cash_prop(tid: str) -> dict:
+    return CASH_PROPS.setdefault(tid, dict(
+        id="cp1", state="waiting", decided_by="",
+        title="Move the courier payout by two days"))
+
+
+def cash_waiting(tid: str) -> int:
+    return 1 if cash_prop(tid)["state"] == "waiting" else 0
+
+
+def cashflow_card(tid: str) -> str:
+    p = cash_prop(tid)
+    if p["state"] == "approved":
+        verdict = (f'<div class="cashdone ok">Approved by '
+                   f'{esc(p["decided_by"] or "you")}. The courier payout '
+                   f'moves to Saturday; the payout calendar is updated and '
+                   f'nobody is paid late.</div>')
+    elif p["state"] == "declined":
+        verdict = ('<div class="cashdone">Left as it was. Thursday will '
+                   'run tight; the planner will warn you again the day '
+                   'before.</div>')
+    else:
+        verdict = (
+            f'<div class="wpbtns">'
+            f'<form method="post" action="/api/cashflow_act" style="display:contents">'
+            f'<input type="hidden" name="action" value="approve">'
+            f'<button class="btn primary">Approve the move</button></form>'
+            f'<form method="post" action="/api/cashflow_act" style="display:contents">'
+            f'<input type="hidden" name="action" value="decline">'
+            f'<button class="btn ghost">Not this time</button></form>'
+            f'<span class="wp-trust">Nothing moves until you say yes.</span>'
+            f'</div>')
+    return (
+        f'<div class="cashcard" id="cashcard">'
+        f'<div class="wp-kicker">Cash call &middot; Cashflow Planner</div>'
+        f'<h3>{esc(p["title"])}</h3>'
+        f'<div class="cashwhy">Thursday collides: vendor day and the GST '
+        f'debit land together. Without a move, the week dips to '
+        f'<b>&minus;&#8377;12,400</b> on Thursday morning.</div>'
+        f'<div class="cashrow"><span>The move</span>Courier payout '
+        f'<b>&#8377;48,200</b>: Thursday &rarr; Saturday. The courier&rsquo;s '
+        f'terms allow it; nobody is paid late.</div>'
+        f'<div class="cashrow"><span>After</span>Thursday stays at '
+        f'<b>+&#8377;35,800</b>. Nothing else changes.</div>'
+        f'<div class="cashrow"><span>Read from</span>settlements landing, '
+        f'the payout calendar, the GST schedule.</div>'
+        f'{verdict}</div>')
+
+
 # ------------------------------------------------------------- assignment
 # A waiting yes can be handed to a named teammate. The agents keep working
 # either way; this only decides whose phone the case sits on.
@@ -5277,6 +5370,18 @@ class Handler(BaseHTTPRequestHandler):
                 AUTONOMY[tid] = "all"
             self.send_response(303)
             self.send_header("Location", "/")
+            self.end_headers(); return
+        if self.path == "/api/cashflow_act":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            action = (parse_qs(raw).get("action") or [""])[0]
+            p = cash_prop(sess["tenant_id"])
+            if p["state"] == "waiting" and action in ("approve", "decline"):
+                p["state"] = "approved" if action == "approve" else "declined"
+                p["decided_by"] = (sess.get("email") or "you").split("@")[0]
+            self.send_response(303)
+            self.send_header("Location", "/agents/cashflow_forecast")
             self.end_headers(); return
         if self.path == "/api/procedure_save":
             sess = self._session()
@@ -6785,7 +6890,8 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
     since = _dt.utcnow() - _td(days=1)
     fresh = [r for r in runs if r.occurred_at >= since]
-    n_wait = sum(1 for r in runs if r.state is RunState.AWAITING_GATE)
+    n_wait = sum(1 for r in runs
+                 if r.state is RunState.AWAITING_GATE) + cash_waiting(tid)
     handled = sum(1 for r in runs
                   if r.state in (RunState.ACTED, RunState.RESOLVED,
                                  RunState.SUPPRESSED))
@@ -6821,11 +6927,19 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
         lines.append(("chart", "The first win lands here."))
     # The rest of the office reports in one line each, only when that
     # agent is on. Demo beats, same fiction as the rest of the world.
+    if cash_prop(tid)["state"] == "approved":
+        cash_beat = ("Cash: Thursday is fixed. The courier payout moves "
+                     "Saturday; the week stays above the floor.")
+    elif cash_prop(tid)["state"] == "declined":
+        cash_beat = ("Cash: Thursday will run tight. The planner warns "
+                     "you again the day before.")
+    else:
+        cash_beat = ("Cash: Thursday looks tight, vendor day and a GST "
+                     "debit collide. A payout move <b>waits on your yes</b>.")
     desk_beats = [
         ("stock_watch", "bm", "Stock: Amla Juice has <b>6 days</b> left at "
          "this pace. A reorder draft waits on your yes."),
-        ("cashflow_forecast", "flow", "Cash: Thursday looks tight, vendor "
-         "day and a GST debit collide. One payout move suggested."),
+        ("cashflow_forecast", "flow", cash_beat),
         ("cod_guard", "send", "COD: <b>31 of 38</b> confirmed for dispatch; "
          "3 held after two unanswered calls."),
         ("three_way_recon", "ledger", "Books: 211 of 214 tied out on their "
@@ -6900,7 +7014,8 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     money = morning_brief_html(tid)
 
     n_wait = sum(1 for r in WORLD.d.ledger.runs.values()
-                 if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
+                 if r.tenant_id == tid and r.state is RunState.AWAITING_GATE
+                 ) + cash_waiting(tid)
     # Lead with what the team handled, not with what the owner owes. In a
     # five-person business nobody is sitting waiting to work a queue, so a
     # screen that opens with "7 chores for you" has handed the owner a job.
