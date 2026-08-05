@@ -5371,11 +5371,58 @@ def memory_content(tid: str) -> str:
             f'<span class="st ok">every night</span></div>')
 
 
+# Every decision leaves a line: who, what, when, and where to see it.
+# Endpoints write here as they act; dispute yeses come straight off
+# the ledger so the trail and the money can never disagree.
+DECISION_LOG: dict[str, list] = {}
+
+
+def log_decision(tid, actor, text, href=""):
+    from datetime import datetime as _dt
+    DECISION_LOG.setdefault(tid, []).append(
+        (_dt.utcnow(), actor or "you", text, href))
+
+
+def decisions_content(tid):
+    led = WORLD.d.ledger
+    items = list(DECISION_LOG.get(tid, []))
+    for r in led.runs.values():
+        if r.tenant_id != tid or r.gate_action is None:
+            continue
+        who = _who(r.gate_actor, seed=r.run_id)
+        act = r.gate_action.value
+        word = {"approve": "Said yes to the reply for",
+                "reject": "Said no to the reply for",
+                "edit": "Reworded and sent the reply for",
+                "timeout": "Let the clock hand over the reply for"
+                }.get(act, act)
+        items.append((r.occurred_at, who,
+                      word + " <b>" + esc(_account_label(r)) + "</b>",
+                      ("/cases/" + r.order_id) if r.order_id else ""))
+    items.sort(key=lambda t: t[0], reverse=True)
+    rows = "".join(
+        '<a class="trow slim" style="display:flex" href="'
+        + (href or "#") + '">'
+        + '<span class="ico">' + ICONS["shield"] + '</span>'
+        + '<span class="tdesc">'
+        + ("You" if who == "you" else mention(who))
+        + ' &middot; ' + text + '</span>'
+        + '<span class="when">' + ts.strftime("%-d %b, %H:%M")
+        + '</span></a>'
+        for ts, who, text, href in items[:40]) or (
+        '<div class="empty">Decisions land here as they are made.'
+        '</div>')
+    return ('<div class="pagehint">Every decision anyone made, newest '
+            'first. Nothing here can be edited or deleted; a decision '
+            'is a fact once made.</div>' + rows)
+
+
 def settings_content(tid: str, s: str = "team") -> str:
     # Each tab is a job the founder actually comes here to do, named as
     # that job — not as a module.
     SECTIONS = [("team", "Who can say yes"),
-                ("connectors", "What it&rsquo;s plugged into"),
+                ("connectors", "Connections"),
+                ("decisions", "Decisions"),
                 ("workspace", "The promises"),
                 ("data", "Your data")]
     if s not in {k for k, _ in SECTIONS}:
@@ -5426,10 +5473,28 @@ def settings_content(tid: str, s: str = "team") -> str:
                  f'hand over. You don&rsquo;t manage them: they come '
                  f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
-        body = ('<div class="pagehint">Relay holds every connection itself. '
-                'There is nothing for you to set up and no keys for you to '
-                'find.</div>'
-                + vault_content(tid))
+        CONNS = [
+            ("Your store", "ojaswellness.in orders and disputes", True),
+            ("Amazon and Flipkart", "marketplace orders and claims", True),
+            ("WhatsApp", "buyer messages, and your yeses on the go", True),
+            ("Voice calls", "the callers ring buyers through this", True),
+            ("Bank and settlements", "what landed, what was deducted", True),
+            ("Email", "dispute mail from the bank", True),
+            ("Quick commerce", "coming with the stock agent", False),
+        ]
+        body = ('<div class="pagehint">What Relay is connected to. Relay '
+                'holds every key itself: nothing to set up, nothing to '
+                'lose.</div>'
+                + "".join(
+            '<div class="trow slim"><span class="ico">' + ICONS["flow"]
+            + '</span><span class="tdesc"><b>' + n
+            + '</b> <span class="mut">' + d + '</span></span>'
+            + ('<span class="st ok">connected</span>' if on else
+               '<span class="st mut">coming</span>')
+            + '</div>'
+            for n, d, on in CONNS))
+    elif s == "decisions":
+        body = decisions_content(tid)
     elif s == "data":
         exports = [
             ("Everything, as a spreadsheet", "/export/impact.csv",
@@ -5489,7 +5554,6 @@ def settings_content(tid: str, s: str = "team") -> str:
              f'{BUSINESS_CHANNELS}</span></span>'
              f'<span class="st ok">this workspace</span></div>')
     return ('<h1 class="page">Settings</h1>'
-            '<div class="pagehint">The business Relay is working for.</div>'
             + ident + tabs + body)
 
 
@@ -5780,6 +5844,14 @@ class Handler(BaseHTTPRequestHandler):
             slug = (parse_qs(raw).get("slug") or [""])[0]
             if any(x["slug"] == slug for x in RELAY_AGENTS):
                 DEMO_ON[slug] = self.path.endswith("_on")
+                role = next(x["role"] for x in RELAY_AGENTS
+                            if x["slug"] == slug)
+                log_decision(
+                    sess["tenant_id"],
+                    (sess.get("email") or "you").split("@")[0],
+                    ("Switched on <b>" if DEMO_ON[slug]
+                     else "Switched off <b>") + esc(role) + "</b>",
+                    "/agents/" + slug)
             self.send_response(303)
             self.send_header("Location", f"/agents/{slug}")
             self.end_headers(); return
@@ -5793,8 +5865,14 @@ class Handler(BaseHTTPRequestHandler):
             # but the server is the one that keeps the promise.
             if mode == "small" and clean_yeses(tid) >= YES_TARGET:
                 AUTONOMY[tid] = "small"
+                log_decision(tid, (sess.get("email") or "you").split("@")[0],
+                             "Let small ones send themselves "
+                             "(under &#8377;500)", "/settings?s=decisions")
             elif mode == "all":
                 AUTONOMY[tid] = "all"
+                log_decision(tid, (sess.get("email") or "you").split("@")[0],
+                             "Back to approving everything",
+                             "/settings?s=decisions")
             self.send_response(303)
             self.send_header("Location", "/")
             self.end_headers(); return
@@ -5813,6 +5891,11 @@ class Handler(BaseHTTPRequestHandler):
                                   else "declined")
                     p["decided_by"] = (sess.get("email")
                                        or "you").split("@")[0]
+                    log_decision(
+                        sess["tenant_id"], p["decided_by"],
+                        ("Approved " if action == "approve" else "Declined ")
+                        + "<b>" + esc(PROPS_DEF[slug]["title"]) + "</b>",
+                        "/agents/" + slug)
             self.send_response(303)
             self.send_header("Location", f"/agents/{slug}")
             self.end_headers(); return
@@ -5851,6 +5934,11 @@ class Handler(BaseHTTPRequestHandler):
             if order and (name in ok or name == ""):
                 if name:
                     ASSIGN[order] = name
+                    log_decision(
+                        sess["tenant_id"],
+                        (sess.get("email") or "you").split("@")[0],
+                        "Handed a yes to <b>" + esc(name) + "</b>",
+                        "/cases/" + order)
                 else:
                     ASSIGN.pop(order, None)
             self.send_response(303)
