@@ -758,8 +758,9 @@ WORK_CSS = """
 .nav.on{background:#ECECF1;color:var(--ink,#1B1F30)}
 .nav.on svg{color:var(--ink,#1B1F30)}
 .railhead{display:flex;align-items:center;justify-content:space-between;
-  padding-right:2px}
-.railhead .navsec{margin:0}
+  padding:2px 2px 6px 10px;min-height:34px}
+.railhead .navsec{margin:0;padding:0;line-height:1}
+.railhead .railfilter{padding:0;align-items:center}
 .railfilter{display:flex;gap:6px;padding:2px 8px 8px}
 .rf{font:inherit;font-size:12.5px;font-weight:500;color:var(--mut,#8A8D9C);
   background:none;border:1px solid transparent;border-radius:8px;padding:5px 11px;
@@ -1652,6 +1653,47 @@ def case_content(tid: str, order_id: str) -> str:
             f'&middot; reply due {due_on(latest).strftime("%-d %B")}'
             + (f' ({left} day{"s" if left != 1 else ""} left)' if left >= 0 else "")
             + (f' &middot; &#8377;{inr(kept)} kept' if kept else ""))
+    # The four moments a founder actually cares about, read left to right
+    # in one second. The full story below is for whoever wants it.
+    filed = any(r.state in (RunState.ACTED, RunState.RESOLVED) for r in runs)
+    res_out = next((led.outcome_for(r.run_id) for r in runs
+                    if r.state is RunState.RESOLVED
+                    and led.outcome_for(r.run_id)), None)
+    won = ((res_out.outcome_value or {}).get("won")
+           if res_out is not None else None)
+    drafted = any(r.decision for r in runs)
+    waiting = any(r.state is RunState.AWAITING_GATE for r in runs)
+    d0 = min(r.occurred_at for r in runs)
+
+    def mile(state, label, sub):
+        tick = "&#10003;" if state == "done" else ""
+        return (f'<span class="mile {state}"><span class="mdot">{tick}</span>'
+                f'<b>{label}</b><span class="msub">{sub}</span></span>')
+
+    if won is True:
+        settle = mile("done", "Settled",
+                      f'<span class="st ok">Won &middot; &#8377;{inr(kept)}</span>')
+    elif won is False:
+        settle = mile("done", "Settled", '<span class="st mut">Lost</span>')
+    elif filed:
+        settle = mile("todo", "Settled", "&mdash;")
+    else:
+        settle = mile("todo", "Settled", "&mdash;")
+    miles = (
+        '<div class="miles">'
+        + mile("done", "Dispute came in", d0.strftime("%-d %b"))
+        + f'<span class="mbar done"></span>'
+        + (mile("done", "Reply written", "with proof attached") if drafted
+           else mile("cur", "Reply written", "being written"))
+        + f'<span class="mbar {"done" if filed else ""}"></span>'
+        + (mile("done", "Filed with the bank", "exactly once") if filed
+           else mile("cur", "Waiting on your yes", "one tap") if waiting
+           else mile("todo", "Filed with the bank", "after your yes"))
+        + f'<span class="mbar {"done" if res_out is not None else ""}"></span>'
+        + (settle if res_out is not None
+           else mile("cur", "Bank reviewing", "in progress") if filed
+           else mile("todo", "Bank review", "&mdash;"))
+        + '</div>')
     return (
         f'<a class="jback" href="/">&lsaquo; Back</a>'
         f'<div class="casehead"><div>'
@@ -1659,6 +1701,7 @@ def case_content(tid: str, order_id: str) -> str:
         f'<h1 class="page casename">{_logo(who, 26)}{esc(who)}</h1>'
         f'<div class="casemeta">{meta}</div></div>'
         f'<span class="casest {skey}">{sword}</span></div>'
+        f'{miles}'
         f'<div class="casegrid">'
         f'<div><h2 class="sec">What happened, start to finish</h2>'
         f'<ol class="ctimeline">{tl}</ol></div>'
@@ -1786,7 +1829,8 @@ font-size:14.5px;color:#26293A;flex-wrap:wrap}
 .mut{color:var(--mut)}
 .tacts{display:flex;gap:7px;align-items:center;flex:none;opacity:.92;margin-left:auto}
 .tacts form{display:flex;gap:7px}
-.when{color:#5A5D6D;font-size:13.5px;flex:none;width:52px;text-align:right}
+.when{color:#5A5D6D;font-size:13.5px;flex:none;min-width:52px;
+  white-space:nowrap;text-align:right;margin-left:auto}
 """ + BTN_CSS + WORK_CSS + """
 .bulkbar{display:flex;gap:10px;align-items:center;margin:14px 0 2px;
 padding:10px 14px;border:1px solid #DFDBFA;background:#F4F3FE;border-radius:10px}
@@ -1871,6 +1915,22 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .capchip.act{background:var(--accent-soft,#E9EBF8);border-color:transparent;
   color:#3A46A8}
 .capchip.act svg{color:#3A46A8}
+.miles{display:flex;align-items:flex-start;background:#fff;
+  border:1px solid var(--hair);border-radius:14px;padding:20px 22px;
+  margin:6px 0 22px;overflow-x:auto}
+.mile{display:flex;flex-direction:column;align-items:center;gap:5px;
+  min-width:120px;text-align:center;flex:none}
+.mile .mdot{width:26px;height:26px;border-radius:50%;display:grid;
+  place-items:center;background:#ECECF1;color:#9A9DAB;font-size:13px;
+  font-weight:700}
+.mile.done .mdot{background:var(--accent);color:#fff}
+.mile.cur .mdot{background:#fff;border:2px solid var(--accent)}
+.mile b{font-size:12.5px;color:var(--ink)}
+.mile.todo b{color:var(--mut);font-weight:500}
+.mile .msub{font-size:11.5px;color:var(--mut)}
+.mbar{flex:1;height:3px;border-radius:99px;background:#ECECF1;
+  margin-top:12px;min-width:24px}
+.mbar.done{background:var(--accent)}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -3042,7 +3102,62 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
+        f'{_kyc_builder() if a["slug"] == "kyc_desk" else ""}'
         f'{helpers}')
+
+
+def _kyc_builder() -> str:
+    """Describe-it-and-it-builds, for onboarding journeys: the founder says
+    what they need in one sentence and watches the journey assemble. Demo
+    plays the moment; the plan it reveals is a real journey shape."""
+    return """
+<h2 class="sec">Or describe the onboarding you need</h2>
+<div class="pagehint">Say it the way you would to a person &mdash; the
+journey builds itself, and nothing goes live until you say yes.</div>
+<form class="notebar" style="max-width:640px" onsubmit="event.preventDefault();kycBuild()">
+  <input class="jfind notein" id="kycask" maxlength="140"
+    placeholder="e.g. checks for buyers above &#8377;2 lakh, PAN before payment">
+  <button class="btn primary sm">Build it</button></form>
+<div id="kycgen" hidden style="max-width:640px;margin-top:14px">
+  <div class="mut" style="font-size:13px;margin-bottom:10px">&#10022; Putting it together&hellip;</div>
+  <div class="shimmer"></div><div class="shimmer" style="width:82%"></div>
+  <div class="shimmer" style="width:90%"></div>
+</div>
+<div id="kycplan" hidden style="max-width:640px;margin-top:14px">
+  <div class="pane-detail"><h3 id="kyctitle">Your onboarding journey</h3>
+  <div class="hsteps" style="margin-top:8px">
+    <div class="hstep"><span class="hdot"></span><div><b>Screen</b>
+      <span class="mut">the buyer in seconds, before any money moves</span></div></div>
+    <div class="hstep"><span class="hdot"></span><div><b>Verify</b>
+      <span class="mut">the checks your rules require, built into one form</span></div></div>
+    <div class="hstep"><span class="hdot"></span><div><b>Escalate</b>
+      <span class="mut">a deeper look only when the risk calls for it</span></div></div>
+    <div class="hstep"><span class="hdot"></span><div><b>Collect</b>
+      <span class="mut">verify and pay in the same form &mdash; one step for the buyer</span></div></div>
+  </div>
+  <p class="mut" style="font-size:12.5px;margin-top:10px">Built from what
+  you said. It goes live only after you read it and say yes.</p></div>
+</div>
+<script>
+function kycBuild(){
+  const q = document.getElementById('kycask').value.trim();
+  if (!q) return;
+  document.getElementById('kycgen').hidden = false;
+  document.getElementById('kycplan').hidden = true;
+  setTimeout(() => {
+    document.getElementById('kycgen').hidden = true;
+    document.getElementById('kyctitle').textContent =
+      'Your onboarding journey — ' + q.slice(0, 60);
+    document.getElementById('kycplan').hidden = false;
+  }, 1600);
+}
+</script>
+<style>
+.shimmer{height:14px;border-radius:99px;margin-bottom:10px;
+  background:linear-gradient(90deg,#E4E0F7 25%,#F4F2FC 50%,#E4E0F7 75%);
+  background-size:200% 100%;animation:shim 1.2s linear infinite}
+@keyframes shim{to{background-position:-200% 0}}
+</style>"""
 
 
 def agent_detail_content(tid: str, slug: str, tab: str = "overview",
@@ -3443,14 +3558,16 @@ def _journey_svg(events: list, run=None) -> str:
         for i, name in enumerate(_LANES))
 
     if run is not None:
-        kv_base = {"source": run.trigger_source,
+        kv_base = {"source": SOURCE_WORDS.get(run.trigger_source,
+                                              run.trigger_source),
                    "customer": _account_label(run),
                    "bought": bought(run.order_id),
                    "reason": COMP.get(run.reason_code, run.reason_code)}
     else:
         kv_base = {}
     payload = _json.dumps([
-        {"agent": e["agent"], "kind": e["kind"], "t": int(e["ts"].timestamp()),
+        {"agent": worker_name(e["agent"]), "kind": e["kind"],
+         "t": int(e["ts"].timestamp()),
          "lane": _LANES[1 if e["kind"] == "note" else _EVENT_LANE.get((e["agent"], e["kind"]), 2)],
          "day": (e["ts"].date() - day0).days + 1,
          "time": e["ts"].strftime("%-I:%M %p").lower(),
@@ -4053,10 +4170,18 @@ def scheduled_content(tid: str) -> str:
         stat = (f'<span class="st ok">on &middot; {r["last"]}</span>' if r["on"] and r["last"]
                 else '<span class="st ok">on</span>' if r["on"]
                 else '<span class="st mut">not switched on</span>')
-        rows += (f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
+        inner = (f'<span class="ico">{ICONS["moon"]}</span>'
                  f'<span class="tdesc"><b>{esc(r["name"])}</b> '
                  f'<span class="mut">{r["when"]} &mdash; {r["what"]}</span></span>'
-                 f'{stat}</div>')
+                 f'{stat}')
+        if r["name"] == "Morning brief":
+            # The run leaves a note; the row opens it. This is the promise
+            # from the intro cards, kept.
+            rows += (f'<a class="trow slim" style="display:flex" '
+                     f'href="/briefs/morning">{inner}'
+                     f'<span class="go2">&rsaquo;</span></a>')
+        else:
+            rows += f'<div class="trow slim">{inner}</div>'
     return (f'<h1 class="page">Scheduled</h1>'
             f'<div class="pagehint">Work your team does on its own clock '
             f'&mdash; while you sleep, over the weekend, on the first of the '
@@ -4341,6 +4466,12 @@ class Handler(BaseHTTPRequestHandler):
             f = _pq(_up(self.path).query).get("f", ["all"])[0]
             self._html(_shell(agents_content(sess["tenant_id"], f), "agents",
                               sess["tenant_id"], sess.get("email", "")))
+        elif self.path == "/briefs/morning":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            self._html(_shell(brief_note_content(sess["tenant_id"]), "scheduled",
+                              sess["tenant_id"], sess.get("email", "")))
         elif self.path == "/scheduled":
             sess = self._session()
             if not sess:
@@ -4404,6 +4535,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/vault":
             return self._redirect("/settings#vault")
         elif self.path == "/chat":
+            return self._redirect("/")
+        elif self.path.startswith("/api/") and self.path != "/api/runs":
+            # A POST endpoint opened in a browser tab should never show the
+            # raw Python error page — nothing here is for reading anyway.
             return self._redirect("/")
         elif self.path == "/api/runs":
             led = WORLD.d.ledger
@@ -4491,7 +4626,13 @@ class Handler(BaseHTTPRequestHandler):
             led = WORLD.d.ledger
             r = led.runs.get(run_id)
             if r is None or r.tenant_id != sess.get("tenant_id") or not text:
-                self.send_response(400); self.end_headers(); return
+                # An empty comment or a stale id is not an error worth a
+                # blank screen — just go back to where the person was.
+                back = (form.get("back") or [""])[0]
+                self.send_response(303)
+                self.send_header("Location",
+                                 back if back.startswith("/") else "/")
+                self.end_headers(); return
             who = (sess.get("email") or "you").split("@")[0]
             from datetime import datetime as _dt, timezone as _tz
             # seeded trace events are naive-UTC; keep annotations consistent
@@ -5427,6 +5568,17 @@ main{flex:1;overflow-y:auto;padding:8px 0 14px}
   margin-bottom:10px;text-align:center}
 .brief{text-align:center;color:var(--mut);font-size:13.5px;margin-bottom:24px}
 .brief b{color:var(--ink);font-weight:600}
+.briefcard{display:block;background:#fff;border:1px solid var(--hair);
+  border-radius:16px;padding:18px 22px;margin:6px 0 16px;color:var(--ink)}
+.briefcard:hover{border-color:#C7CDF3}
+.bhead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.bhead b{font-size:14.5px}
+.bhead .mut{margin-left:auto;font-size:12px}
+.bline{display:flex;gap:11px;align-items:flex-start;padding:5px 0;
+  font-size:14.5px;color:var(--text)}
+.bline .ico{width:16px;flex:none;margin-top:2px}
+.bline .ico svg{width:15px;height:15px;color:#6A6D7D}
+.bmore{display:block;margin-top:10px;font-size:12px;color:var(--accent)}
 .money{text-align:center;margin:2px 0 18px}
 .money .big{display:block;font-size:52px;line-height:1.08;font-weight:600;
   color:var(--ink);letter-spacing:-.02em}
@@ -5774,6 +5926,70 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
     return (f"Good {tod}", "", chips[:4])
 
 
+def brief_lines(tid: str) -> list[tuple[str, str]]:
+    """This morning's brief, computed from the record: what came in, what
+    the team did, and where the money stands. Same lines on Home and on
+    the note the Scheduled run leaves behind."""
+    from datetime import datetime as _dt, timedelta as _td
+    led = WORLD.d.ledger
+    runs = [r for r in led.runs.values() if r.tenant_id == tid]
+    since = _dt.utcnow() - _td(days=1)
+    fresh = [r for r in runs if r.occurred_at >= since]
+    n_wait = sum(1 for r in runs if r.state is RunState.AWAITING_GATE)
+    handled = sum(1 for r in runs
+                  if r.state in (RunState.ACTED, RunState.RESOLVED,
+                                 RunState.SUPPRESSED))
+    kept, n_wins, window = recovered(tid)
+    lines = []
+    if fresh:
+        lines.append(("bolt", f'<b>{len(fresh)}</b> new dispute'
+                      f'{"s" if len(fresh) != 1 else ""} came in &mdash; '
+                      f'{"replies are drafted" if n_wait else "all handled"}.'))
+    else:
+        lines.append(("bolt", "A quiet night &mdash; nothing new came in."))
+    lines.append(("tasks", f'Your team has handled <b>{handled}</b> '
+                  f'thing{"s" if handled != 1 else ""} on its own'
+                  + (f'; <b>{n_wait}</b> waiting on your yes.' if n_wait
+                     else '; nothing needs your yes.')))
+    if kept:
+        lines.append(("chart", f'<b>&#8377;{inr(kept)}</b> kept {window}, '
+                      f'across {n_wins} dispute'
+                      f'{"s" if n_wins != 1 else ""} your team won.'))
+    else:
+        lines.append(("chart", "The first win lands here."))
+    return lines
+
+
+def morning_brief_html(tid: str) -> str:
+    from datetime import datetime as _dt
+    rows = "".join(
+        f'<div class="bline"><span class="ico">{ICONS[i]}</span>'
+        f'<span>{t}</span></div>' for i, t in brief_lines(tid))
+    return (f'<a class="briefcard" href="/briefs/morning">'
+            f'<div class="bhead"><b>Morning brief</b>'
+            f'<span class="mut">{_dt.now().strftime("%a, %b %-d")} &middot; '
+            f'8:00</span></div>{rows}'
+            f'<span class="bmore">From your Scheduled routine &middot; '
+            f'read it &rarr;</span></a>')
+
+
+def brief_note_content(tid: str) -> str:
+    from datetime import datetime as _dt
+    rows = "".join(
+        f'<div class="trow slim"><span class="ico">{ICONS[i]}</span>'
+        f'<span class="tdesc">{t}</span></div>' for i, t in brief_lines(tid))
+    return (f'<div class="dhead"><a class="back2" href="/scheduled">&lsaquo;</a>'
+            f'<div><h1>Morning brief</h1>'
+            f'<div class="meta"><span class="st ok">ran this morning</span>'
+            f'<span>&middot;</span>'
+            f'<span>{_dt.now().strftime("%A, %B %-d")} &middot; 8:00</span>'
+            f'</div></div></div>'
+            f'{rows}'
+            f'<div class="pagehint" style="margin-top:16px">Every morning '
+            f'this note is rewritten from your own record. Earlier briefs '
+            f'stay in <a href="/journeys"><b>History</b></a>.</div>')
+
+
 def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner") -> str:
     c = CONVS.get(conv_id)
     if c and c["tenant"] != tid:
@@ -5800,15 +6016,11 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         'filed anywhere.</span></form>')
 
     # The AI-CFO headline: one number, big, in rupees, from the record.
-    kept, n_wins, window = recovered(tid)
-    if kept:
-        money = (f'<div class="money"><b class="big">&#8377;{inr(kept)}</b>'
-                 f'<span class="cap">kept {window}, across {n_wins} '
-                 f'dispute{"s" if n_wins != 1 else ""} your team won</span></div>')
-    else:
-        money = ('<div class="money"><b class="big">&#8377;0</b>'
-                 '<span class="cap">your team is on the job &mdash; the '
-                 'first win lands here</span></div>')
+    # The cumulative number used to sit here as a permanent headline. It
+    # never earned that space — "kept since April" is a brief, not a
+    # dashboard. So it lives where a brief lives: in this morning's note,
+    # dated, alongside what happened overnight.
+    money = morning_brief_html(tid)
 
     n_wait = sum(1 for r in WORLD.d.ledger.runs.values()
                  if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
@@ -5829,11 +6041,9 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
                  f'your yes.</span>'
                  f'<span class="go">&rarr;</span></a>')
     else:
-        needs = (f'<a class="needs calm" href="/approvals">{ICONS["tasks"]}'
-                 f'<span>Your team handled <b>{handled}</b> '
-                 f'thing{"s" if handled != 1 else ""} on its own. Nothing '
-                 f'needs your yes.</span>'
-                 f'<span class="go">&rarr;</span></a>')
+        # The brief already says "nothing needs your yes" — a second calm
+        # pill saying it again is noise. The pill appears only as a CTA.
+        needs = ""
 
     # Three rows, not five: the founder reads this on a phone at 9 PM.
     # Everything else is one tap away behind "See all".
