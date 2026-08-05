@@ -2164,8 +2164,20 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .avatar{width:26px;height:26px;border-radius:50%;background:#5266EB;color:#fff;
   display:inline-flex;align-items:center;justify-content:center;
   font-size:12px;font-weight:650;text-transform:uppercase}
-.topbar .logout{color:var(--mut);text-decoration:none}
-.topbar .logout:hover{color:#1a1c23}
+.acct{position:relative}
+.acct summary{list-style:none;cursor:pointer}
+.acct summary::-webkit-details-marker{display:none}
+.acct[open] summary{outline:2px solid #C7CDF3;outline-offset:2px}
+.acctmenu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;
+  border:1px solid var(--hair);border-radius:12px;
+  box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
+  z-index:40;text-align:left}
+.acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13.5px}
+.acct-mail{color:var(--mut);padding:0 12px 8px;font-size:12.5px;
+  border-bottom:1px solid var(--hair);margin-bottom:4px}
+.acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
+  font-size:13.5px;text-decoration:none}
+.acct-out:hover{background:#FBF1EF}
 .content{max-width:1120px;margin:0 auto;padding:8px 44px 88px}
 .alogo{display:inline-flex;width:18px;height:18px;border-radius:5px;color:#fff;
   font-size:10.5px;font-weight:700;align-items:center;justify-content:center;
@@ -2607,11 +2619,21 @@ __SIDEBAR__
 <div class="main">
   <div class="topbar">
     <span></span>
-    <div class="right"><span class="bizchip">__BIZ__</span><span>__USER__</span><a class="logout" href="/logout">Log out</a><span class="avatar">__INITIAL__</span></div>
+    <div class="right"><details class="acct"><summary class="avatar">__INITIAL__</summary>
+      <div class="acctmenu">
+        <div class="acct-biz">__BIZ__</div>
+        <div class="acct-mail">__USER__</div>
+        <a class="acct-out" href="/logout">Log out</a>
+      </div></details></div>
   </div>
   <div class="content">__CONTENT__</div>
 </div>
 <script>
+document.addEventListener('click', e => {
+  document.querySelectorAll('details.acct[open]').forEach(d => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
 function toggleEdit(id){document.getElementById(id).toggleAttribute('hidden')}
 function bulksync(){
   const sel = document.querySelectorAll('.selrun:checked');
@@ -7969,8 +7991,20 @@ background:linear-gradient(#FDFDFE,#F1F2F8)}
 font-size:14.5px;font-weight:500;flex:none}
 .uwrap{display:flex;align-items:center;gap:16px;margin-left:auto;font-size:13.5px;
 color:var(--mut)}
-.uwrap .logout{color:var(--mut)}
-.uwrap .logout:hover{color:var(--ink)}
+.acct{position:relative}
+.acct summary{list-style:none;cursor:pointer}
+.acct summary::-webkit-details-marker{display:none}
+.acct[open] summary{outline:2px solid #C7CDF3;outline-offset:2px}
+.acctmenu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;
+  border:1px solid var(--hair);border-radius:12px;
+  box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
+  z-index:40;text-align:left;font-weight:400}
+.acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13.5px}
+.acct-mail{color:var(--mut);padding:0 12px 8px;font-size:12.5px;
+  border-bottom:1px solid var(--hair);margin-bottom:4px}
+.acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
+  font-size:13.5px}
+.acct-out:hover{background:#FBF1EF}
 .uwrap .avatar{width:26px;height:26px;border-radius:50%;background:var(--accent);
 color:#fff;display:inline-flex;align-items:center;justify-content:center;
 font-size:12px;font-weight:650;text-transform:uppercase}
@@ -8174,9 +8208,12 @@ background:none}
 __SIDEBAR__
 <div class="main">
   <div class="convhead" id="convhead"><span id="ctitle">__CONVTITLE__</span>
-    <span class="uwrap"><span class="bizchip">__BIZ__</span><span class="uemail">__USER__</span>
-    <a class="logout" href="/logout">Log out</a>
-    <span class="avatar">__INITIAL__</span></span></div>
+    <span class="uwrap"><details class="acct"><summary class="avatar">__INITIAL__</summary>
+      <div class="acctmenu">
+        <div class="acct-biz">__BIZ__</div>
+        <div class="acct-mail">__USER__</div>
+        <a class="acct-out" href="/logout">Log out</a>
+      </div></details></span></div>
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
       __ROLEPILLS__<h1>__GREET__</h1>
@@ -8223,6 +8260,9 @@ function closeMenus(){
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('.lcluster')) closeMenus();
+  document.querySelectorAll('details.acct[open]').forEach(d => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
 });
 function plusToggle(ev){
   ev.stopPropagation();
