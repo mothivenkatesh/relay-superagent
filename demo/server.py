@@ -1065,19 +1065,23 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     dot saying where it stands. "Needs you" filters this list in place.
     it was never a place of its own."""
     cases = rail_cases(tid)
-    n_need = sum(1 for c in cases if c["key"] == "need") + cash_waiting(tid)
-    # The planner's cash call sits in the same list as everything else
+    n_need = sum(1 for c in cases if c["key"] == "need") + props_waiting(tid)
+    # Every agent's finished work sits in the same list as everything else
     # that needs a yes: one queue, no side doors.
     cash_row = ""
-    if cash_waiting(tid):
-        cash_row = (
+    for slug, d in PROPS_DEF.items():
+        if prop_state(tid, slug)["state"] != "waiting":
+            continue
+        role = next((a["role"] for a in RELAY_AGENTS
+                     if a["slug"] == slug), slug)
+        cash_row += (
             f'<a class="rail unread" data-st="need" '
-            f'href="/agents/cashflow_forecast#cashcard" '
-            f'title="Cashflow Planner: a payout move needs your yes">'
-            f'{_identicon("cashflow_forecast", 30)}'
+            f'href="/agents/{slug}#prop-{slug}" '
+            f'title="{role}: needs your yes">'
+            f'{_identicon(slug, 30)}'
             f'<span class="rbody"><span class="rtop"><span class="rname">'
-            f'Cashflow Planner</span><span class="rwhen">today</span></span>'
-            f'<span class="rsub"><span class="rprev">Payout move &middot; '
+            f'{role}</span><span class="rwhen">today</span></span>'
+            f'<span class="rsub"><span class="rprev">{d["rail"]} &middot; '
             f'Needs your yes</span><span class="cdot need"></span>'
             f'</span></span></a>')
 
@@ -1840,9 +1844,10 @@ def render(tid: str = "t1", email: str = "") -> str:
     runs = sorted((r for r in led.runs.values() if r.tenant_id == tid),
                   key=lambda r: r.occurred_at, reverse=True)
     waiting = [r for r in runs if r.state is RunState.AWAITING_GATE]
-    # The planner's cash call queues with the dispute replies: one list of
-    # yeses, whatever kind of work produced them.
-    cash = cashflow_card(tid) if cash_waiting(tid) else ""
+    # Every agent's finished work queues with the dispute replies: one
+    # list of yeses, whatever kind of work produced them.
+    cash = "".join(prop_card(tid, slug) for slug in PROPS_DEF
+                   if prop_state(tid, slug)["state"] == "waiting")
     tasks = cash + ("\n".join(task_row(r) for r in waiting) or (
         '' if cash else
         '<div class="empty">All clear: nothing needs review.</div>'))
@@ -2007,6 +2012,8 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 2px}
 .slimcard .slimdesc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;font-size:12.5px}
 .slimcard .go2{flex:none}
+.sec.fam{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sec.fam .st{flex:none;line-height:1.4}
 .outcome{font-size:24px;font-weight:600;letter-spacing:-.01em;color:var(--ink);
   margin:20px 0 8px;max-width:640px}
 .hsteps{margin:4px 0 8px;max-width:560px}
@@ -2623,7 +2630,7 @@ RELAY_AGENTS = [
         replaces="the returns coordinator between courier, warehouse and refund"),
     # --- Your telecaller --------------------------------------------------
     dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
-        status="roadmap", desk="calling",
+        status="live", desk="calling",
         role="Cart Recovery Caller",
         desc="Calls buyers who left without paying and sends them a payment "
              "link.",
@@ -2631,7 +2638,7 @@ RELAY_AGENTS = [
               "dropped carts a day.",
         replaces="a telecaller, &#8377;15&ndash;22k a month"),
     dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
-        status="roadmap", desk="calling",
+        status="live", desk="calling",
         role="Payment Recovery Caller",
         desc="Reads why a payment failed, waits a few minutes, then calls "
              "and sends a fresh link.",
@@ -3401,7 +3408,11 @@ def roster_detail_content(tid: str, a: dict) -> str:
     on = a["status"] == "live" or DEMO_ON.get(a["slug"], False)
     acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
     helpers = ""
-    if a["status"] == "live":
+    if a["status"] == "live" and a["slug"] != "dispute_defender":
+        # Live, but not the dispute pipeline: no crew list to show.
+        state = '<span class="st ok">working</span>'
+        action = ""
+    elif a["status"] == "live":
         state = '<span class="st ok">working</span>'
         action = ""
         # The machinery lives here, one level down — never on the team
@@ -3484,9 +3495,17 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
         + (f'<h2 class="sec">'
-           f'{"Waiting on your yes" if cash_waiting(tid) else "The cash call"}'
-           f'</h2>{cashflow_card(tid)}'
-           if a["slug"] == "cashflow_forecast" else "")
+           f'{"Waiting on your yes" if prop_state(tid, a["slug"])["state"] == "waiting" else "Its last call"}'
+           f'</h2>{prop_card(tid, a["slug"])}'
+           if a["slug"] in PROPS_DEF else "")
+        + (f'<h2 class="sec">Where its work lands</h2>'
+           f'<div class="trow slim" style="display:flex">'
+           f'<span class="ico">{ICONS["flow"]}</span>'
+           f'<span class="tdesc">Its note is written into the <b>Morning '
+           f'brief</b> every day, before you sit down.</span>'
+           f'<a class="st wait" href="/briefs/morning">read today&rsquo;s '
+           f'&rarr;</a></div>'
+           if a["slug"] in REPORT_AGENTS else "")
         + f'{thread_html(a["slug"]) or day_html(a["slug"])}'
         f'{risk_ladder_html() if a["slug"] == "kyc_desk" else ""}'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
@@ -3892,6 +3911,27 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
     watching = not live and DEMO_ON.get(a["slug"], False)
     if live:
         since, n = _working_since(tid)
+        if a["slug"] in ("cart_rescue", "payment_rescue"):
+            pstate = prop_state(tid, a["slug"])["state"]
+            horizon = ("Working &middot; tonight&rsquo;s list waits on "
+                       "your yes" if pstate == "waiting" else
+                       "Working &middot; calling now, outcomes land in "
+                       "your chats" if pstate == "approved" else
+                       "Working &middot; standing by, next list this evening")
+            horizon = f'<div class="hzn on">{horizon}</div>'
+            switch = '<span class="st ok">On</span>'
+            inner = (f'<div class="aname" style="margin-bottom:8px;'
+                     f'flex-wrap:wrap;row-gap:8px">'
+                     f'{_identicon(a["slug"])}'
+                     f'<span class="dot2 on"></span>'
+                     f'<b style="font-size:15px">{a["role"]}</b>'
+                     f'<span class="st mut" style="flex:none">{a["name"]}</span>'
+                     f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
+                     f'<div style="margin:4px 0 8px">{a["desc"]}</div>'
+                     f'<div class="repl">Replaces {a["replaces"]}.</div>'
+                     f'{horizon}')
+            return (f'<a class="arow2" style="display:block;padding:16px" '
+                    f'href="/agents/{a["slug"]}">{inner}</a>')
         horizon = (f'Working since {since} &middot; {n} disputes checked '
                    f'&middot; never sleeps' if since
                    else "Switched on &middot; never sleeps")
@@ -3943,10 +3983,9 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
             continue
         n_on_fam = sum(1 for a in mine
                        if a["status"] == "live" or DEMO_ON.get(a["slug"]))
-        desks += (f'<h2 class="sec">{title} '
-                  f'<span class="st {"ok" if n_on_fam else "mut"}" '
-                  f'style="margin-left:8px">{n_on_fam} of {len(mine)} on'
-                  f'</span></h2>'
+        desks += (f'<h2 class="sec fam">{title}'
+                  f'<span class="st {"ok" if n_on_fam else "mut"}">'
+                  f'{n_on_fam} of {len(mine)} on</span></h2>'
                   f'<div class="pagehint">{line}</div>'
                   f'<div class="atable" style="grid-template-columns:1fr">'
                   + "".join(_relay_agent_card(a, tid) for a in mine) + '</div>')
@@ -4586,60 +4625,212 @@ function shstart(){
 </script>""")
 
 
-# ------------------------------------------------------------- cash calls
-# Cashflow Planner's proposal, wired like a dispute reply: one card, one
-# yes, and the decision written down. The store is per tenant; the seeded
-# proposal is the Thursday collision the brief has been warning about.
-CASH_PROPS: dict[str, dict] = {}
+# ------------------------------------------------------------- proposals
+# The employee thesis, made mechanical: every acting agent ends its job in
+# finished work plus ONE decision. Same card shape, same store, same
+# lifecycle for all of them; a decision is written down and cannot be
+# re-decided. Reporting agents close their loop in the morning note instead.
+PROPS_DEF = {
+    "cashflow_forecast": dict(
+        kicker="Cash call", rail="Payout move",
+        title="Move the courier payout by two days",
+        why="Thursday collides: vendor day and the GST debit land together. "
+            "Without a move, the week dips to <b>&minus;&#8377;12,400</b> "
+            "on Thursday morning.",
+        rows=[("The move", "Courier payout <b>&#8377;48,200</b>: Thursday "
+               "&rarr; Saturday. The courier&rsquo;s terms allow it; nobody "
+               "is paid late."),
+              ("After", "Thursday stays at <b>+&#8377;35,800</b>. Nothing "
+               "else changes."),
+              ("Read from", "settlements landing, the payout calendar, the "
+               "GST schedule.")],
+        yes="Approve the move", no="Not this time",
+        approved="The courier payout moves to Saturday; the calendar is "
+                 "updated and nobody is paid late.",
+        declined="Left as it was. Thursday will run tight; the planner "
+                 "warns you again the day before."),
+    "stock_watch": dict(
+        kicker="Reorder", rail="Reorder draft",
+        title="Reorder Amla Juice before it runs out",
+        why="6 days of stock left at this pace, across every channel. The "
+            "supplier needs 10 to deliver.",
+        rows=[("The order", "40 cases, <b>&#8377;68,400</b>, Vasudha Farms. "
+               "Same terms as the last three orders."),
+              ("After", "Covered for six weeks. No channel oversells."),
+              ("Read from", "channel counts, sales pace, supplier lead times.")],
+        yes="Place the order", no="Not yet",
+        approved="Order placed with Vasudha Farms. Delivery expected Tuesday.",
+        declined="No order placed. It warns again at 4 days of stock."),
+    "payouts_desk": dict(
+        kicker="Payment day", rail="Tomorrow&rsquo;s payments",
+        title="Tomorrow&rsquo;s 14 payments, one yes",
+        why="Vendors, two refunds, and the courier. Every payment sits "
+            "against its bill.",
+        rows=[("The list", "14 payments, <b>&#8377;1,12,350</b> together. "
+               "Each goes out the way the receiver wants it."),
+              ("Read from", "bills due, the payout calendar, past payment "
+               "preferences.")],
+        yes="Pay all 14", no="Hold them",
+        approved="All 14 scheduled for the morning. Each lands against its "
+                 "bill.",
+        declined="Held. Nothing goes out until you say so."),
+    "refund_shield": dict(
+        kicker="Refund check", rail="A claim to refuse",
+        title="Refuse the broken-bottle claim, with proof",
+        why="Second claim from this buyer in three weeks. The delivery scan "
+            "is clean, and the photo matches the first claim&rsquo;s photo.",
+        rows=[("The reply", "Refuse politely, proof attached, and offer a "
+               "replacement instead of cash."),
+              ("At stake", "<b>&#8377;1,249</b>, and the pattern if it works "
+               "twice."),
+              ("Read from", "the claim photo, the delivery scan, the "
+               "buyer&rsquo;s history.")],
+        yes="Refuse with proof", no="Pay it anyway",
+        approved="Refused with the proof attached. A replacement was "
+                 "offered instead.",
+        declined="Refund paid as claimed. The pattern is noted."),
+    "cod_guard": dict(
+        kicker="Dispatch hold", rail="3 COD orders held",
+        title="Hold 3 COD orders that never picked up",
+        why="Two calls each, unanswered, plus a WhatsApp. Their pincode "
+            "bounces 2 of every 5 COD parcels.",
+        rows=[("The hold", "3 orders stay back today. Their slots go to "
+               "confirmed orders."),
+              ("At stake", "<b>&#8377;2,141</b> of shipping and return cost "
+               "if they bounce."),
+              ("Read from", "call outcomes, the pincode&rsquo;s history.")],
+        yes="Hold them", no="Ship anyway",
+        approved="Held from dispatch. The slots went to confirmed orders.",
+        declined="Shipped as normal. The bounce risk is noted against the "
+                 "pincode."),
+    "returns_desk": dict(
+        kicker="Refund release", rail="A refund to release",
+        title="Release the &#8377;1,899 refund: the item is back",
+        why="The return reached the warehouse this morning. Seal checked, "
+            "item fine.",
+        rows=[("The release", "<b>&#8377;1,899</b> back to the buyer, "
+               "today."),
+              ("Read from", "the courier scan, the warehouse check.")],
+        yes="Release it", no="Hold it",
+        approved="Refund released the same hour. Case closed.",
+        declined="Held. A person takes a look first."),
+    "payment_forms": dict(
+        kicker="Payment form", rail="An advance form to send",
+        title="Send the &#8377;2.6 lakh advance form",
+        why="A bulk buyer wants to pay 40% up front. The form carries the "
+            "PAN step and the balance-on-delivery terms in one link.",
+        rows=[("The form", "<b>&#8377;1,04,000</b> advance now, balance on "
+               "delivery. Verify and pay in one step."),
+              ("Read from", "the order, your terms, the KYC rules that "
+               "apply above &#8377;2 lakh.")],
+        yes="Send the form", no="Not yet",
+        approved="Sent on WhatsApp. The payment lands against the order "
+                 "and the books already know.",
+        declined="Not sent. The draft stays here."),
+    "kyc_desk": dict(
+        kicker="Deep check done", rail="A buyer to clear",
+        title="Clear the flagged buyer: the deep check came back clean",
+        why="Two days of checks: watchlists clear, registry matched. The "
+            "buyer has seen &ldquo;under review&rdquo;, never an error.",
+        rows=[("The call", "Clear the buyer and let the payment through."),
+              ("Read from", "watchlists, the registry answer, the order.")],
+        yes="Clear the buyer", no="Refuse politely",
+        approved="Cleared. The payment goes through; nothing else changes.",
+        declined="Refused politely and the order cancelled. Written down "
+                 "with the reason."),
+    "gst_compliance": dict(
+        kicker="Filing pack", rail="The month&rsquo;s file",
+        title="Send the month&rsquo;s file to your CA",
+        why="Every invoice tied to a real order. The two mismatches are "
+            "fixed and noted in the file.",
+        rows=[("The file", "One clean pack, in the format your CA asked "
+               "for. Nothing rebuilt by hand."),
+              ("Read from", "invoices, orders, the GST schedule.")],
+        yes="Send it", no="Hold it",
+        approved="Sent. Your CA has it well before the 20th.",
+        declined="Held. It stays ready whenever you are."),
+    "cart_rescue": dict(
+        kicker="Tonight&rsquo;s calls", rail="12 carts to call",
+        title="Tonight&rsquo;s rescue list: 12 dropped carts",
+        why="Worth <b>&#8377;31,240</b> together. Calls between 6 and 8 PM, "
+            "WhatsApp for anyone who does not pick up.",
+        rows=[("The plan", "One call each, one WhatsApp fallback, then it "
+               "stops. Anyone who says stop is never called again."),
+              ("Read from", "dropped carts, buyer hours, past outcomes.")],
+        yes="Start calling at 6", no="Skip tonight",
+        approved="Calling starts at 6. Every outcome lands in your chats.",
+        declined="Nobody is called tonight. The list stays."),
+    "payment_rescue": dict(
+        kicker="Failed payments", rail="5 payments to chase",
+        title="Chase today&rsquo;s 5 failed payments",
+        why="<b>&#8377;4,890</b> together, each with the decline reason "
+            "already read: two bank timeouts, two limits, one wrong PIN.",
+        rows=[("The plan", "WhatsApp first with a fresh link, a call only "
+               "if the money matters and the link sits unused."),
+              ("Read from", "decline reasons, order values, buyer hours.")],
+        yes="Chase them", no="Let them go",
+        approved="On it. Fresh links are out; calls follow where needed.",
+        declined="Left alone. The orders stay unpaid."),
+}
+
+# Reporting agents close their loop in the morning note, not a card.
+REPORT_AGENTS = {"three_way_recon", "settlement_insights", "daily_mis"}
+
+PROPS: dict[str, dict] = {}      # tid -> {slug: {state, decided_by}}
 
 
-def cash_prop(tid: str) -> dict:
-    return CASH_PROPS.setdefault(tid, dict(
-        id="cp1", state="waiting", decided_by="",
-        title="Move the courier payout by two days"))
+def prop_state(tid: str, slug: str) -> dict:
+    return PROPS.setdefault(tid, {}).setdefault(
+        slug, dict(state="waiting", decided_by=""))
 
 
-def cash_waiting(tid: str) -> int:
-    return 1 if cash_prop(tid)["state"] == "waiting" else 0
+def props_waiting(tid: str) -> int:
+    return sum(1 for slug in PROPS_DEF
+               if prop_state(tid, slug)["state"] == "waiting")
 
 
-def cashflow_card(tid: str) -> str:
-    p = cash_prop(tid)
+def prop_card(tid: str, slug: str) -> str:
+    d = PROPS_DEF[slug]
+    p = prop_state(tid, slug)
+    role = next((a["role"] for a in RELAY_AGENTS if a["slug"] == slug), slug)
     if p["state"] == "approved":
         verdict = (f'<div class="cashdone ok">Approved by '
-                   f'{esc(p["decided_by"] or "you")}. The courier payout '
-                   f'moves to Saturday; the payout calendar is updated and '
-                   f'nobody is paid late.</div>')
+                   f'{esc(p["decided_by"] or "you")}. {d["approved"]}</div>')
     elif p["state"] == "declined":
-        verdict = ('<div class="cashdone">Left as it was. Thursday will '
-                   'run tight; the planner will warn you again the day '
-                   'before.</div>')
+        verdict = f'<div class="cashdone">{d["declined"]}</div>'
     else:
         verdict = (
             f'<div class="wpbtns">'
-            f'<form method="post" action="/api/cashflow_act" style="display:contents">'
+            f'<form method="post" action="/api/prop_act" style="display:contents">'
+            f'<input type="hidden" name="slug" value="{slug}">'
             f'<input type="hidden" name="action" value="approve">'
-            f'<button class="btn primary">Approve the move</button></form>'
-            f'<form method="post" action="/api/cashflow_act" style="display:contents">'
+            f'<button class="btn primary">{d["yes"]}</button></form>'
+            f'<form method="post" action="/api/prop_act" style="display:contents">'
+            f'<input type="hidden" name="slug" value="{slug}">'
             f'<input type="hidden" name="action" value="decline">'
-            f'<button class="btn ghost">Not this time</button></form>'
+            f'<button class="btn ghost">{d["no"]}</button></form>'
             f'<span class="wp-trust">Nothing moves until you say yes.</span>'
             f'</div>')
-    return (
-        f'<div class="cashcard" id="cashcard">'
-        f'<div class="wp-kicker">Cash call &middot; Cashflow Planner</div>'
-        f'<h3>{esc(p["title"])}</h3>'
-        f'<div class="cashwhy">Thursday collides: vendor day and the GST '
-        f'debit land together. Without a move, the week dips to '
-        f'<b>&minus;&#8377;12,400</b> on Thursday morning.</div>'
-        f'<div class="cashrow"><span>The move</span>Courier payout '
-        f'<b>&#8377;48,200</b>: Thursday &rarr; Saturday. The courier&rsquo;s '
-        f'terms allow it; nobody is paid late.</div>'
-        f'<div class="cashrow"><span>After</span>Thursday stays at '
-        f'<b>+&#8377;35,800</b>. Nothing else changes.</div>'
-        f'<div class="cashrow"><span>Read from</span>settlements landing, '
-        f'the payout calendar, the GST schedule.</div>'
-        f'{verdict}</div>')
+    rows = "".join(f'<div class="cashrow"><span>{lbl}</span>{txt}</div>'
+                   for lbl, txt in d["rows"])
+    return (f'<div class="cashcard" id="prop-{slug}">'
+            f'<div class="wp-kicker">{d["kicker"]} &middot; {role}</div>'
+            f'<h3>{d["title"]}</h3>'
+            f'<div class="cashwhy">{d["why"]}</div>'
+            f'{rows}{verdict}</div>')
+
+
+# Kept for the surfaces wired before the engine went general.
+def cash_prop(tid: str) -> dict:
+    return prop_state(tid, "cashflow_forecast")
+
+
+def cash_waiting(tid: str) -> int:
+    return props_waiting(tid)
+
+
+def cashflow_card(tid: str) -> str:
+    return prop_card(tid, "cashflow_forecast")
 
 
 # ------------------------------------------------------------- assignment
@@ -5371,17 +5562,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(303)
             self.send_header("Location", "/")
             self.end_headers(); return
-        if self.path == "/api/cashflow_act":
+        if self.path in ("/api/prop_act", "/api/cashflow_act"):
             sess = self._session()
             if not sess:
                 self.send_response(403); self.end_headers(); return
-            action = (parse_qs(raw).get("action") or [""])[0]
-            p = cash_prop(sess["tenant_id"])
-            if p["state"] == "waiting" and action in ("approve", "decline"):
-                p["state"] = "approved" if action == "approve" else "declined"
-                p["decided_by"] = (sess.get("email") or "you").split("@")[0]
+            form = parse_qs(raw)
+            action = (form.get("action") or [""])[0]
+            slug = (form.get("slug") or ["cashflow_forecast"])[0]
+            if slug in PROPS_DEF:
+                p = prop_state(sess["tenant_id"], slug)
+                if (p["state"] == "waiting"
+                        and action in ("approve", "decline")):
+                    p["state"] = ("approved" if action == "approve"
+                                  else "declined")
+                    p["decided_by"] = (sess.get("email")
+                                       or "you").split("@")[0]
             self.send_response(303)
-            self.send_header("Location", "/agents/cashflow_forecast")
+            self.send_header("Location", f"/agents/{slug}")
             self.end_headers(); return
         if self.path == "/api/procedure_save":
             sess = self._session()
