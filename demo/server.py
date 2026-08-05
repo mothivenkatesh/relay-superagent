@@ -647,7 +647,7 @@ TEAM = [
 ]
 REP = {tid: name for tid, name, _, _, _ in TEAM}
 STATE_META = {
-    RunState.AWAITING_GATE: ("Needs your yes", "wait"),
+    RunState.AWAITING_GATE: ("Pending approval", "wait"),
     RunState.ACTED: ("Sent to the bank", "ok"),
     RunState.RESOLVED: ("Done", "ok"),
     RunState.EDITED: ("Your wording, sent", "ok"),
@@ -1236,7 +1236,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
         rows += (
             f'<a class="needsrow" href="/approvals">'
             f'<span class="rbadge">{n_need}</span>'
-            f'<span class="nr-t"><b>Need your yes</b>'
+            f'<span class="nr-t"><b>Pending approvals</b>'
             f'<span class="nr-sub">&#8377;{inr(total_p)} riding on '
             f'them</span></span>'
             f'<span class="nharrow">&rarr;</span></a>')
@@ -1880,7 +1880,7 @@ def case_runs(tid: str, order_id: str) -> list:
 def case_status(runs: list) -> tuple[str, str]:
     """(key, words): the one line that says where a case stands."""
     if any(r.state is RunState.AWAITING_GATE for r in runs):
-        return ("need", "Needs your yes")
+        return ("need", "Pending approval")
     if any(r.state in (RunState.TIMED_OUT, RunState.FAILED) for r in runs):
         # A Relay person is on it — that is THEIR queue, not the founder's.
         # Counting it under "Needs you" hands the founder a job they cannot
@@ -2050,7 +2050,7 @@ def case_content(tid: str, order_id: str) -> str:
 
 
 HOME_CONTENT = """
-    <h1 class="page" id="tasks">Needs you</h1>
+    <h1 class="page" id="tasks">Approvals</h1>
     <div class="pagehint">__QSUMMARY__ Nothing moves until you say yes.
       <form method="post" action="/api/sample" style="display:inline;margin-left:8px">
       <button class="btn ghost sm">Try a sample</button></form></div>
@@ -4693,7 +4693,7 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         desks += (f'<h2 class="sec fam">{title}'
                   f'<span class="st {"ok" if n_on_fam else "mut"}">'
                   f'{n_on_fam} of {len(mine)} on</span>'
-                  + (f'<span class="st need2">{n_need_fam} need you</span>'
+                  + (f'<span class="st need2">{n_need_fam} pending</span>'
                      if n_need_fam else '')
                   + '</h2>'
                   f'<div class="pagehint">{line}</div>'
@@ -4719,7 +4719,7 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         f'<span>Agents on</span><i>{n_live} working &middot; '
         f'{n_on - n_live} watching</i></a>'
         f'<a class="stile need" href="/approvals"><b>{n_yes}</b>'
-        f'<span>Need your yes</span><i>replies, holds, payouts</i></a>'
+        f'<span>Pending approval</span><i>replies, holds, payouts</i></a>'
         f'<a class="stile" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
         f'<span>Kept for you</span><i>{n_wins2} disputes won</i></a>'
         f'<a class="stile" href="/impact"><b>{len(truns)}</b>'
@@ -7661,7 +7661,7 @@ def load_sample(tid: str, email: str) -> str:
 # The composer is a front door, not a question box: describe a job in one
 # sentence and Relay drafts the teammate. The draft is inert until the yes,
 # and the finished agent obeys the same house rule as the shipped fifteen:
-# anything it wants to send or hold lands in Needs you first.
+# anything it wants to send or hold waits for the owner's approval.
 PENDING_BUILDS: dict[str, dict] = {}
 _build_n = 0
 
@@ -7762,7 +7762,7 @@ def _build_questions(kind: str) -> list[dict]:
              opts=[(lbl, sub, i == 0) for i, (lbl, sub) in enumerate(touch)]),
         dict(key="gate", type="one", q="When must it check with you?", opts=[
             ("Before anything moves",
-             "Every send and hold lands in Needs you first.", True),
+             "Every send and hold waits for your approval.", True),
             ("Only above ₹5,000",
              "Small ones go on their own; big ones wait for you.", False),
             ("Only the unusual ones",
@@ -7808,9 +7808,9 @@ def _build_draft_res(tid: str, bid: str) -> dict:
     qs = _build_questions(d["kind"])
     ans = _default_answers(qs, d.get("answers") or {})
     gate = ans["gate"]
-    ask_line = ("Anything it wants to send or hold lands in Needs you first."
+    ask_line = ("Anything it wants to send or hold waits for your approval."
                 if gate == "Before anything moves" else
-                esc(gate) + ". Everything else lands in Needs you first.")
+                esc(gate) + ". Everything else waits for your approval.")
     summary = ('<div class="qzsum">' + "".join(
         f'<div class="qzsq">{q["q"]}</div>'
         f'<div class="qzsa">'
@@ -7861,7 +7861,7 @@ def _build_confirm(tid: str, bid: str) -> str:
                  "/agents/" + slug)
     return (f'Meet <b>{d["name"]}</b>. It is on the Agents page under '
             f'<b>Built by you</b>, watching from now. Its first find will '
-            f'land in Needs you.'
+            f'land in Approvals.'
             f'<span class="rmeta"><a href="/agents/{slug}">Open '
             f'{d["name"]} &rarr;</a></span>')
 
