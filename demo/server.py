@@ -3504,32 +3504,29 @@ def agent_cfg(tid: str, slug: str) -> dict:
 
 
 def agent_settings_content(tid: str, a: dict) -> str:
+    """Five controls, almost no words. Placeholders teach; captions are
+    one line; anything constant is said once, at the bottom."""
     slug = a["slug"]
     cfg = agent_cfg(tid, slug)
     acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
 
-    # Instructions: the founder's standing note, followed on every job.
     instr = (
-        '<h2 class="sec">Standing instructions</h2>'
-        '<div class="pagehint">Written once, followed on every job. '
-        'Plain words work: &ldquo;never call before 11&rdquo;, '
-        '&ldquo;always mention the refill discount&rdquo;.</div>'
+        '<h2 class="sec">Instructions</h2>'
         '<form method="post" action="/api/agent_cfg">'
         '<input type="hidden" name="slug" value="' + slug + '">'
-        '<textarea class="whenbox" name="instructions" rows="3" '
+        '<textarea class="whenbox" name="instructions" rows="2" '
         'style="width:100%;max-width:640px;resize:vertical" '
-        'placeholder="Tell it how you want things done">'
+        'placeholder="e.g. never call before 11 AM. It follows this on '
+        'every job.">'
         + esc(cfg["instructions"]) + '</textarea>'
         '<div style="margin-top:8px"><button class="btn primary sm">'
-        'Save</button> <span class="ctahint" style="display:inline;'
-        'text-align:left">Applies from its next job.</span></div></form>')
+        'Save</button></div></form>')
 
-    # Tools: what it may use; actions can be switched off, reads cannot.
-    trows = "".join(
+    reads_line = (
         '<div class="trow slim"><span class="ico">' + ICONS["book"]
-        + '</span><span class="tdesc">Reads ' + r
-        + ' <span class="mut">read only, always on</span></span></div>'
-        for r in acc["reads"])
+        + '</span><span class="tdesc"><span class="mut">Always reads: '
+        + ", ".join(acc["reads"]) + '.</span></span></div>')
+    trows = ""
     for i, d in enumerate(acc["does"]):
         off = str(i) in cfg["tools_off"]
         trows += (
@@ -3538,20 +3535,11 @@ def agent_settings_content(tid: str, a: dict) -> str:
             'style="display:contents">'
             '<input type="hidden" name="slug" value="' + slug + '">'
             '<input type="hidden" name="tool" value="' + str(i) + '">'
-            '<button class="tglbtn ' + ("" if off else "on") + '" '
-            'title="' + ("Allow" if off else "Take away") + '"><i></i>'
+            '<button class="tglbtn ' + ("" if off else "on") + '"><i></i>'
             '</button></form>'
-            '<span class="tdesc">Can ' + d
-            + ' <span class="mut">acts only after your yes</span></span>'
-            + ('<span class="st mut">off for now</span>' if off else
-               '<span class="st ok">allowed</span>')
-            + '</div>')
-    tools = ('<h2 class="sec">What it may use</h2>'
-             '<div class="pagehint">Reading is always safe and always on. '
-             'Anything that acts can be taken away here, and still stops '
-             'for your yes when allowed.</div>' + trows)
+            '<span class="tdesc">' + d[0].upper() + d[1:] + '</span></div>')
+    tools = ('<h2 class="sec">Tools</h2>' + trows + reads_line)
 
-    # Memory: learn toggle + forget button + link to Knowledge.
     mem = (
         '<h2 class="sec">Memory</h2>'
         '<div class="trow slim" style="display:flex">'
@@ -3561,19 +3549,9 @@ def agent_settings_content(tid: str, a: dict) -> str:
         + ("0" if cfg["learn"] else "1") + '">'
         '<button class="tglbtn ' + ("on" if cfg["learn"] else "") + '">'
         '<i></i></button></form>'
-        '<span class="tdesc">Learn from what you change '
-        '<span class="mut">your rewording teaches it your voice</span>'
-        '</span>'
-        + ('<span class="st ok">learning</span>' if cfg["learn"] else
-           '<span class="st mut">paused</span>')
-        + '</div>'
-        '<div class="trow slim" style="display:flex">'
-        '<span class="ico">' + ICONS["book"] + '</span>'
-        '<span class="tdesc">Everything it has learned lives in '
-        '<b>Knowledge</b>, where you can read and correct it.</span>'
-        '<a class="st wait" href="/memory">open &rarr;</a></div>')
+        '<span class="tdesc">Learns your style from what you change</span>'
+        '<a class="st wait" href="/memory">what it knows &rarr;</a></div>')
 
-    # Guardrails: the numbers it must respect, editable.
     fields = GUARD_DEFAULTS.get(a["desk"], GUARD_DEFAULTS["analyst"])
     grows = ""
     for key, label, default in fields:
@@ -3582,47 +3560,39 @@ def agent_settings_content(tid: str, a: dict) -> str:
             '<form class="trow slim" method="post" action="/api/agent_cfg" '
             'style="display:flex;align-items:center">'
             '<input type="hidden" name="slug" value="' + slug + '">'
-            '<span class="ico">' + ICONS["shield"] + '</span>'
             '<span class="tdesc">' + label + '</span>'
             '<input class="inedit-in" style="flex:none;width:140px" '
             'name="guard_' + key + '" value="' + esc(val) + '">'
             '<button class="btn ghost sm">Save</button></form>')
-    grows += (
-        '<div class="trow slim"><span class="ico">' + ICONS["shield"]
-        + '</span><span class="tdesc"><b>Always true, not settings:</b> '
-        '<span class="mut">nothing sends without a yes, a buyer who says '
-        'stop is never contacted, and every action lands in Decisions.'
-        '</span></span></div>')
-    guards = ('<h2 class="sec">Limits it must respect</h2>'
-              '<div class="pagehint">Your numbers. It stops and asks at '
-              'the line, every time.</div>' + grows)
+    guards = ('<h2 class="sec">Limits</h2>' + grows) if grows else ""
 
-    # Checks: plain evals with a run button.
     checked = cfg["eval_at"]
     ev = (
         '<h2 class="sec">Checks</h2>'
-        '<div class="pagehint">Run any time. The same checks run on their '
-        'own every night.</div>'
         + "".join(
             '<div class="trow slim"><span class="ico">' + ICONS["shield"]
             + '</span><span class="tdesc">' + c + '</span>'
             + ('<span class="st ok">passed</span>' if checked else
-               '<span class="st mut">will run tonight</span>')
+               '<span class="st mut">runs tonight</span>')
             + '</div>'
-            for c in ["Sticks to your standing instructions",
-                      "Stops at every limit you set",
-                      "Says things plainly, no jargon"])
+            for c in ["Follows your instructions",
+                      "Stops at your limits",
+                      "Speaks plainly"])
         + '<form method="post" action="/api/agent_cfg" '
         'style="margin-top:8px">'
         '<input type="hidden" name="slug" value="' + slug + '">'
         '<input type="hidden" name="run_checks" value="1">'
-        '<button class="btn ghost sm">Run the checks now</button>'
+        '<button class="btn ghost sm">Run now</button>'
         + (('<span class="ctahint" style="display:inline;margin-left:8px">'
-            'Last run ' + esc(checked) + '. All good.</span>') if checked
-           else '')
+            'Last run ' + esc(checked) + '.</span>') if checked else '')
         + '</form>')
 
-    return instr + tools + mem + guards + ev
+    footer = ('<div class="pagehint" style="margin-top:32px">Always true, '
+              'whatever is set here: nothing sends without your yes, and '
+              'every change lands in '
+              '<a href="/settings?s=decisions"><b>Decisions</b></a>.</div>')
+
+    return instr + tools + mem + guards + ev + footer
 
 
 # The moat, made visible: one order record that every agent reads and
