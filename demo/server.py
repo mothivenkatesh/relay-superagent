@@ -2148,6 +2148,17 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 2px}
   border-radius:16px;padding:20px 24px;margin:4px 0 8px}
 .cashcard h3{font-size:17px;color:var(--ink);margin:4px 0 8px}
 .cashwhy{font-size:13.5px;line-height:1.6;margin-bottom:12px}
+.abwrap{display:flex;gap:12px;margin:12px 0 16px;flex-wrap:wrap}
+.ab{flex:1;min-width:200px;border-radius:12px;padding:12px 16px}
+.ab span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;margin-bottom:4px;opacity:.75}
+.ab b{font-size:15px;line-height:1.4;display:block}
+.ab.no{background:#FDF1EF;color:#A63A2B}
+.ab.yes{background:#E9F7EF;color:#177245}
+.cashmore{margin-top:12px;border-top:1px solid #F1F1F5;padding-top:8px}
+.cashmore summary{font-size:12.5px;color:var(--mut);cursor:pointer;
+  padding:4px 0}
+.cashmore[open] summary{margin-bottom:8px}
 .cashrow{display:flex;gap:12px;font-size:13.5px;line-height:1.6;
   padding:8px 0;border-top:1px solid #F1F1F5}
 .cashrow span:first-child{flex:none;width:88px;font-size:11.5px;
@@ -4812,6 +4823,7 @@ function shstart(){
 # re-decided. Reporting agents close their loop in the morning note instead.
 PROPS_DEF = {
     "cashflow_forecast": dict(
+        ifno="Thursday dips to &minus;&#8377;12,400", ifyes="Thursday stays at +&#8377;35,800",
         kicker="Cash call", rail="Payout move",
         title="Move the courier payout by two days",
         why="Thursday collides: vendor day and the GST debit land together. "
@@ -4830,6 +4842,7 @@ PROPS_DEF = {
         declined="Left as it was. Thursday will run tight; the planner "
                  "warns you again the day before."),
     "stock_watch": dict(
+        ifno="Out of Amla Juice in 6 days", ifyes="Covered for six weeks",
         kicker="Reorder", rail="Reorder draft",
         title="Reorder Amla Juice before it runs out",
         why="6 days of stock left at this pace, across every channel. The "
@@ -4842,6 +4855,7 @@ PROPS_DEF = {
         approved="Order placed with Vasudha Farms. Delivery expected Tuesday.",
         declined="No order placed. It warns again at 4 days of stock."),
     "payouts_desk": dict(
+        ifno="14 payments go out late", ifyes="Everyone paid on time, morning",
         kicker="Payment day", rail="Tomorrow&rsquo;s payments",
         title="Tomorrow&rsquo;s 14 payments, one yes",
         why="Vendors, two refunds, and the courier. Every payment sits "
@@ -4855,6 +4869,7 @@ PROPS_DEF = {
                  "bill.",
         declined="Held. Nothing goes out until you say so."),
     "refund_shield": dict(
+        ifno="&#8377;1,249 paid to a likely fraud", ifyes="Refused with proof, replacement offered",
         kicker="Refund check", rail="A claim to refuse",
         title="Refuse the broken-bottle claim, with proof",
         why="Second claim from this buyer in three weeks. The delivery scan "
@@ -4870,6 +4885,7 @@ PROPS_DEF = {
                  "offered instead.",
         declined="Refund paid as claimed. The pattern is noted."),
     "cod_guard": dict(
+        ifno="&#8377;2,141 shipped at a 40% bounce risk", ifyes="3 held; slots go to confirmed orders",
         kicker="Dispatch hold", rail="3 COD orders held",
         title="Hold 3 COD orders that never picked up",
         why="Two calls each, unanswered, plus a WhatsApp. Their pincode "
@@ -4884,6 +4900,7 @@ PROPS_DEF = {
         declined="Shipped as normal. The bounce risk is noted against the "
                  "pincode."),
     "returns_desk": dict(
+        ifno="The buyer waits and chases you", ifyes="&#8377;1,899 back today, case closed",
         kicker="Refund release", rail="A refund to release",
         title="Release the &#8377;1,899 refund: the item is back",
         why="The return reached the warehouse this morning. Seal checked, "
@@ -4895,6 +4912,7 @@ PROPS_DEF = {
         approved="Refund released the same hour. Case closed.",
         declined="Held. A person takes a look first."),
     "payment_forms": dict(
+        ifno="A &#8377;2.6 lakh order sits unpaid", ifyes="Advance collected in one step",
         kicker="Payment form", rail="An advance form to send",
         title="Send the &#8377;2.6 lakh advance form",
         why="A bulk buyer wants to pay 40% up front. The form carries the "
@@ -4908,6 +4926,7 @@ PROPS_DEF = {
                  "and the books already know.",
         declined="Not sent. The draft stays here."),
     "kyc_desk": dict(
+        ifno="A clean buyer stays blocked", ifyes="The buyer pays; the check is on record",
         kicker="Deep check done", rail="A buyer to clear",
         title="Clear the flagged buyer: the deep check came back clean",
         why="Two days of checks: watchlists clear, registry matched. The "
@@ -4919,6 +4938,7 @@ PROPS_DEF = {
         declined="Refused politely and the order cancelled. Written down "
                  "with the reason."),
     "gst_compliance": dict(
+        ifno="The 18th scramble, again", ifyes="Your CA has the file today",
         kicker="Filing pack", rail="The month&rsquo;s file",
         title="Send the month&rsquo;s file to your CA",
         why="Every invoice tied to a real order. The two mismatches are "
@@ -4930,6 +4950,7 @@ PROPS_DEF = {
         approved="Sent. Your CA has it well before the 20th.",
         declined="Held. It stays ready whenever you are."),
     "cart_rescue": dict(
+        ifno="&#8377;31,240 in carts goes cold", ifyes="12 buyers called back tonight",
         kicker="Tonight&rsquo;s calls", rail="12 carts to call",
         title="Tonight&rsquo;s rescue list: 12 dropped carts",
         why="Worth <b>&#8377;31,240</b> together. Calls between 6 and 8 PM, "
@@ -4941,6 +4962,7 @@ PROPS_DEF = {
         approved="Calling starts at 6. Every outcome lands in your chats.",
         declined="Nobody is called tonight. The list stays."),
     "payment_rescue": dict(
+        ifno="&#8377;4,890 stays unpaid", ifyes="Fresh links out within the hour",
         kicker="Failed payments", rail="5 payments to chase",
         title="Chase today&rsquo;s 5 failed payments",
         why="<b>&#8377;4,890</b> together, each with the decline reason "
@@ -5018,11 +5040,18 @@ def prop_card(tid: str, slug: str) -> str:
             f'</div>')
     rows = "".join(f'<div class="cashrow"><span>{lbl}</span>{txt}</div>'
                    for lbl, txt in d["rows"])
+    contrast = (
+        f'<div class="abwrap">'
+        f'<div class="ab no"><span>If you do nothing</span>'
+        f'<b>{d["ifno"]}</b></div>'
+        f'<div class="ab yes"><span>If you say yes</span>'
+        f'<b>{d["ifyes"]}</b></div></div>')
+    details = (f'<details class="cashmore"><summary>The details</summary>'
+               f'<div class="cashwhy">{d["why"]}</div>{rows}</details>')
     return (f'<div class="cashcard" id="prop-{slug}">'
             f'<div class="wp-kicker">{d["kicker"]} &middot; {role}</div>'
             f'<h3>{d["title"]}</h3>'
-            f'<div class="cashwhy">{d["why"]}</div>'
-            f'{rows}{verdict}</div>')
+            f'{contrast}{verdict}{details}</div>')
 
 
 # Kept for the surfaces wired before the engine went general.
