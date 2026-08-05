@@ -263,3 +263,52 @@ dataclass so every existing kwargs construction site stays valid;
 the Agents console with verbatim intro-deck one-liners — Dispute Defender
 live, the other seven visibly badged roadmap. 108 tests green (Postgres
 contract tests included, no skips).
+
+## D23 — Relay is a Super Agent for Commerce; lineup cut to six on one order (2026-08-05)
+
+Captain-directed repositioning, layered over three messages in one session.
+
+**Mission:** every small business should run itself; the busy work is done by
+agents. Category: AI for small business / Super Agent for Commerce.
+
+**Mechanism is labor arbitrage.** In commerce every unit of growth buys a
+proportional unit of ops labor, so growth never compounds margin. At a small
+merchant the labor line runs ~10x the software line, and ops headcount scales
+with orders while software does not. Relay moves work across that boundary.
+Pricing follows: per unit of work against the labor budget, never per seat,
+which makes revenue scale with the merchant's order volume by construction.
+
+**Three classes of commerce work** (the frame that picked the lineup): work
+done expensively today (ceiling = current spend, incumbent to displace); work
+not done at all because at human cost it isn't worth doing (no budget fight,
+no incumbent, self-closing sale); work humans can't do at speed. The second
+class is the best arbitrage and the lineup leans into it.
+
+**Lineup cut from eight to six**, ordered by the life of a single order:
+Cart Rescue (cart dropped) → Payment Rescue (payment failed) → COD Guard
+(before dispatch) → Refund Shield (refund claimed) → Dispute Defender
+(dispute filed) → Reconciliation (money settles). Loan Recovery and Due
+Diligence dropped: NBFC/LSP lending is a different buyer, not commerce.
+Settlement Clarity renamed Reconciliation (name already retired upstream).
+
+**Why one super agent, not six tools:** all six key off the same object, the
+order. Six views of one graph (order → payment → shipment → conversation →
+refund → dispute → settlement), so each agent added makes the others better.
+That compounding is the moat and it is unavailable to point tools. This is
+the concrete form of "memory is the moat" — a shared join key, not abstract
+memory.
+
+**Buyer:** millions of small merchants, teams of 5–10, non-technical, cannot
+bring API keys, will not run an integrations project. Interface is a few
+lines of prompt, not a canvas. Relay holds every credential itself.
+
+**Code effect:** AgentType cut to the six in lifecycle order
+(SETTLEMENT_CLARITY → RECONCILIATION); RELAY_AGENTS rebuilt with a `moment`
+and a `today` field, the latter being the labor-arbitrage line rendered on
+every agent card; Agents page copy rewritten to the one-order thesis;
+README and CLAUDE.md rewritten. Dispute Defender remains the only wired
+pipeline. Engine untouched — 108 tests still green.
+
+**Open:** self-serve onboarding (required by the no-setup-project promise)
+is not built; no real webhook is attached; which agent gets wired second is
+undecided.

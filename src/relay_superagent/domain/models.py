@@ -81,20 +81,24 @@ class Arm(StrEnum):
 
 
 class AgentType(StrEnum):
-    """Which of Relay's real public agents produced this run — the full
-    8-agent lineup from the canonical intro deck. Dispute Defender is the
-    only one wired end-to-end in this codebase today; the rest exist so the
-    ledger, metrics and demo console can already speak in terms of the
-    full agent fleet."""
+    """Which of Relay's agents produced this run.
 
-    DISPUTE_DEFENDER = "dispute_defender"
-    COD_GUARD = "cod_guard"
-    PAYMENT_RESCUE = "payment_rescue"
+    The lineup is the money motion of a single commerce order, in
+    lifecycle order: a cart drops, a payment fails, a COD order needs
+    confirming, a refund is claimed, a dispute is filed, and the money
+    finally settles (or doesn't). Six views of one order — which is why
+    they belong to one super agent and not six point tools.
+
+    Dispute Defender is the only one wired end-to-end in this codebase
+    today; the rest exist so the ledger, metrics and demo console can
+    already speak in terms of the full fleet."""
+
     CART_RESCUE = "cart_rescue"
-    SETTLEMENT_CLARITY = "settlement_clarity"
+    PAYMENT_RESCUE = "payment_rescue"
+    COD_GUARD = "cod_guard"
     REFUND_SHIELD = "refund_shield"
-    LOAN_RECOVERY = "loan_recovery"
-    DUE_DILIGENCE = "due_diligence"
+    DISPUTE_DEFENDER = "dispute_defender"
+    RECONCILIATION = "reconciliation"
 
 
 def sha(*parts: str) -> str:

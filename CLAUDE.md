@@ -1,16 +1,39 @@
 # Relay — project memory
 
+## Mission (north star, captain's words 2026-08-05)
+**Every small business should run itself.** The busy work is done by agents.
+
 ## What this is
-Relay: an agent orchestrator for payments and compliance operations, built
-for SMB teams (5–10 people). Eight pre-built agents (Dispute Defender, COD
-Guard, Payment Rescue, Cart Rescue, Settlement Clarity, Refund Shield, Loan
-Recovery, Due Diligence) plus build-your-own. The merchant prompts one
-conversation (insights, work status, delegation); specialist agents run the
-work behind it; every money- or customer-touching action waits at a human
-gate. Not a workflow builder — workflows are value-added services on top,
-never the core. Canonical agent lineup + copy source: Mothi's Relay Intro
-deck (~/Downloads/Relay Intro (4).html). Trust line, used verbatim in
-product copy: "You approve before anything sends."
+Relay: the super agent that makes a small business AI-first. Built for
+millions of small merchants on teams of 5–10 — non-technical, no API keys
+to bring, no integrations project, nobody whose job is "owning the tool."
+They prompt a few lines and the agents handle the rest. Relay holds every
+credential and connection itself; there is no setup project (the Lassie
+no-BYOK constraint). Not a workflow builder and not a canvas — workflows
+are value-added services on top, never the core.
+
+**Positioning stack (settled 2026-08-05, captain-directed):**
+- Mission: every small business should run itself.
+- Category: Super Agent for Commerce / AI for small business.
+- Mechanism: **labor arbitrage.** Ops headcount scales with orders, software
+  doesn't; at a small merchant the labor line is ~10x the software line.
+  Price against the labor budget, per unit of work — never per seat.
+- Problem sentence: every unit of growth buys a proportional unit of ops
+  labor, so growth never compounds margin.
+- Surface: six agents = the money motion of ONE order, in lifecycle order
+  (Cart Rescue → Payment Rescue → COD Guard → Refund Shield → Dispute
+  Defender → Reconciliation). Loan Recovery and Due Diligence were dropped
+  from the earlier 8-agent deck lineup: they are NBFC/LSP lending, not
+  commerce. Settlement Clarity renamed Reconciliation (that name was
+  already retired per the Arivu wiki).
+- Moat: **one order graph.** All six key off the same order, so each agent
+  added makes the others better. This is the concrete version of "memory is
+  the moat" — a shared join key, not abstract memory.
+- Trust line, verbatim in product copy: "You approve before anything sends."
+
+Agent copy source: Mothi's Relay Intro deck (~/Downloads/Relay Intro (4).html);
+the `today:` labor line on each agent card is the arbitrage frame and is the
+new product-visible expression of the thesis.
 
 ## Origin + rebuild history
 Forked from [CoMarketer](https://github.com/mothivenkatesh/comarketer)

@@ -1410,64 +1410,67 @@ def _card(title: str, sub: str, right: str = "") -> str:
             f'{right}</div>')
 
 
-# Relay's eight real public agents (the canonical intro-deck lineup, verbatim
-# one-liners). Dispute Defender is the only one wired to a live pipeline in
-# this codebase; the other seven are named here so the console can show the
-# whole fleet honestly, badged as roadmap.
+# Relay's six agents — the money motion of a single commerce order, in
+# lifecycle order: cart drops, payment fails, COD needs confirming, refund
+# is claimed, dispute is filed, money settles. Six views of one order.
+#
+# `today` is the labor-arbitrage line: who does this work now, and what it
+# costs or why it goes undone. That gap is the product. Dispute Defender is
+# the only one wired to a live pipeline here; the rest are badged roadmap.
 RELAY_AGENTS = [
-    dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
-        status="live",
-        persona="For the support lead at an online merchant.",
-        desc="Gathers the evidence, builds the case, and files before the "
-             "deadline.",
-        tagline="Never miss a deadline &middot; Evidence auto-gathered (order, "
-                "delivery, comms) &middot; More disputes won."),
+    dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
+        status="roadmap", moment="Cart dropped",
+        persona="For the growth lead at an ad-spending D2C brand.",
+        desc="On a cart drop, calls the buyer in their language within "
+             "minutes, presents the offer, and sends a payment link.",
+        today="A WhatsApp blast recovers a fraction. Voice converts better, "
+              "but nobody can call 400 dropped carts a day.",
+        tagline="Charged only on recovered orders. TRAI-compliant."),
+    dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
+        status="roadmap", moment="Payment failed",
+        persona="For the growth lead at a UPI-heavy online store.",
+        desc="Reads the decline reason. Waits 3 minutes for the customer to "
+             "self-retry. If still open, places a voice call explaining what "
+             "failed and sends a link to retry.",
+        today="A failed UPI payment is simply a lost order. Nobody reads a "
+              "decline code, and nobody follows up.",
+        tagline="Recovered while the intent is still warm. One call per "
+                "customer per hour."),
     dict(slug="cod_guard", name="COD Guard", icon="note",
-        status="roadmap",
+        status="roadmap", moment="Before dispatch",
         persona="For the ops lead at a COD-heavy D2C brand.",
         desc="Confirms each COD order before dispatch via WhatsApp or voice, "
              "offers a prepaid option to flagged orders, and blocks repeat "
              "bad addresses.",
-        tagline="Fewer returns-to-origin before they cost a courier run."),
-    dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
-        status="roadmap",
-        persona="For the growth lead at a UPI-heavy online store.",
-        desc="Reads the decline reason. Waits 3 minutes for self-retry. If "
-             "still open, places a voice call explaining what failed and "
-             "sends a WhatsApp link to retry.",
-        tagline="Failed payments recovered while the intent is still warm."),
-    dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
-        status="roadmap",
-        persona="For the growth lead at an ad-spending D2C brand.",
-        desc="On a cart drop, calls the buyer in their language within "
-             "minutes, presents the offer, and sends a Cashfree payment link.",
-        tagline="Outcome-based pricing, charged only on recovered orders. "
-                "TRAI-compliant."),
-    dict(slug="settlement_clarity", name="Settlement Clarity", icon="ledger",
-        status="roadmap",
-        persona="For the finance lead at a multi-channel merchant.",
-        desc="Matches each payout to its order against the bank, flags the "
-             "gaps, and posts to your books.",
-        tagline="Bank-verified match &middot; silent failures caught."),
+        today="Someone works the COD list every morning. COD runs 50&ndash;65% "
+              "of orders and 15&ndash;25% of those come back.",
+        tagline="Fewer returns-to-origin, at &#8377;150&ndash;300 a return."),
     dict(slug="refund_shield", name="Refund Shield", icon="moon",
-        status="roadmap",
+        status="roadmap", moment="Refund claimed",
         persona="For the risk lead at a high-refund D2C brand.",
         desc="Scores each claim against fraud signals, holds the risky ones "
              "before you pay.",
-        tagline="Cross-merchant fraud signals."),
-    dict(slug="loan_recovery", name="Loan Recovery", icon="send",
-        status="roadmap",
-        persona="For the collections lead at an NBFC or lender.",
-        desc="On a bounce, verifies the borrower, states the EMI, captures "
-             "consent, and takes the agreed action.",
-        tagline="Every step on record."),
-    dict(slug="due_diligence", name="Due Diligence", icon="lock",
-        status="roadmap",
-        persona="For the compliance lead at an LSP or lender.",
-        desc="On a new application, verifies on Secure ID, risk-tiers the "
-             "customer, auto-clears the low-risk, and escalates for enhanced "
-             "review.",
-        tagline="Compliance throughput without compliance risk."),
+        today="Claims get paid before anyone reviews them, because reviewing "
+              "every claim costs more than the fraud does.",
+        tagline="Cross-merchant signals. Checked before paying, not after."),
+    dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
+        status="live", moment="Dispute filed",
+        persona="For the support lead at an online merchant.",
+        desc="Gathers the evidence, builds the case, and files before the "
+             "deadline.",
+        today="Evidence sits across the store, the courier and the inbox. By "
+              "the time it is gathered, the window has closed.",
+        tagline="Never miss a deadline &middot; evidence auto-gathered."),
+    dict(slug="reconciliation", name="Reconciliation", icon="ledger",
+        status="roadmap", moment="Money settles",
+        persona="For the finance lead at a multi-channel merchant.",
+        desc="Matches each payout to its order against the bank, flags the "
+             "gaps, and posts to your books.",
+        today="A finance exec ties out lines by hand every day. Tools reach "
+              "about 80%, and a pending payout can fail weeks later with no "
+              "alert.",
+        tagline="Bank-verified match, not a status webhook. Silent failures "
+                "caught."),
 ]
 
 # Dispute Defender's own crew — the seven sub-agents inside the pipeline
@@ -2023,12 +2026,18 @@ def _relay_agent_card(a: dict) -> str:
     live = a["status"] == "live"
     badge = ('<span class="st ok">live in this demo</span>' if live
              else '<span class="st wait">Coming next &middot; roadmap</span>')
-    inner = (f'<div class="aname" style="margin-bottom:6px">'
+    inner = (f'<div class="aname" style="margin-bottom:6px;flex-wrap:wrap;'
+             f'row-gap:6px">'
              f'<span class="tile">{ICONS[a["icon"]]}</span>'
              f'<span class="dot2 {"on" if live else "off"}"></span>'
-             f'<b style="font-size:15px">{a["name"]}</b></div>'
+             f'<b style="font-size:15px;white-space:nowrap">{a["name"]}</b>'
+             f'<span class="st mut" style="margin-left:8px;flex:none">'
+             f'{a["moment"]}</span></div>'
              f'<div class="mut" style="margin:0 0 6px;font-size:12px">{a["persona"]}</div>'
-             f'<div style="margin:2px 0 8px">&ldquo;{a["desc"]}&rdquo;</div>'
+             f'<div style="margin:2px 0 10px">&ldquo;{a["desc"]}&rdquo;</div>'
+             f'<div class="mut" style="margin:0 0 8px;font-size:12px;'
+             f'border-left:2px solid var(--hair);padding-left:10px">'
+             f'<b>Today:</b> {a["today"]}</div>'
              f'<div class="mut"><b>{a["tagline"]}</b></div>'
              f'<div style="margin-top:10px">{badge}</div>')
     if live:
@@ -2074,10 +2083,12 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
                               f'href="/agents?f={key}">{label}</a>')
     return (f'<h1 class="page">Agents</h1>'
-            f'<div class="pagehint">Pre-built agents for payment and '
-            f'compliance ops. Or build your own. Eight agents, one workspace '
-            f'&mdash; Dispute Defender is wired end-to-end below; the other '
-            f'seven are next. You approve before anything sends.</div>'
+            f'<div class="pagehint">Six agents, one order. Relay follows a '
+            f'single order from dropped cart to settled rupee &mdash; the same '
+            f'graph every agent reads and writes, which is why each one makes '
+            f'the others better. Your ops cost scales with orders. Relay&rsquo;s '
+            f'does not. Dispute Defender is wired end-to-end below; the other '
+            f'five are next. You approve before anything sends.</div>'
             f'<div class="atoolbar">'
             f'<span class="search-in">{ICONS["search"]}'
             f'<input placeholder="Search agents&hellip;" '
