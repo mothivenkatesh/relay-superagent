@@ -2580,7 +2580,7 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
 __SIDEBAR__
 <div class="main">
   <div class="topbar">
-    <label class="search">""" + ICONS["search"] + """<input id="pgfilter" placeholder="Filter this page&hellip;  ( / )"></label>
+    <span></span>
     <div class="right"><span class="bizchip">__BIZ__</span><span>__USER__</span><a class="logout" href="/logout">Log out</a><span class="avatar">__INITIAL__</span></div>
   </div>
   <div class="content">__CONTENT__</div>
@@ -2722,7 +2722,16 @@ function bulk(action, btn){
 })();
 (function(){
   const f = document.getElementById('pgfilter');
-  if (!f) return;
+  if (!f){
+    document.addEventListener('keydown', ev => {
+      if (ev.key === '/'
+          && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)
+          && typeof openSpot === 'function'){
+        ev.preventDefault(); openSpot();
+      }
+    });
+    return;
+  }
   const rows = () => document.querySelectorAll('.trow, .jgoalrow, .acard');
   f.addEventListener('input', () => {
     const q = f.value.toLowerCase();
