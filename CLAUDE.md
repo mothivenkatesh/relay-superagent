@@ -72,6 +72,21 @@ Agent copy source: Mothi's Relay Intro deck (~/Downloads/Relay Intro (4).html);
 the `today:` labor line on each agent card is the arbitrage frame and is the
 new product-visible expression of the thesis.
 
+## Payment Forms + KYC (grounded, do not re-invent)
+Source of truth: Mothi's memo **"Cashfree Relay - Use cases" (2026-05-21)**,
+catalogued in Arivu (sources/2026-07-16-downloads-sweep-catalog.md). Two
+template families: **Payment Forms** (verification + checkout INLINE — the
+jeweller taking a PAN above Rs 2L is the canonical example) and **KYC
+Journeys** (compliance-mapped API bundles). Four sellable components: Lead
+Screening (<10s), CDD (<30s), EDD (2-7 days, 200+ watchlists), Mule
+Detection (MuleHunter.ai, score >70 blocks). 11 journey templates incl.
+Low-Risk CDD Video-KYC bypass, Gold Verify & Pay, GIFT City VideoKYC —
+the repo's relay-* skills mirror these. Vision: peer-contributed template
+gallery, "Figma community for KYC workflows" (NOT built here).
+The distinguishing idea is verify-and-pay in ONE form, not "generate a
+payment link". Keep the component names off the shop owner's screen —
+plain words only.
+
 ## Lassie principles (captain: "think like lassie", 2026-08-05)
 Source: the lassie.ai a16z interview. Governing lessons for this build.
 - **Lead with work done, not chores owed.** "In SMBs there's nobody to
@@ -159,7 +174,24 @@ captain thinking about the next decision, not waiting.
   binaries). Ports are 5435/8790 because comarketer still owns 5434/8787
   on this machine.
 
-## Current state (2026-08-05)
+## Current state (2026-08-05, evening)
+The demo workspace IS one business now (D26): **Ojas Wellness**, an
+invented Indian D2C Ayurvedic brand (juices, A2 ghee, capsules, monthly
+refills; own store + Amazon + Flipkart + quick commerce; ~8 people; the
+logged-in user is the founder). The five old merchants are gone. Every
+dispute comes from one of Ojas's own buyers — named individuals held in
+the demo seed layer (`CUSTOMERS`, keyed by order id), display-only and
+NOT a field on `domain/models.py`. `Run.merchant_id` is a single constant
+`m_ojas` (plus `m_ojas_marketplace_unlinked`, which exists only so the
+`merchant_not_enrolled` suppression has an honest example). The demo
+policy raises `per_merchant_per_day` to 200 — tenant config, not a
+constant; `policy.py` is untouched. "merchant" is gone from all
+user-visible copy in favour of "customer". Brand identity shows in the
+sidebar, topbar and Settings. Seeded states, counted off the ledger: 7
+awaiting the gate · 7 acted · 5 resolved · 5 suppressed · 3 rejected ·
+1 timed out · 1 QA-blocked. 108 tests green; all routes 200.
+
+## Previous state (2026-08-05, afternoon)
 Virtual-back-office pass landed: `AgentType` is 7 values (THREE_WAY_RECON,
 SETTLEMENT_INSIGHTS, DISPUTE_DEFENDER, REFUND_SHIELD, CART_RESCUE,
 PAYMENT_RESCUE, COD_GUARD); `RELAY_AGENTS` carries `desk`, no `persona`,
@@ -169,9 +201,9 @@ and seeded conversations. 108 tests green; all routes 200.
 
 ## Previous state (2026-08-04, evening)
 Dispute Defender domain-complete on the inherited engine; demo workspace
-fully re-seeded (fictional Indian SMB merchants: Loomcraft Textiles, Verve
-Wellness, Bumblebee Mobility, Kavali Kitchens, Northgate Fresh; dispute
-reason codes; evidence packs). Browser-verified: Home brief, Approvals
+fully re-seeded (five fictional SMB merchants — superseded by D26, which
+replaced them with the single Ojas Wellness business; dispute reason
+codes; evidence packs). Browser-verified: Home brief, Approvals
 queue, Agents console (8 agents, live vs Coming-next badges) all render
 dispute content with zero GTM leftovers. Connectors still on fakes.
 
@@ -179,8 +211,12 @@ dispute content with zero GTM leftovers. Connectors still on fakes.
 - Product face is **Relay** (bare name — captain's explicit call, over the
   earlier "Relay SuperAgent"). The repo/folder stays `relay-superagent`
   purely to avoid filesystem/GitHub collision with Cashfree Relay repos.
-- Demo merchants must be INVENTED names. Never seed real Cashfree
-  customers/pilots (Country Chicken Co, Cure.fit, Ohsou) into fake data.
+- Demo names must be INVENTED. Never seed real Cashfree customers/pilots
+  (Country Chicken Co, Cure.fit, Ohsou) into fake data — and never a real
+  brand for the workspace business either (Ojas Wellness is invented; it
+  is Kapiva-shaped, not Kapiva).
+- The workspace is ONE business, not a portfolio. If a screen ever reads
+  like an agency managing clients, that is a positioning bug.
 - Agent lineup and copy come from the canonical intro deck, not memory —
   an earlier pass invented a 5-agent lineup with wrong metrics; the deck
   has 8 agents with locked personas and one-liners. Extract, don't recall.

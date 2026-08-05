@@ -52,7 +52,7 @@ DRAFT_SCHEMA = _schema({
     "cited_evidence_ids": {"type": "array", "items": {"type": "string"}},
     "confidence": {"type": "number"},
     "escalate": {"type": "boolean",
-                 "description": "True if a human should review before any merchant sees this"},
+                 "description": "True if a human should review before anyone at the business sees this"},
 })
 
 JUDGE_SCHEMA = _schema({
@@ -75,7 +75,8 @@ DIFF_SCHEMA = _schema({
 # at runtime.
 SEAM_PROMPTS = {
     "confirm_mention": (
-        "You screen inbound dispute/chargeback webhooks for a merchant. "
+        "You screen inbound dispute/chargeback webhooks for a small "
+        "business. "
         "Decide whether this is a genuine, actionable dispute (a real "
         "chargeback filed against a real order) as opposed to noise (a "
         "duplicate webhook redelivery, a test payload, or a notification "
@@ -86,8 +87,8 @@ SEAM_PROMPTS = {
         "buyer's claim in one tight sentence (e.g. 'buyer says the order "
         "never arrived')."),
     "draft_counter": (
-        "You draft evidence-backed responses to payment disputes for a "
-        "merchant. Rules: cite ONLY evidence ids from the list provided, "
+        "You draft evidence-backed responses to payment disputes on behalf "
+        "of a small business. Rules: cite ONLY evidence ids from the list provided, "
         "never invent a fact or a source, never use superlatives like best "
         "or leading, no contact details, 2-4 sentences, confident and "
         "specific, and reference the concrete proof (delivery record, "
@@ -105,7 +106,7 @@ SEAM_PROMPTS = {
 
 SEAM_PROMPTS["narrate"] = (
     "You rewrite a structured Relay result into one to three conversational "
-    "sentences for a merchant. Use ONLY facts present in FACTS — every "
+    "sentences for a business owner. Use ONLY facts present in FACTS — every "
     "number, name and claim in your reply must appear there verbatim. Never "
     "add analysis, advice or data that is not present. Plain, warm, direct.")
 
@@ -117,7 +118,7 @@ NARRATE_SCHEMA = {
 }
 
 SEAM_PROMPTS["semantic_diff"] = """You compare an AI-drafted dispute response with the version a human \
-merchant actually sent, and classify the edit.
+operator at the business actually sent, and classify the edit.
 
 is_material is true ONLY if the meaning changed: a different claim, a different \
 piece of evidence, an argument added or removed, or a factual correction. It is \
@@ -125,7 +126,7 @@ false for typo, grammar, tone, length or formatting changes. This value drives \
 billing, so when genuinely uncertain, choose true (the customer-favourable answer).
 
 changed: the specific differences. implies: what the edit suggests about how this \
-merchant likes to respond (one sentence). example: a short quote from the edited \
+business likes to respond (one sentence). example: a short quote from the edited \
 text that shows the preference."""
 
 
@@ -169,7 +170,7 @@ class ClaudeLlm:
             system=SEAM_PROMPTS["draft_counter"],
             user=f"Claim to respond to: {claim}\n\nOrder context: {json.dumps(deal)}\n\n"
                  f"Available evidence:\n{ev}\n\n"
-                 + (f"This merchant's style, learned from their edits:\n{style}" if style else ""),
+                 + (f"This business's style, learned from their edits:\n{style}" if style else ""),
             schema=DRAFT_SCHEMA,
         )
 

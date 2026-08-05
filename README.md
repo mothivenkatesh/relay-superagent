@@ -89,7 +89,7 @@ Relay holds the whole graph — order → payment → shipment → conversation 
 
 - **The engine, fully tested:** trigger → classify → draft → check → gate → act as a strict run state machine; append-only Postgres ledger with row-level security and write-once gate fields; ports-and-fakes adapters; multi-tenancy; supervisor stall detection. 108 tests, ~1s, no credentials needed.
 - **Dispute Defender, domain-complete:** disputes arrive as structured webhooks with a reason code; the agent structures the claim, assembles an evidence pack matched to that code, drafts the response, and files once the merchant approves. Disputes are never held out of treatment — a missed deadline is real money.
-- **The demo:** Home (one money number, what needs your yes, what the team did today, and a prompt box), Needs you, History, Your team (all 14 agents grouped by the hire they replace), and Settings.
+- **The demo:** one business, not a portfolio. The workspace is **Ojas Wellness**, an invented Indian D2C Ayurvedic brand — juices, A2 ghee, capsules and monthly refills, sold on its own store plus Amazon, Flipkart and quick commerce — and every dispute in it comes from one of its own buyers. Home (one money number, what needs your yes, what the team did today, and a prompt box), Needs you, History, Your team (all 14 agents grouped by the hire they replace), and Settings.
 - **Not live:** every connector runs on fakes. No real bank or PG webhook is attached yet, and the self-serve onboarding that the "no setup project" promise requires is not built.
 
 ## Try it
@@ -101,7 +101,7 @@ make pg                          # local Postgres 17 on :5435
 uv run python demo/server.py     # workspace on http://localhost:8790
 ```
 
-Log in with **"Continue with the demo workspace"**, then walk Home → Needs you → History → Your team.
+Log in with **"Continue with the demo workspace"**, then walk Home → Needs you → History → Your team. Names, products and buyers are invented; nothing here is a real merchant or a real dispute.
 
 ## Origin
 

@@ -42,18 +42,67 @@ from relay_superagent.tenants import (  # noqa: E402
 
 PORT = 8790
 
-# The six merchants on this Relay workspace. Defined here (ahead of
-# build_world) since the seed data and the Team/roster pages both need the
-# same canonical ids — a merchant is a merchant everywhere in this demo.
-MERCHANTS = [
-    ("m_loomcraft",  "Loomcraft Textiles",   "D2C apparel"),
-    ("m_kavali",     "Kavali Kitchens",      "QSR"),
-    ("m_verve",      "Verve Wellness",       "D2C skincare"),
-    ("m_bumblebee",  "Bumblebee Mobility",   "D2C EV accessories"),
-    ("m_sundar",     "Sundar Studio Prints", "Print-on-demand"),
-    ("m_northgate",  "Northgate Fresh Mart", "Grocery"),
-]
-MERCHANT_IDS = [m[0] for m in MERCHANTS]
+# ------------------------------------------------------------- the business
+# This workspace IS one small business, not a portfolio of them: Ojas
+# Wellness, an invented Indian D2C Ayurvedic brand — cold-pressed juices,
+# A2 ghee, capsules and monthly refills. Eight people. Its own store plus
+# Amazon, Flipkart and quick commerce. ~₹50L a month, most orders between
+# ₹700 and ₹1,400, a lot of it cash on delivery. The logged-in user is the
+# founder.
+#
+# `Run.merchant_id` means "whose business is this", so it is ONE constant
+# value here. The people raising chargebacks are this business's own buyers,
+# and they are display-only seed data (CUSTOMERS below), never a field on
+# the domain model.
+BUSINESS = "Ojas Wellness"
+BUSINESS_TAG = "Ayurvedic wellness &middot; Bengaluru"
+BUSINESS_CHANNELS = ("ojaswellness.in, Amazon, Flipkart and quick commerce")
+BUSINESS_ID = "m_ojas"
+
+# The one exception to the single-id rule: a marketplace account that has not
+# been connected to Relay yet. It is not this business's own connected store,
+# which is exactly why a dispute arriving on it gets set aside.
+UNLINKED_CHANNEL_ID = "m_ojas_marketplace_unlinked"
+
+# order_id -> (customer, what they bought, where they bought it). Display
+# only: the buyer never touches the engine, the ledger or the SQL.
+CUSTOMERS: dict[str, tuple[str, str, str]] = {
+    "order_1":  ("Priya S.",   "A2 Desi Ghee 500ml",         "our store"),
+    "order_2":  ("Rahul M.",   "Ashwagandha Gold capsules",  "monthly refill"),
+    "order_3":  ("Anjali K.",  "Aloe Vera Juice 1L",         "Amazon"),
+    "order_4":  ("Vikram R.",  "Shilajit Resin 20g",         "our store"),
+    "order_5":  ("Sneha D.",   "Amla Juice 1L",              "monthly refill"),
+    "order_6":  ("Farhan A.",  "Triphala tablets",           "Flipkart"),
+    "order_7":  ("Meera J.",   "Karela Jamun Juice 1L",      "quick commerce"),
+    "order_9":  ("Karthik V.", "Moringa capsules",           "Amazon"),
+    "order_10": ("Divya P.",   "Wild Turmeric powder",       "our store"),
+    "order_11": ("Arun N.",    "Ashwagandha Gold capsules",  "monthly refill"),
+    "order_12": ("Ritu B.",    "A2 Desi Ghee 500ml",         "Flipkart"),
+    "order_13": ("Sameer T.",  "Shilajit Resin 20g",         "our store"),
+    "order_14": ("Nandini G.", "Aloe Vera Juice 1L",         "quick commerce"),
+    "order_15": ("Harsh V.",   "Amla Juice 1L",              "Amazon"),
+    "order_16": ("Ishita R.",  "Triphala tablets",           "our store"),
+    "order_17": ("Gaurav S.",  "Karela Jamun Juice 1L",      "our store"),
+    "order_18": ("Pooja M.",   "Moringa capsules",           "monthly refill"),
+    "order_19": ("Tarun K.",   "Wild Turmeric powder",       "Amazon"),
+    "order_20": ("Lata S.",    "A2 Desi Ghee 500ml",         "our store"),
+}
+ORDER_IDS = list(CUSTOMERS)
+
+
+def customer_of(order_id: str | None) -> str:
+    row = CUSTOMERS.get(order_id or "")
+    return row[0] if row else "Unknown buyer"
+
+
+def bought(order_id: str | None) -> str:
+    row = CUSTOMERS.get(order_id or "")
+    return row[1] if row else "no matching order"
+
+
+def channel_of(order_id: str | None) -> str:
+    row = CUSTOMERS.get(order_id or "")
+    return row[2] if row else "our store"
 
 
 def _make_ledger():
@@ -72,6 +121,40 @@ def _make_ledger():
 
 
 # ---------------------------------------------------------------- seed world
+# Responses, written once per dispute reason and filled with the SKU that was
+# actually ordered. The same evidence bank backs every one of them, and every
+# row goes through the same checks as the live path.
+RESP = {
+    "RG": ("Courier proof-of-delivery shows this order of {sku} signed for and "
+           "GPS-stamped at the address on file, and the WhatsApp thread "
+           "carries the buyer's own confirmation from the same evening. "
+           "Both are attached to this reply."),
+    "RD": ("The invoice and the payment gateway agree on one reference for "
+           "this order of {sku}, and the bank settlement excerpt confirms a "
+           "single debit cleared. The second line on the buyer's "
+           "statement is an authorisation hold, not a charge, and it drops "
+           "off on its own."),
+    "RN": ("The product page snapshot from the order date matches the batch "
+           "and the seal that shipped, and the buyer's own return-request "
+           "photos show that same seal intact on the {sku} that shipped. Both "
+           "are attached."),
+    "RC": ("The refill log shows this {sku} subscription was still running "
+           "when the order was picked and packed; the cancellation is "
+           "timestamped after the parcel left the warehouse, and the refill "
+           "policy on the page that day credits the next cycle instead of "
+           "the shipped one."),
+    "RF": ("The device and the phone number on this order of {sku} match the "
+           "buyer's three earlier orders, the delivery address is the one "
+           "used on all of them, and the one-time password at checkout was "
+           "confirmed on that same number."),
+}
+CITES = {
+    "RG": ["ev_pod", "ev_wa"], "RD": ["ev_inv", "ev_bank"],
+    "RN": ["ev_listing", "ev_returnphotos"], "RC": ["ev_subs", "ev_policy"],
+    "RF": ["ev_device", "ev_otp"],
+}
+
+
 def build_world() -> Pipeline:
     clock = FakeClock(datetime(2026, 8, 3, 9, 0))
     policy = Policy(
@@ -88,40 +171,60 @@ def build_world() -> Pipeline:
             DisputeReason(id="subscription_cancelled", code="RC",
                          label="Subscription already cancelled"),
         ],
-        banned_terms=["best", "leading", "number one"], holdout_pct=0)
+        banned_terms=["best", "leading", "number one"], holdout_pct=0,
+        # Tenant config, not a constant: the cap exists to stop one business
+        # flooding an operator's day. This workspace IS one business, so the
+        # meaningful number is "how many of our own disputes may be worked in
+        # a day", and at ~₹50L a month that is not five. The safety check
+        # itself is untouched.
+        per_merchant_per_day=200)
     crm = FakeCrm(opportunities={
-        f"order_{i}": {"stage": "evaluation", "amount_band": b}
-        for i, b in enumerate(
-            ["under-1k", "1k-3k", "3k-10k", "under-1k", "1k-3k",
-             "10k+", "1k-3k", "3k-10k", "1k-3k", "under-1k",
-             "10k+", "3k-10k", "1k-3k", "under-1k", "1k-3k",
-             "3k-10k", "1k-3k", "under-1k", "3k-10k", "1k-3k"], 1)})
+        oid: {"stage": "evaluation",
+              "amount_band": ["under-1k", "1k-3k", "3k-10k"][i % 3]}
+        for i, oid in enumerate(ORDER_IDS)})
     evidence = [
         EvidenceItem("ev_pod", "t1", "RG", "delivery_proof",
-                     "Courier proof-of-delivery, signed and GPS-stamped at the doorstep",
-                     "https://ours.example/pod"),
+                     "Courier proof-of-delivery, signed and GPS-stamped at the door",
+                     "https://ojaswellness.example/proof/delivery"),
         EvidenceItem("ev_wa", "t1", "RG", "communication_log",
-                     "WhatsApp delivery-confirmation thread with the buyer",
-                     "https://ours.example/whatsapp-log"),
+                     "WhatsApp thread where the buyer confirms the parcel arrived",
+                     "https://ojaswellness.example/proof/whatsapp"),
         EvidenceItem("ev_inv", "t1", "RD", "invoice",
-                     "Original invoice matched to a single gateway transaction id",
-                     "https://ours.example/invoice"),
+                     "The order invoice, tied to one payment reference",
+                     "https://ojaswellness.example/proof/invoice"),
         EvidenceItem("ev_bank", "t1", "RD", "communication_log",
-                     "Bank settlement excerpt showing one debit, not two",
-                     "https://ours.example/bank-note"),
+                     "Bank settlement excerpt showing one debit on this order, not two",
+                     "https://ojaswellness.example/proof/settlement"),
         EvidenceItem("ev_listing", "t1", "RN", "invoice",
-                     "Product listing snapshot matching the SKU that shipped",
-                     "https://ours.example/listing"),
+                     "Product page snapshot from the order date, with the batch and seal detail",
+                     "https://ojaswellness.example/proof/listing"),
         EvidenceItem("ev_returnphotos", "t1", "RN", "communication_log",
-                     "Buyer's own return-request photos matching the listed product",
-                     "https://ours.example/return-photos"),
+                     "The buyer's own return-request photos of the bottle and its seal",
+                     "https://ojaswellness.example/proof/return-photos"),
+        EvidenceItem("ev_subs", "t1", "RC", "communication_log",
+                     "Refill subscription log, showing to the minute when it was paused or cancelled",
+                     "https://ojaswellness.example/proof/subscription-log"),
+        EvidenceItem("ev_policy", "t1", "RC", "refund_policy",
+                     "The refills and cancellation policy page as it stood on the order date",
+                     "https://ojaswellness.example/proof/refill-policy"),
+        EvidenceItem("ev_device", "t1", "RF", "communication_log",
+                     "Device, phone and delivery address matched to the buyer's earlier orders",
+                     "https://ojaswellness.example/proof/device-match"),
+        EvidenceItem("ev_otp", "t1", "RF", "invoice",
+                     "The one-time password confirmation captured on this order at checkout",
+                     "https://ojaswellness.example/proof/otp"),
     ]
     deps = Deps(clock=clock, llm=ScriptedLlm(), crm=crm, slack=FakeSlack(),
                 url_checker=FakeUrlChecker(), ledger=_make_ledger(), policy=policy,
-                evidence=evidence, enrolled_merchants=set(MERCHANT_IDS))
+                evidence=evidence, enrolled_merchants={BUSINESS_ID})
     p = Pipeline(deps)
 
-    def fire(ref, order, merchant, reason, text, claim, counter, cites):
+    def fire(ref, order, reason, text, claim, counter=None, cites=None,
+             merchant=BUSINESS_ID):
+        """One dispute from one of Ojas Wellness's own buyers. `merchant` is
+        the business, always — the buyer lives in CUSTOMERS, keyed by order."""
+        counter = counter or RESP[reason].format(sku=bought(order))
+        cites = cites or CITES[reason]
         deps.llm.mention = {"is_competitive": True, "claim_text": claim, "confidence": .9}
         deps.llm.claim = {"claim_text": claim, "speaker_role": "buyer", "confidence": .9}
         deps.llm.draft = {"counter_text": counter, "cited_evidence_ids": cites,
@@ -138,7 +241,7 @@ def build_world() -> Pipeline:
         for stage, ref in [("review", "m_lifecycle_1"), ("edited", "lc_edit"),
                            ("lost", "lc_lost"), ("qa_blocked", "lc_qa"),
                            ("not_actionable", "lc_noise"),
-                           ("merchant_not_enrolled", "lc_unenrolled"),
+                           ("merchant_not_enrolled", "lc_unlinked"),
                            ("no_order", "lc_noopp"),
                            ("recently_countered", "lc_recent"),
                            ("won", "c_won"),
@@ -151,121 +254,93 @@ def build_world() -> Pipeline:
         return p
 
     # 1) a run that will time out and escalate
-    fire("c_old", "order_6", "m_northgate",  "RD",
-         "Same order billed twice on our card, please refund one.",
-         "Buyer says the order was charged twice",
-         "The gateway settlement shows a single successful debit for this order id; "
-         "the invoice and the bank settlement excerpt both tie to one transaction, "
-         "and the second attempt shown to the buyer never captured.",
-         ["ev_inv", "ev_bank"])
+    fire("c_old", "order_6", "RD",
+         "Chargeback filed on Flipkart: buyer says the Triphala order was billed twice.",
+         "Charged twice for the triphala tablets")
     clock.advance(hours=25)
     Supervisor(deps.ledger, clock, deps.slack, policy).sweep()
 
     # 2) resolved win — approved 6 weeks ago, dispute won
-    r = fire("c_won", "order_1", "m_loomcraft", "RG",
-             "Buyer says the order never arrived.",
-             "Buyer says the order never arrived",
-             "Courier proof-of-delivery shows this order signed for and GPS-stamped "
-             "at the delivery address on the date claimed; the WhatsApp thread with "
-             "the buyer confirms receipt the same evening.",
-             ["ev_pod", "ev_wa"])
+    r = fire("c_won", "order_1", "RG",
+             "Chargeback filed: buyer says the ghee order never arrived.",
+             "Says the ghee never arrived")
     clock.advance(minutes=4)
-    p.approve(r, "m_loomcraft")
+    p.approve(r, BUSINESS_ID)
     clock.advance(days=40)
-    p.record_resolution(r, won=True, amount_paise=840_000)
+    p.record_resolution(r, won=True, amount_paise=499_600)   # a 4-jar ghee box
 
     # 3) an edit (non-material) that landed and is still open
-    r = fire("c_edit", "order_2", "m_kavali", "RD",
-             "Buyer's bank shows two debits for one order.",
-             "Buyer says they were charged twice",
-             "The invoice and the payment gateway both show one transaction id for "
-             "this order; the bank settlement excerpt confirms only one debit "
-             "cleared, the second was an authorization that was never captured.",
-             ["ev_inv", "ev_bank"])
+    r = fire("c_edit", "order_2", "RD",
+             "Chargeback filed: two debits on the card for one monthly refill.",
+             "Charged twice for the monthly ashwagandha refill")
     clock.advance(minutes=11)
-    p.edit(r, "m_kavali",
-           "Only one debit settled for this order — the gateway transaction id and "
-           "the bank settlement excerpt both confirm it. The second attempt shown "
-           "on the buyer's statement was an authorization hold that was never "
-           "captured and will drop off within a few days.")
+    deps.llm.diff = {"changed": "said the hold drops off in a few days",
+                     "is_material": False,
+                     "implies": "tell the buyer when the second line disappears"}
+    p.edit(r, BUSINESS_ID,
+           "Only one debit settled on this refill — the payment reference and "
+           "the bank settlement excerpt both say so. The second line on the "
+           "statement is an authorisation hold that was never captured, and "
+           "it drops off within a few days.")
 
     # 4) rejected
-    r = fire("c_rej", "order_3", "m_verve", "RN",
-             "Buyer says the cream isn't the one they ordered.",
-             "Buyer says the product doesn't match the listing",
-             "The listing snapshot from the order date matches the SKU that "
-             "shipped exactly; the buyer's own return-request photos show the "
-             "same packaging and batch code as the listing.",
-             ["ev_listing", "ev_returnphotos"])
+    r = fire("c_rej", "order_3", "RN",
+             "Chargeback filed on Amazon: buyer says the aloe vera juice arrived unsealed.",
+             "Says the seal on the aloe vera juice was broken")
     clock.advance(minutes=27)
-    p.reject(r, "m_verve")
+    p.reject(r, BUSINESS_ID)
 
     # 5) suppressed — same order, same reason again inside the window
-    fire("c_dup", "order_2", "m_kavali", "RD",
-         "Buyer reopened the case — still says they were double charged.",
-         "Buyer says they were charged twice", "unused", ["ev_inv"])
+    fire("c_dup", "order_2", "RD",
+         "Buyer reopened the case — still says the refill was double charged.",
+         "Reopened the charged-twice claim on the ashwagandha refill")
 
     # 6–8) three live cards awaiting review
-    fire("c_live1", "order_4", "m_bumblebee", "RG",
-         "Buyer says the scooter charger never showed up.",
-         "Buyer says the order never arrived",
-         "Courier proof-of-delivery shows the package signed for at the registered "
-         "address two days before the dispute was filed; the WhatsApp thread has "
-         "the buyer's own delivery-day confirmation message.",
-         ["ev_pod"])
+    fire("c_live1", "order_4", "RF",
+         "Chargeback filed: cardholder does not recognise this order.",
+         "Does not recognise the shilajit order")
     clock.advance(minutes=9)
-    fire("c_live2", "order_5", "m_sundar", "RD",
-         "Buyer's statement shows the print order billed twice.",
-         "Buyer says they were charged twice",
-         "One transaction id, one settlement — the invoice and the bank excerpt "
-         "for this order agree, and the duplicate line on the buyer's statement "
-         "is a pending authorization that will reverse on its own.",
-         ["ev_inv", "ev_bank"])
+    fire("c_live2", "order_5", "RC",
+         "Chargeback filed: buyer says the refill was cancelled before dispatch.",
+         "Says she cancelled the refill before it shipped")
     clock.advance(minutes=6)
-    fire("c_live3", "order_7", "m_northgate", "RN",
-         "Buyer says the grocery box had substitutes they didn't approve.",
-         "Buyer says the order doesn't match what was listed",
-         "The listing snapshot and the packed-order photo the buyer sent back "
-         "both show the same items; two SKUs were out of stock and substituted "
-         "per the standing substitution policy on file for this account.",
-         ["ev_listing", "ev_returnphotos"])
-    # a quarter of activity across the merchant roster (claims and responses
-    # cite the same evidence bank; every row passes the same checks as the
-    # live path)
-    RG_RESPONSE = ("Courier proof-of-delivery shows this order signed for at the "
-                   "registered address, and the WhatsApp thread has the buyer's "
-                   "own delivery-day confirmation — both attached.")
-    RD_RESPONSE = ("The invoice and the payment gateway agree on one transaction "
-                   "id for this order; the bank settlement excerpt confirms a "
-                   "single debit, and the second line on the buyer's statement "
-                   "is an authorization hold, not a charge.")
+    fire("c_live3", "order_7", "RN",
+         "Chargeback filed on a quick-commerce order: buyer says the juice is not what was listed.",
+         "Says the juice that arrived is not what the page showed")
+
+    # a quarter of this business's own disputes: same evidence bank, same
+    # checks, one buyer per row.
     QUARTER = [
-        # ref, order, merchant, claim, reason, action, won_amount_paise
-        ("q1",  "order_9",  "m_loomcraft", "Buyer says a second parcel never arrived",       "RG", "approve", 1_200_00),
-        ("q2",  "order_10", "m_kavali",    "Buyer's card statement shows a duplicate line",  "RD", "approve",   650_00),
-        ("q3",  "order_11", "m_verve",     "Buyer says the refill order was never delivered","RG", "approve",    None),
-        ("q4",  "order_12", "m_bumblebee", "Buyer's bank flagged a repeat charge",           "RD", "edit",      450_00),
-        ("q5",  "order_13", "m_sundar",    "Buyer says the print run never showed up",       "RG", "edit",       None),
-        ("q6",  "order_14", "m_northgate", "Buyer says the delivery slot was a no-show",     "RG", "reject",     None),
-        ("q7",  "order_15", "m_loomcraft", "Buyer's statement lists the order twice",        "RD", "approve",    None),
-        ("q8",  "order_16", "m_kavali",    "Buyer says the order never left the kitchen",    "RG", "wait",       None),
-        ("q9",  "order_9",  "m_loomcraft", "Buyer reopened — still says it's missing",       "RG", "wait",       None),
-        ("q10", "order_11", "m_verve",     "Buyer's bank disputes the refill charge",        "RD", "wait",       None),
+        # ref, order, claim, reason, action, won_amount_paise
+        ("q1",  "order_9",  "Says a second moringa parcel never arrived",     "RG", "approve", 224_700),
+        ("q2",  "order_10", "Statement shows the turmeric order twice",       "RD", "approve", 119_800),
+        ("q3",  "order_11", "Says the ashwagandha refill was never delivered","RG", "approve",    None),
+        ("q4",  "order_12", "Bank flagged a repeat charge on the ghee order", "RD", "edit",    249_800),
+        ("q5",  "order_13", "Says the shilajit resin never showed up",        "RG", "edit",       None),
+        ("q6",  "order_14", "Says the delivery slot came and went",           "RG", "reject",     None),
+        ("q7",  "order_15", "Statement lists the amla juice order twice",     "RD", "approve",    None),
+        ("q8",  "order_16", "Says the triphala order never left the warehouse","RG", "wait",      None),
+        ("q9",  "order_9",  "Reopened — still says the moringa parcel is missing", "RG", "wait",  None),
+        ("q10", "order_11", "Bank is disputing the ashwagandha refill charge","RD", "wait",       None),
     ]
-    for ref, order, merchant, claim, reason, action, won in QUARTER:
+    for ref, order, claim, reason, action, won in QUARTER:
         clock.advance(hours=13)
-        counter = RG_RESPONSE if reason == "RG" else RD_RESPONSE
-        cites = ["ev_pod", "ev_wa"] if reason == "RG" else ["ev_inv", "ev_bank"]
-        r = fire(ref, order, merchant, reason, claim + ".", claim, counter, cites)
+        r = fire(ref, order, reason, claim + ".", claim)
         clock.advance(minutes=18)
         if action == "approve":
-            p.approve(r, merchant)
+            p.approve(r, BUSINESS_ID)
         elif action == "edit":
-            deps.llm.diff = {"changed": "tightened the numbers", "is_material": False,
-                             "implies": "keep it concrete"}
-            p.edit(r, merchant, counter + " Happy to share the raw settlement export too.")
+            deps.llm.diff = ({"changed": "named the payment reference outright",
+                              "is_material": False,
+                              "implies": "quote the reference, not the wording"}
+                             if reason == "RD" else
+                             {"changed": "led with the delivery scan",
+                              "is_material": False,
+                              "implies": "put the proof in the first line"})
+            p.edit(r, BUSINESS_ID, RESP[reason].format(sku=bought(order))
+                   + " Happy to share the raw settlement export too.")
         elif action == "reject":
-            p.reject(r, merchant)
+            p.reject(r, BUSINESS_ID)
         if won:
             clock.advance(days=21)
             p.record_resolution(r, won=True, amount_paise=won)
@@ -278,71 +353,76 @@ def build_world() -> Pipeline:
             EXEMPLARS[stage] = run.run_id
         return run
 
-    # signal heard + gated (a merchant forwarding a chargeback email this time)
+    # signal heard + gated (the chargeback notice forwarded by email this time)
     clock.advance(hours=3)
     deps.llm.mention = {"is_competitive": True,
-                        "claim_text": "Buyer says the order never arrived",
+                        "claim_text": "Says the juice order never arrived",
                         "confidence": .9}
-    deps.llm.claim = {"claim_text": "Buyer says the order never arrived",
+    deps.llm.claim = {"claim_text": "Says the juice order never arrived",
                       "speaker_role": "buyer", "confidence": .9}
     deps.llm.draft = {"counter_text":
-        "The delivery address on file matches the courier's proof-of-delivery scan, "
-        "signed the same afternoon the buyer filed; the WhatsApp confirmation "
-        "thread from that day is attached, and neither shows any return request "
-        "on record before the dispute.",
+        "The delivery address on the order matches the courier's "
+        "proof-of-delivery scan, signed the same afternoon the buyer filed; "
+        "the WhatsApp confirmation from that day is attached, and there is no "
+        "return request on this karela jamun juice order before the dispute.",
         "cited_evidence_ids": ["ev_pod", "ev_wa"], "confidence": .8,
         "escalate": False}
     r = p.handle_event(TriggerEvent(
         tenant_id="t1", source="email_forward", source_ref="m_lifecycle_1",
         occurred_at=clock.now(), order_id="order_17",
-        merchant_id="m_bumblebee", dispute_id="dp_m_lifecycle_1", reason_code="RG",
-        text="Forwarding the chargeback notice — buyer says the order never arrived."))
+        merchant_id=BUSINESS_ID, dispute_id="dp_m_lifecycle_1", reason_code="RG",
+        text="Forwarding the chargeback notice — buyer says the juice order never arrived."))
     mark("review", r)
 
     # a material edit, then filed
     clock.advance(hours=1)
-    r2 = fire("lc_edit", "order_18", "m_kavali", "RD",
-              "Buyer says two separate charges hit their card for one order.",
-              "Buyer says two separate charges hit their card",
-              "The invoice and the gateway transaction id agree on one charge for "
-              "this order; the bank settlement excerpt confirms a single debit, "
-              "and the duplicate line will drop off the buyer's statement.",
-              ["ev_inv", "ev_bank"])
+    r2 = fire("lc_edit", "order_18", "RD",
+              "Chargeback filed: two separate charges for one moringa refill.",
+              "Says two charges hit the card for one refill")
     clock.advance(minutes=25)
     deps.llm.diff = {"changed": "replaced the generic settlement language with the "
                      "buyer's own bank reference number", "is_material": True,
                      "implies": "quote the buyer's own reference number back"}
-    p.edit(r2, "m_kavali",
-           "Only one debit settled for this order — reference the gateway "
-           "transaction id and the buyer's own bank reference number, both "
-           "attached. The second line is an authorization hold, not a charge, "
-           "and reverses automatically within 3-5 business days.")
+    p.edit(r2, BUSINESS_ID,
+           "Only one debit settled on this refill — quote the payment "
+           "reference and the buyer's own bank reference number, both "
+           "attached. The second line is an authorisation hold, not a charge, "
+           "and it reverses on its own within a few working days.")
     mark("edited", r2)
+
+    # the same claim, sent again a few hours later: set aside, never worked
+    # twice on the same order
+    clock.advance(hours=6)
+    deps.llm.mention = {"is_competitive": True,
+                        "claim_text": "Reopened the charged-twice claim on the refill",
+                        "confidence": .9}
+    r8 = p.handle_event(TriggerEvent(
+        tenant_id="t1", source="bank_webhook", source_ref="lc_recent",
+        occurred_at=clock.now(), order_id="order_18",
+        merchant_id=BUSINESS_ID, dispute_id="dp_lc_recent", reason_code="RD",
+        text="Buyer reopened the same duplicate-charge claim on the refill."))
+    mark("recently_countered", r8)
 
     # a loss, honestly recorded
     clock.advance(hours=2)
-    r3 = fire("lc_lost", "order_19", "m_verve", "RN",
-              "Buyer says the serum shipped is a different shade than ordered.",
-              "Buyer says the product doesn't match the listing",
-              "The listing snapshot and the batch code on the shipped unit "
-              "match; the buyer's return photos show unopened packaging, which "
-              "the shade-mismatch policy on file still credits in full.",
-              ["ev_listing", "ev_returnphotos"])
+    r3 = fire("lc_lost", "order_19", "RN",
+              "Chargeback filed on Amazon: buyer says the turmeric powder is a different shade.",
+              "Says the turmeric powder is a different shade to the photos")
     clock.advance(minutes=12)
-    p.approve(r3, "m_verve")
+    p.approve(r3, BUSINESS_ID)
     clock.advance(days=14)
     p.record_resolution(r3, won=False)
     mark("lost", r3)
 
     # QA blocks a draft that breaks the rules (banned superlative)
     clock.advance(hours=1)
-    r4 = fire("lc_qa", "order_20", "m_sundar", "RG",
-              "Buyer says the whole print order is missing.",
-              "Buyer says the order never arrived",
-              "Our delivery record is simply the best in the industry and "
-              "everyone knows it; the numbers speak for themselves and the "
-              "buyer is clearly wrong about the whole thing.",
-              ["ev_pod"])
+    r4 = fire("lc_qa", "order_20", "RG",
+              "Chargeback filed: buyer says the whole case of ghee is missing.",
+              "Says the whole case of ghee never came",
+              counter="Our delivery record is simply the best in the trade and "
+                      "everyone knows it; the numbers speak for themselves and "
+                      "the buyer is clearly wrong about the whole thing.",
+              cites=["ev_pod"])
     mark("qa_blocked", r4)
 
     # triage suppressions, one per reason
@@ -351,73 +431,58 @@ def build_world() -> Pipeline:
     r5 = p.handle_event(TriggerEvent(
         tenant_id="t1", source="bank_webhook", source_ref="lc_noise",
         occurred_at=clock.now(), order_id="order_4",
-        merchant_id="m_bumblebee", dispute_id="dp_lc_noise", reason_code="RG",
+        merchant_id=BUSINESS_ID, dispute_id="dp_lc_noise", reason_code="RG",
         text="Duplicate redelivery of a webhook already actioned — no new claim."))
     mark("not_actionable", r5)
 
-    deps.llm.mention = {"is_competitive": True, "claim_text": "Buyer says the order never arrived",
+    deps.llm.mention = {"is_competitive": True,
+                        "claim_text": "Says the amla juice refill never arrived",
                         "confidence": .9}
     r6 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="bank_webhook", source_ref="lc_unenrolled",
+        tenant_id="t1", source="bank_webhook", source_ref="lc_unlinked",
         occurred_at=clock.now(), order_id="order_5",
-        merchant_id="m_unlisted", dispute_id="dp_lc_unenrolled", reason_code="RG",
-        text="Buyer says the order never arrived."))
+        merchant_id=UNLINKED_CHANNEL_ID, dispute_id="dp_lc_unlinked",
+        reason_code="RG",
+        text="Chargeback on a marketplace account that is not connected to Relay yet."))
     mark("merchant_not_enrolled", r6)
 
+    deps.llm.mention = {"is_competitive": True,
+                        "claim_text": "Charged twice, on an order we cannot find",
+                        "confidence": .9}
     r7 = p.handle_event(TriggerEvent(
         tenant_id="t1", source="bank_webhook", source_ref="lc_noopp",
         occurred_at=clock.now(), order_id="order_missing",
-        merchant_id="m_northgate", dispute_id="dp_lc_noopp", reason_code="RD",
-        text="Buyer's bank flagged a duplicate charge on an order we can't find."))
+        merchant_id=BUSINESS_ID, dispute_id="dp_lc_noopp", reason_code="RD",
+        text="A duplicate-charge chargeback against an order we cannot find."))
     mark("no_order", r7)
 
-    r8 = p.handle_event(TriggerEvent(
-        tenant_id="t1", source="bank_webhook", source_ref="lc_recent",
-        occurred_at=clock.now(), order_id="order_18",
-        merchant_id="m_kavali", dispute_id="dp_lc_recent", reason_code="RD",
-        text="Buyer reopened the same duplicate-charge claim again."))
-    mark("recently_countered", r8)
-
-    # two shorter merchant sagas, for texture beyond the single-run exemplars
+    # one buyer's saga in full, for texture beyond the single-run exemplars
     clock.advance(days=2)
-    r10 = fire("lc_1", "order_1", "m_loomcraft", "RG",
-               "Buyer reopened: still says the replacement order never showed.",
-               "Buyer says the replacement order never arrived",
-               "The courier proof-of-delivery for the replacement shipment is "
-               "signed and dated three days after the original claim; the "
-               "WhatsApp thread has the buyer confirming receipt that evening.",
-               ["ev_pod", "ev_wa"])
+    r10 = fire("lc_1", "order_1", "RG",
+               "Buyer reopened: says the replacement ghee jar never showed either.",
+               "Says the replacement ghee jar never showed")
     clock.advance(minutes=31)
-    p.reject(r10, "m_loomcraft")
+    p.reject(r10, BUSINESS_ID)
 
     clock.advance(days=9)
-    r11 = fire("lc_2", "order_1", "m_loomcraft", "RG",
-               "Buyer's bank escalated: proof of delivery wasn't enough for them.",
-               "Buyer disputes the delivery proof itself",
-               "The courier's GPS stamp places the delivery at the registered "
-               "address, and the buyer's own WhatsApp message thanking the "
-               "rider is timestamped the same afternoon — both attached again "
-               "for the bank's escalation review.",
-               ["ev_pod", "ev_wa"])
+    r11 = fire("lc_2", "order_1", "RG",
+               "The bank escalated: it says the delivery proof on its own is not enough.",
+               "Bank says the delivery proof is not enough")
     clock.advance(minutes=14)
     deps.llm.diff = {"changed": "tightened to the bank's escalation format",
                      "is_material": False, "implies": "mirror the bank's own language"}
-    p.edit(r11, "m_loomcraft",
-           "The courier's GPS-stamped delivery scan places this at the "
-           "registered address, and the buyer's own WhatsApp message thanking "
-           "the rider is timestamped the same afternoon. Both attached for the "
-           "bank's escalation review.")
+    p.edit(r11, BUSINESS_ID,
+           "The courier's GPS-stamped scan places this ghee order at the "
+           "address on file, and the buyer's own WhatsApp message thanking the "
+           "rider is timestamped the same afternoon. Both are attached again "
+           "for the bank's escalation review.")
 
     clock.advance(days=16)         # past the 7-day suppress window
-    r12 = fire("lc_3", "order_1", "m_loomcraft", "RG",
-               "Final round: the bank asked for a signed acknowledgement too.",
-               "Bank requests a signed delivery acknowledgement",
-               "The courier's proof-of-delivery already carries a signature "
-               "captured on the handheld device at drop-off; that signature "
-               "scan is attached alongside the WhatsApp confirmation.",
-               ["ev_pod", "ev_wa"])
+    r12 = fire("lc_3", "order_1", "RG",
+               "Final round: the bank has asked for a signed acknowledgement too.",
+               "Bank asked for a signed delivery acknowledgement")
     clock.advance(minutes=9)
-    p.approve(r12, "m_loomcraft")
+    p.approve(r12, BUSINESS_ID)
 
     # exemplar pointers for stages already seeded earlier
     for run in deps.ledger.runs.values():
@@ -546,10 +611,12 @@ COMP = {"RG": "Goods not received", "RN": "Not as described",
 # the owner should never have to read one.
 PLAIN_SKIP = {
     "no_order": "no order matches this",
-    "merchant_not_enrolled": "this business isn&rsquo;t switched on",
-    "merchant_daily_cap": "already handled enough for them today",
+    "merchant_not_enrolled": "that sales channel isn&rsquo;t connected yet",
+    "merchant_daily_cap": "already handled plenty today",
     "not_actionable": "not really a dispute",
     "recent_duplicate": "same claim, already handled",
+    "recently_countered": "same claim, already answered",
+    "claim_already_handled": "same claim, already answered",
 }
 
 PLAIN_REASON = {
@@ -560,19 +627,24 @@ PLAIN_REASON = {
     "RC": "Buyer says they had already cancelled",
 }
 
-# The six merchants (defined near the top, alongside MERCHANT_IDS) live on
-# this Relay workspace, plus the small Relay-side ops team who own
-# escalations. Merchants are the "enrolled reviewers" here — each merchant's
-# own ops contact is who approves (or edits, or dismisses) the response
-# Dispute Defender drafts on their orders.
-TEAM = (
-    [(mid, name, category, "Businesses you look after", True)
-     for mid, name, category in MERCHANTS]
-    # Relay Ops (3) — own escalations, never see a queue of their own
-    + [("ops_deepa",  "Deepa Krishnan", "handles disputes", "Relay’s people", False),
-       ("ops_farhan", "Farhan Sheikh",  "looks after you",   "Relay’s people", False),
-       ("ops_riya",   "Riya Kapoor",    "support",           "Relay’s people", False)]
-)
+# The eight people who actually run Ojas Wellness, plus the small Relay-side
+# crew who pick up anything the agents hand over. "Says yes or no" marks the
+# people who can approve a reply before it goes to a bank.
+TEAM = [
+    ("u_aditya",  "Aditya Rao",      "founder",                BUSINESS, True),
+    ("u_lakshmi", "Lakshmi Menon",   "operations",             BUSINESS, True),
+    ("u_nikhil",  "Nikhil Bhat",     "customer support",       BUSINESS, True),
+    ("u_preeti",  "Preeti Nair",     "accounts",               BUSINESS, False),
+    ("u_ravi",    "Ravi Deshmukh",   "packing and dispatch",   BUSINESS, False),
+    ("u_zoya",    "Zoya Ahmed",      "marketplaces",           BUSINESS, False),
+    ("u_manish",  "Manish Gupta",    "subscriptions and refills", BUSINESS, False),
+    ("u_kavya",   "Kavya Reddy",     "social and content",     BUSINESS, False),
+    # Relay's people (3) — they pick up what needs a human, and never see a
+    # queue of their own
+    ("ops_deepa", "Deepa Krishnan",  "handles disputes",  "Relay’s people", False),
+    ("ops_arjun", "Arjun Pillai",    "looks after you",   "Relay’s people", False),
+    ("ops_riya",  "Riya Kapoor",     "support",           "Relay’s people", False),
+]
 REP = {tid: name for tid, name, _, _, _ in TEAM}
 STATE_META = {
     RunState.AWAITING_GATE: ("Needs your yes", "wait"),
@@ -592,7 +664,7 @@ def auth_page(mode: str, error: str = "") -> str:
     passwords go form → WorkOS over TLS, nothing stored here."""
     signup = mode == "signup"
     company = ('<label>Company<input name="company" required '
-               'placeholder="Loomcraft Textiles"></label>') if signup else ""
+               'placeholder="Ojas Wellness"></label>') if signup else ""
     err = f'<div class="err">{esc(error)}</div>' if error else ""
     swap = (('Already have an account? <a href="/login">Log in</a>') if signup
             else ('New here? <a href="/signup">Create a workspace</a>'))
@@ -819,7 +891,8 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
         return f'<a class="{cls}" href="{href}">{ICONS[icon]}<span>{label}</span>{extra}</a>'
     return f"""
   <aside class="sidebar">
-    <div class="brand"><span class="logo">C</span><b>Relay</b></div>
+    <div class="brand"><span class="logo">R</span>
+      <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
     {nav("/", "home", "Home", key="cmd")}
     {nav("/approvals", "tasks", "Needs you", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
     {nav("/journeys", "bolt", "History", key="journeys")}
@@ -861,16 +934,15 @@ def _identicon(seed: str, size: int = 34) -> str:
 _LOGO_COLORS = ["#5266EB", "#E8590C", "#0CA678", "#B33AB3", "#E0A800",
                 "#2B8A9E", "#D6336C", "#6741D9"]
 
-# These six are fictional demo SMB merchants (not real Cashfree customers) —
-# no real logos or domains, so every merchant renders as a letter-mark
-# avatar. Real tenants' merchants arrive with their own display name from
-# the onboarding flow and get the same letter-mark treatment automatically.
+# Buyers are people, not companies, so there is no logo to fetch — everyone
+# renders as a letter-mark avatar. The map stays because a real workspace may
+# one day carry a domain for a business-to-business buyer.
 _DOMAIN_BY_NAME: dict[str, str] = {}
 
 
 def _logo(label: str, size: int = 18) -> str:
-    """Favicon when the merchant has a real domain on file; letter-mark
-    fallback otherwise (every fictional demo merchant, today)."""
+    """Favicon when there is a real domain on file; letter-mark fallback
+    otherwise (every buyer in this demo)."""
     if not label:
         return ""
     domain = _DOMAIN_BY_NAME.get(label) or (
@@ -884,16 +956,39 @@ def _logo(label: str, size: int = 18) -> str:
             f'{esc(label[0].upper())}</span>')
 
 
+def plain_detail(d: str) -> str:
+    """Trace details are internal strings. The handful that are suppression
+    or escalation codes get said in plain words before anyone reads one."""
+    d = (d or "").strip()
+    if not d:
+        return "&mdash;"
+    if d in PLAIN_SKIP:
+        return PLAIN_SKIP[d]
+    if d == "gate_timeout":
+        return "waited a day for your yes, so a person has it now"
+    if d.startswith("stalled"):
+        return "got stuck part-way, so a person has it now"
+    if d == "drafter_escalate":
+        return "the drafter wasn&rsquo;t sure, so a person has it now"
+    if d.startswith("layer1:"):
+        return "the reply broke one of your rules, so nobody was shown it"
+    if d.startswith("judge:"):
+        return "the wording scored too low, so a person got it instead"
+    if d.startswith("llm_unavailable"):
+        return "the AI was unreachable, so a person got it instead"
+    return esc(d)
+
+
 def _account_label(r) -> str:
-    """A run's merchant id maps to its display name; anything unmapped
-    (a raw domain, an unenrolled test id) passes through as-is."""
-    a = r.merchant_id or ""
-    return REP.get(a, a)
+    """Whose dispute this is, on screen: the Ojas Wellness buyer who raised
+    it. Held in the demo seed against the order, never on the run — the run
+    only knows whose business it belongs to."""
+    return customer_of(r.order_id)
 
 
 def task_row(r) -> str:
     plain = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
-    merchant = esc(REP.get(r.merchant_id, r.merchant_id))
+    customer = esc(_account_label(r))
     when = r.occurred_at.strftime("%b %-d")
     rid = r.run_id
     counter = esc((r.decision or {}).get("counter_text", ""))
@@ -902,7 +997,8 @@ def task_row(r) -> str:
   <div class="trow">
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
-    <span class="tdesc">Reply to the bank for <b>{merchant}</b>. {plain}.
+    <span class="tdesc">Reply to the bank for <b>{customer}</b> &mdash;
+      {esc(bought(r.order_id))}. {plain}.
       <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span></span>
     <span class="tacts">
       <form method="post" action="/act"><input type="hidden" name="run" value="{rid}">
@@ -943,7 +1039,8 @@ def ledger_row(r) -> str:
     return (f'<a class="trow slim" href="/runs/{r.run_id}"><span class="ico">{ICONS["ledger"]}</span>'
             f'<span class="tdesc"><b>{PLAIN_REASON.get(r.reason_code, "A buyer disputed a payment")}</b> '
             f'<span class="stream">&ldquo;{esc(r.claim_text) if r.claim_text else "&mdash;"}&rdquo;</span> '
-            f'<span class="mut">{esc(REP.get(r.merchant_id, r.merchant_id or "&ndash;"))}</span></span>'
+            f'<span class="mut">{esc(_account_label(r))} &middot; '
+            f'{esc(bought(r.order_id))}</span></span>'
             f'{mat}{won}<span class="st {cls}">{label}{extra}</span>'
             f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>')
 
@@ -975,6 +1072,7 @@ def render(tid: str = "t1", email: str = "") -> str:
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
             .replace("__SIDEBAR__", sidebar_html("tasks", tid))
+            .replace("__BIZ__", BUSINESS)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0]))
             .replace("__NWAIT__", str(len(waiting)))
@@ -997,7 +1095,11 @@ border-right:1px solid #ECECF1;padding:14px 12px;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:12px}
 .logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
 font-size:13px;display:grid;place-items:center}
-.brand b{font-size:14px;color:var(--ink);font-weight:600}
+.brand b{font-size:14px;color:var(--ink);font-weight:600;line-height:1.15}
+.brand .bname{display:flex;flex-direction:column;gap:1px}
+.brand .biz{font-size:11px;color:var(--mut);font-weight:500;letter-spacing:.2px}
+.bizchip{border:1px solid var(--hair);border-radius:999px;padding:3px 10px;
+font-size:12px;color:var(--ink);background:#fff;white-space:nowrap}
 .pro{margin-left:auto;background:#21232E;color:#fff;font-size:10.5px;font-weight:600;
 border-radius:6px;padding:2px 7px}
 .nav{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:8px;
@@ -1304,7 +1406,7 @@ __SIDEBAR__
 <div class="main">
   <div class="topbar">
     <label class="search">""" + ICONS["search"] + """<input id="pgfilter" placeholder="Filter this page&hellip;  ( / )"></label>
-    <div class="right"><span>__USER__</span><a class="logout" href="/logout">Log out</a><span class="avatar">__INITIAL__</span></div>
+    <div class="right"><span class="bizchip">__BIZ__</span><span>__USER__</span><a class="logout" href="/logout">Log out</a><span class="avatar">__INITIAL__</span></div>
   </div>
   <div class="content">__CONTENT__</div>
 </div>
@@ -1353,7 +1455,7 @@ function jfilter(q){
     if (!r.hidden) n++;
   });
   const c = document.getElementById('jcount');
-  if (c) c.textContent = 'Showing ' + n + ' of ' + rows.length + ' merchants';
+  if (c) c.textContent = 'Showing ' + n + ' of ' + rows.length + ' customers';
   const m = document.getElementById('jmore');
   if (m) m.hidden = !!q || !!window._jall;
 }
@@ -1483,6 +1585,7 @@ def _shell(content: str, active: str, tid: str, email: str) -> str:
     return (TEMPLATE
             .replace("__CONTENT__", content)
             .replace("__SIDEBAR__", sidebar_html(active, tid))
+            .replace("__BIZ__", BUSINESS)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0])))
 
@@ -1563,6 +1666,18 @@ RELAY_AGENTS = [
         today="Payment day is one person with a bank tab open, copying "
               "account numbers. Something always goes out late.",
         replaces="the accounts payable clerk, &#8377;20&ndash;28k a month"),
+    dict(slug="payment_forms", name="Payment Forms", icon="pen",
+        status="roadmap", desk="accounts",
+        role="Billing Executive",
+        desc="Builds a payment form on the fly for anything that isn&rsquo;t "
+             "normal checkout &mdash; a bulk order, a part advance, a "
+             "subscription mandate &mdash; with any verification the rules "
+             "require built into the same form.",
+        today="Someone opens the dashboard, hand-builds a link, WhatsApps it, "
+              "then chases the customer and types the details into the books "
+              "afterwards.",
+        replaces="the billing executive who hand-builds links, "
+                 "&#8377;18&ndash;25k a month"),
     # --- Your inventory manager ------------------------------------------
     dict(slug="stock_watch", name="Stock Watch", icon="folder",
         status="roadmap", desk="inventory",
@@ -1592,11 +1707,12 @@ RELAY_AGENTS = [
     dict(slug="kyc_desk", name="KYC Desk", icon="lock",
         status="roadmap", desk="risk",
         role="KYC Verifier",
-        desc="Verifies PAN, Aadhaar, GST, RC or driving licence in seconds, "
-             "and keeps the proof for audit.",
-        today="The jewellery counter needs a PAN before a &#8377;2L sale. "
-              "Someone types the number into a portal and files a printout "
-              "while the customer waits at the counter.",
+        desc="Screens a buyer in seconds, runs the standard checks, escalates "
+             "to a deeper review when the risk calls for it, and blocks mule "
+             "accounts before any money moves.",
+        today="The counter needs a PAN before a &#8377;2L sale. Someone types "
+              "the number into a portal and files a printout while the "
+              "customer stands there waiting.",
         replaces="a KYC executive checking documents by hand, "
                  "&#8377;18&ndash;25k a month"),
     # --- Your support manager --------------------------------------------
@@ -1683,16 +1799,19 @@ def _agent_chips(slugs: list[str]) -> str:
     return f'<span class="agchips">{"".join(chips)}</span>'
 
 
-# Journey scenarios: reference-style goal names per merchant saga.
+# Journey scenarios: what your team is doing for one buyer, keyed by the
+# order the buyer disputed.
 GOAL_META = {
-    "m_loomcraft": ("Never-arrived claims",
-                    "Keep winning Loomcraft Textiles&rsquo; never-arrived claims, even when the bank asks twice."),
-    "m_kavali":    ("Charged-twice claims",
-                    "Clear Kavali Kitchens&rsquo; charged-twice claims before the next payout."),
-    "m_verve":     ("Wrong-item claims",
-                    "Get Verve Wellness&rsquo; wrong-item claims settled without paying the bank&rsquo;s fee."),
-    "m_bumblebee": ("Delivery proof",
-                    "Make sure Bumblebee Mobility has delivery proof on every never-arrived claim."),
+    "order_1":  ("Never-arrived claims",
+                 "Keep winning Priya S.&rsquo;s ghee claim, even when the bank asks twice."),
+    "order_2":  ("Charged-twice claims",
+                 "Clear Rahul M.&rsquo;s charged-twice claim on the ashwagandha refill before the next payout."),
+    "order_3":  ("Broken-seal claims",
+                 "Settle Anjali K.&rsquo;s broken-seal claim on the aloe vera juice without paying the bank&rsquo;s fee."),
+    "order_4":  ("Unknown-order claims",
+                 "Show that Vikram R. placed and confirmed the shilajit order himself."),
+    "order_5":  ("Cancelled-refill claims",
+                 "Prove when Sneha D.&rsquo;s amla juice refill was actually cancelled."),
 }
 
 
@@ -1764,17 +1883,19 @@ def workflows_content(tid: str) -> str:
          "Nobody had to notice.",
          f"{n_all} signals so far", "review"),
         ("funnel", "2 · Eligibility decides if it matters",
-         "No matching order, duplicate claim, merchant over cap &mdash; each no "
-         "is a logged row with its reason, not a silent drop.",
+         "No matching order, the same claim twice, a sales channel that "
+         "isn&rsquo;t connected &mdash; every no is written down with its "
+         "reason, never quietly dropped.",
          f"{n_sup} filtered out", "recently_countered"),
         ("pen", "3 · A response is drafted and checked",
-         "Written from your evidence library in the merchant&rsquo;s voice, then "
-         "compliance blocks anything with dead links, invented facts or hype "
-         "before a human sees it.",
+         "Written from your own proof, in the way {biz} writes, then anything "
+         "with a dead link, an invented fact or a boast is stopped before you "
+         "ever see it.".format(biz=BUSINESS),
          f"{n_drafted} drafted &middot; {n_blocked} blocked or escalated", "qa_blocked"),
         ("tasks", "4 · You decide",
-         "The merchant gets the card. Approve, edit or dismiss &mdash; nothing "
-         "files without a yes. Unanswered cards escalate to ops, never auto-file.",
+         "You get the card. Say yes, change the wording, or say no &mdash; "
+         "nothing is filed without your yes. Anything you leave goes to a "
+         "person, never files itself.",
          f"{n_wait} waiting now", "edited"),
         ("note", "5 · The response is filed with the bank",
          "Approved responses are filed onto the order exactly once, with the "
@@ -1839,6 +1960,12 @@ def _edit_history(entries) -> str:
 EV_NOTES: list = []       # (tenant_id, actor, when-str, text) — demo store
 
 
+# Evidence types are stored as the engine's snake_case strings; nobody
+# reading the vault should have to see one.
+EV_TYPE = {"delivery_proof": "delivery proof", "invoice": "invoice",
+           "communication_log": "message thread", "refund_policy": "policy page"}
+
+
 def knowledge_content(tid: str) -> str:
     ev = [e for e in WORLD.d.evidence if e.tenant_id == tid]
     notes = [m for m in WORLD.d.ledger.memory if m.tenant_id == tid
@@ -1847,22 +1974,22 @@ def knowledge_content(tid: str) -> str:
     ev_rows = _tbl(ECOLS, ["Dispute reason", "Evidence type", "What it proves", "Source"],
                    [_trow2(ECOLS, [
                        f"<b>{esc(COMP.get(e.reason_code, e.reason_code))}</b>",
-                       f'<span class="st mut">{esc(e.evidence_type)}</span>',
+                       f'<span class="st mut">{EV_TYPE.get(e.evidence_type, esc(e.evidence_type))}</span>',
                        f'<span class="mut">{esc(e.text)}</span>',
                        f'<a class="st wait" href="{esc(e.source_url)}">source &rarr;</a>'])
                     for e in ev])
     NCOLS = "1.2fr 3fr"
-    note_rows = _tbl(NCOLS, ["Merchant", "What their edits taught the drafter"],
+    note_rows = _tbl(NCOLS, ["What you changed", "What it taught the drafter"],
                      [_trow2(NCOLS, [
-                         f"<b>{esc(REP.get(m.subject_id, m.subject_id))}</b>",
-                         f'<span class="mut">{esc((m.body or {}).get("implies") or (m.body or {}).get("changed") or "style note")}</span>'])
+                         f"<b>{esc((m.body or {}).get('changed') or 'a rewording')}</b>",
+                         f'<span class="mut">{esc((m.body or {}).get("implies") or "style note")}</span>'])
                       for m in notes])
     return (f'<h1 class="page">Evidence vault</h1>'
             f'<div class="pagehint">Evidence packs by reason code. Every '
             f'dispute response cites from here &mdash; no claim ships that '
             f'you didn&rsquo;t arm it with.</div>'
             f'<h2 class="sec" id="knowledge">Evidence packs</h2>{ev_rows}'
-            f'<h2 class="sec">Your merchants&rsquo; voice &mdash; learned from their edits</h2>{note_rows}'
+            f'<h2 class="sec">Your voice &mdash; learned from the wording you change</h2>{note_rows}'
             f'<h2 class="sec">Edit history</h2>'
             f'<div class="pagehint">The evidence vault is governed: every change '
             f'has an author, a timestamp, and an approval behind it.</div>'
@@ -1872,7 +1999,7 @@ def knowledge_content(tid: str) -> str:
                  [("Courier POD feed v2", "ec-purple"), ("GPS-stamp attachment", "ec-blue")]),
                 ("Autopilot proposal", "Jul 21, 9:05 AM", "Approved by Deepa Krishnan",
                  [("Duplicate-charge bank excerpt refresh", "ec-green")]),
-                ("Farhan Sheikh", "Jul 12, 3:08 PM", "Removed",
+                ("Arjun Pillai", "Jul 12, 3:08 PM", "Removed",
                  [("Expired refund-policy PDF", "ec-amber")]),
                 ("Deepa Krishnan", "Jul 12, 3:07 PM", "Added",
                  [("WhatsApp comms-log export", "ec-blue"), ("Listing snapshot archive", "ec-orange")]),
@@ -1893,7 +2020,7 @@ def projects_content(tid: str) -> str:
     orders: dict[str, list] = {}
     for r in led.runs.values():
         if r.tenant_id == tid and r.merchant_id:
-            orders.setdefault(r.order_id or f"merchant:{r.merchant_id}", []).append(r)
+            orders.setdefault(r.order_id or "unknown_order", []).append(r)
     if not orders:
         return ('<h1 class="page">Pipeline</h1>'
                 '<div class="empty">Orders appear here once the first dispute '
@@ -1928,15 +2055,16 @@ def projects_content(tid: str) -> str:
         last = max(r.occurred_at for r in runs).strftime("%b %-d")
         entries.append((0 if waiting else (1 if not outs else 2),
                         _trow2(PCOLS, [
-            f'{_logo(label)}<b>{esc(label)}</b>',
+            f'{_logo(label)}<b>{esc(label)}</b>'
+            f'<span class="mut"> &middot; {esc(bought(oid))}</span>',
             stage,
             f'<span class="mut">{esc(", ".join(reasons)) or "&mdash;"}</span>',
             f'{len(runs)} dispute{"s" if len(runs) != 1 else ""} on this order',
             value,
             f'<span class="mut">{last}</span>',
-            f'<a class="st wait" href="/journeys?a={esc(r0.merchant_id)}">journey &rarr;</a>'])))
+            f'<a class="st wait" href="/journeys?a={esc(oid)}">journey &rarr;</a>'])))
     rows = [h for _, h in sorted(entries, key=lambda t: t[0])]
-    table = _tbl(PCOLS, ["Order", "Stage", "Dispute reason",
+    table = _tbl(PCOLS, ["Customer &amp; order", "Stage", "Dispute reason",
                          "Coverage", "Won amount", "Last seen", ""],
                  rows)
     return (f'<h1 class="page">Pipeline</h1>'
@@ -2150,13 +2278,13 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
         ACOLS = "1.1fr 2.4fr 1.2fr .9fr"
         rows2 = [_trow2(ACOLS, [
             f'<b>{esc(e["kind"])}</b>',
-            f'<span class="mut">{esc(e["detail"] or "&mdash;")}</span>',
+            f'<span class="mut">{plain_detail(e["detail"])}</span>',
             f'{_logo(_account_label(r))}{esc(_account_label(r))}',
             f'<a class="st wait" href="/runs/{r.run_id}">see it &rarr;</a>'],
         ) for e, r in mine[:25]]
         body = (f'<div class="pagehint">What this one did, newest first. '
                 f'Open any row to see the whole story it belongs to.</div>'
-                + _tbl(ACOLS, ["What it did", "Detail", "Business", ""], rows2))
+                + _tbl(ACOLS, ["What it did", "Detail", "Customer", ""], rows2))
     elif tab == "quality":
         import json as _json
         from pathlib import Path as _Path
@@ -2479,7 +2607,8 @@ def _journey_svg(events: list, run=None) -> str:
 
     if run is not None:
         kv_base = {"source": run.trigger_source,
-                   "merchant": _account_label(run),
+                   "customer": _account_label(run),
+                   "bought": bought(run.order_id),
                    "reason": COMP.get(run.reason_code, run.reason_code)}
     else:
         kv_base = {}
@@ -2489,7 +2618,7 @@ def _journey_svg(events: list, run=None) -> str:
          "day": (e["ts"].date() - day0).days + 1,
          "time": e["ts"].strftime("%-I:%M %p").lower(),
          "bubble": e.get("bubble", ""),
-         "kv": {**kv_base, **e.get("kv", {}), "detail": e["detail"] or "&mdash;"}}
+         "kv": {**kv_base, **e.get("kv", {}), "detail": plain_detail(e["detail"])}}
         for e in events])
     first_x = xs[0]
 
@@ -2596,10 +2725,10 @@ jshow(0, true);
 def account_journey_content(tid: str, acct_id: str) -> str:
     led = WORLD.d.ledger
     runs = sorted((r for r in led.runs.values()
-                   if r.tenant_id == tid and r.merchant_id == acct_id),
+                   if r.tenant_id == tid and r.order_id == acct_id),
                   key=lambda r: r.occurred_at)
     if not runs:
-        return '<h1 class="page">Account not found</h1>'
+        return '<h1 class="page">Nothing here</h1>'
     label = _account_label(runs[0])
     merged = []
     for r in runs:
@@ -2610,7 +2739,8 @@ def account_journey_content(tid: str, acct_id: str) -> str:
             merged.append({**e, "bubble": bubble, "kv": {
                 "claim": r.claim_text or "&mdash;",
                 "reason": COMP.get(r.reason_code, r.reason_code),
-                "merchant": REP.get(r.merchant_id, r.merchant_id),
+                "customer": _account_label(r),
+                "bought": bought(r.order_id),
                 "run": f'<a href="/runs/{r.run_id}">open this run &rarr;</a>'}})
     merged.sort(key=lambda e: e["ts"])
     won = 0
@@ -2620,7 +2750,10 @@ def account_journey_content(tid: str, acct_id: str) -> str:
             won += (out.outcome_value or {}).get("amount_paise") or 0
     waiting = sum(1 for r in runs if r.state is RunState.AWAITING_GATE)
     goal_line = (GOAL_META[acct_id][1] if acct_id in GOAL_META
-                 else f'Keep {esc(label)}&rsquo;s money where it belongs.')
+                 else "Work out which order this claim belongs to."
+                 if acct_id not in CUSTOMERS
+                 else esc(f"Answer {label}'s claim on the "
+                          f"{bought(acct_id)} and keep the money."))
     stats = (f'{len(runs)} things done &middot; {waiting} need your yes'
              + (f' &middot; &#8377;{inr(won)} kept' if won else ""))
     rows = "\n".join(ledger_row(r) for r in reversed(runs))
@@ -2629,6 +2762,8 @@ def account_journey_content(tid: str, acct_id: str) -> str:
         f'<div class="dhead"><a class="back2" href="/journeys">&lsaquo;</a>'
         f'<div><h1><span class="goalk">Job:</span> {goal_line}</h1>'
         f'<div class="meta">{_logo(label)}{esc(label)}'
+        f'<span>&middot;</span><span>{esc(bought(acct_id))}, '
+        f'{esc(channel_of(acct_id))}</span>'
         f'<span>&middot;</span><span>{stats}</span></div></div>'
         f'<span class="jnav"><button class="btn ghost sm jcirc" onclick="jstep(-1)">&larr;</button>'
         f'<button class="btn primary sm jcirc" onclick="jplay(this)">&#9654;</button>'
@@ -2645,19 +2780,20 @@ def account_journey_content(tid: str, acct_id: str) -> str:
 
 
 def journeys_content(tid: str, sel: str = "") -> str:
-    # Scales past the demo world: an index of every account with a journey,
-    # searchable client-side, sorted by last activity. One journey view per
-    # account behind it. Lanes are agent-agnostic (signal/decision/task/
-    # interaction), so new plays and agents land here without redesign; goal
-    # titles derive from the runs and GOAL_META only overrides the wording.
+    # One row per buyer who disputed something, keyed by the order they
+    # disputed, searchable client-side, sorted by last activity. Lanes are
+    # agent-agnostic (signal/decision/task/interaction), so new agents land
+    # here without redesign; goal titles derive from the runs and GOAL_META
+    # only overrides the wording.
     led = WORLD.d.ledger
     accts: dict[str, dict] = {}
     for r in led.runs.values():
-        if r.tenant_id != tid or not r.merchant_id or not led.trace_for(r.run_id):
+        if r.tenant_id != tid or not r.order_id or not led.trace_for(r.run_id):
             continue
-        a = accts.setdefault(r.merchant_id, {
+        a = accts.setdefault(r.order_id, {
             "n": 0, "waiting": 0, "won": 0, "lost": False,
-            "last": r.occurred_at, "comps": set(), "name": _account_label(r)})
+            "last": r.occurred_at, "comps": set(), "name": _account_label(r),
+            "bought": bought(r.order_id)})
         a["n"] += 1
         a["last"] = max(a["last"], r.occurred_at)
         if r.reason_code:
@@ -2672,8 +2808,8 @@ def journeys_content(tid: str, sel: str = "") -> str:
                 a["lost"] = True
     if not accts:
         return ('<h1 class="page">History</h1>'
-                '<div class="pagehint">Everything your team has done, business '
-                'by business: what came in, what it decided, what you said yes '
+                '<div class="pagehint">Everything your team has done, customer '
+                'by customer: what came in, what it decided, what you said yes '
                 'to, and how it ended.</div>'
                 '<div class="empty">Nothing here yet &mdash; load the sample '
                 'from Home, then come back.</div>')
@@ -2687,7 +2823,10 @@ def journeys_content(tid: str, sel: str = "") -> str:
         # titles are escaped at build below.
         if a in GOAL_META:
             return GOAL_META[a][1]
-        return esc(f"Keep {d['name']}'s money where it belongs.")
+        if a not in CUSTOMERS:
+            return "Work out which order this claim belongs to."
+        return esc(f"Answer {d['name']}'s claim on the {d['bought']} "
+                   f"and keep the money.")
 
     order = sorted(accts, key=lambda a: accts[a]["last"], reverse=True)
     SHOW = 60  # chunked render: everything is in the DOM for search/sort,
@@ -2706,9 +2845,10 @@ def journeys_content(tid: str, sel: str = "") -> str:
         stream = " stream" if i < 8 else ""
         hid = " hidden" if i >= SHOW else ""
         rows.append(
-            f'<tr class="jgoalrow" data-q="{esc(d["name"].lower())}" data-i="{i}"{hid} '
+            f'<tr class="jgoalrow" data-q="{esc((d["name"] + " " + d["bought"]).lower())}" data-i="{i}"{hid} '
             f'onclick="location=\'/journeys?a={a}\'">'
-            f'<td class="acct">{_logo(d["name"])}<b>{esc(d["name"])}</b></td>'
+            f'<td class="acct">{_logo(d["name"])}<b>{esc(d["name"])}</b>'
+            f'<span class="mut"> &middot; {esc(d["bought"])}</span></td>'
             f'<td><span class="ell{stream}">{_goal(a, d)}</span></td>'
             f'<td>{comps}</td>'
             f'<td class="num">{d["n"]}</td>'
@@ -2721,16 +2861,16 @@ def journeys_content(tid: str, sel: str = "") -> str:
     shown = min(SHOW, len(order))
     return (
         '<h1 class="page">History</h1>'
-        '<div class="pagehint">Every business your team has worked for, and '
-        'everything it did for them. Open one to play it back.</div>'
-        '<input class="jfind" placeholder="Search by name or by what happened&hellip;" '
+        '<div class="pagehint">Every customer your team has answered for you, '
+        'and everything it did. Open one to play it back.</div>'
+        '<input class="jfind" placeholder="Search by customer, product or what happened&hellip;" '
         'oninput="jfilter(this.value)">'
         f'<div class="gridcount" id="jcount">Showing {shown} of {len(order)}</div>'
         '<div class="dgridwrap"><table class="dgrid" id="jgrid">'
         '<thead><tr>'
-        '<th onclick="dsort(this)">Business</th>'
-        '<th onclick="dsort(this)">What we are doing for them</th>'
-        '<th onclick="dsort(this)">What the buyers claimed</th>'
+        '<th onclick="dsort(this)">Customer</th>'
+        '<th onclick="dsort(this)">What we are doing for you</th>'
+        '<th onclick="dsort(this)">What they claimed</th>'
         '<th onclick="dsort(this)" class="num">Things done</th>'
         '<th onclick="dsort(this)">Where it stands</th>'
         '<th onclick="dsort(this)" class="num">Last touched</th>'
@@ -2753,7 +2893,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
         f'<div class="trow slim"><span class="ico">'
         f'{ICONS[_AGENT_ICONS.get(e["agent"], "bolt")]}</span>'
         f'<span class="tdesc"><b>{esc(e["agent"])}</b> {esc(e["kind"])} '
-        f'<span class="mut">{esc(e["detail"])}</span></span>'
+        f'<span class="mut">{plain_detail(e["detail"])}</span></span>'
         f'<span class="when">{e["ts"].strftime("%b %-d, %H:%M")}</span></div>'
         for e in events) or (
         '<div class="empty">Nothing was written down for this one.</div>')
@@ -2762,8 +2902,11 @@ def run_trace_content(tid: str, run_id: str) -> str:
         '<div class="tkscope">'
         f'<div class="dhead"><a class="back2" href="/journeys" onclick="if(history.length>1){{history.back();return false}}">&lsaquo;</a>'
         f'<div><h1><span class="goalk">Job:</span> {comp_name} &mdash; '
-        f'&ldquo;{esc(r.claim_text or "claim")}&rdquo; at {esc(_account_label(r))}.</h1>'
+        f'&ldquo;{esc(r.claim_text or "claim")}&rdquo;, from '
+        f'{esc(_account_label(r))}.</h1>'
         f'<div class="meta">{_logo(_account_label(r))}{esc(_account_label(r))}'
+        f'<span>&middot;</span><span>{esc(bought(r.order_id))}, '
+        f'{esc(channel_of(r.order_id))}</span>'
         f'<span>&middot;</span><span class="st {cls}">{label}</span></div></div>'
         f'<span class="jnav"><button class="btn ghost sm jcirc" onclick="jstep(-1)">&larr;</button>'
         f'<button class="btn primary sm jcirc" onclick="jplay(this)">&#9654;</button>'
@@ -2778,34 +2921,36 @@ def run_trace_content(tid: str, run_id: str) -> str:
         + f'<h2 class="sec">Everything that happened</h2>{rows}')
 
 
-# (days ago, merchant, reason label, buyer claim, verdict, evidence, draft)
+# (days ago, customer, reason label, buyer claim, verdict, evidence, draft)
+# The look-back: what Dispute Defender would have done with Ojas Wellness's
+# own last 30 days, before it was switched on. Nothing here was ever sent.
 SHADOW_ROWS = [
-    (27, "Loomcraft Textiles",   "Says it never arrived",   "Kurta set never arrived",             "send", "2 proofs",
+    (27, "Ananya B.",  "Says it never arrived",   "A2 ghee jar never arrived",              "send", "2 proofs",
      "The courier's delivery proof is signed and stamped at the door; the WhatsApp thread confirms it arrived the same evening."),
-    (25, "Kavali Kitchens",      "Says charged twice",      "Two debits for one thali order",      "send", "2 proofs",
+    (25, "Rohit K.",   "Says charged twice",      "Two debits for one ashwagandha refill",  "send", "2 proofs",
      "One payment, one debit. The second line is a hold the bank releases on its own."),
-    (24, "Verve Wellness",       "",                        "Asking where a refund is, not a dispute", "skip", "",
+    (24, "Shruti M.",  "",                        "Asking where a refund is, not a dispute", "skip", "",
      ""),
-    (21, "Bumblebee Mobility",   "Says it never arrived",   "Scooter charger missing",             "send", "2 proofs",
-     "It was delivered two days before the buyer complained, and the buyer's own message from that day is attached."),
-    (19, "Sundar Studio Prints", "Says it was wrong",       "Print colours don't match listing",   "send", "1 proof",
-     "The listing from the day they ordered matches the batch that shipped, exactly."),
-    (17, "Northgate Fresh Mart", "Says charged twice",      "Grocery order billed twice",          "send", "2 proofs",
-     "The bill and the bank statement agree: one charge for this order."),
-    (16, "Verve Wellness",       "",                        "Buyer praised the delivery speed",    "skip", "",
+    (21, "Devang P.",  "Says it never arrived",   "Shilajit resin marked delivered, not received", "send", "2 proofs",
+     "It was delivered two days before the complaint, and the buyer's own message from that day is attached."),
+    (19, "Nisha T.",   "Says it was wrong",       "Aloe vera juice seal looked tampered",   "send", "1 proof",
+     "The listing from the order date matches the batch and the seal that shipped, exactly."),
+    (17, "Imran S.",   "Says charged twice",      "Amla juice order billed twice on Amazon","send", "2 proofs",
+     "The invoice and the bank statement agree: one charge for this order."),
+    (16, "Bhavna R.",  "",                        "Buyer praised the delivery speed",       "skip", "",
      ""),
-    (14, "Kavali Kitchens",      "Says it wasn't them",     "Card owner says order wasn't theirs", "esc",  "none",
+    (14, "Suresh N.",  "Says it wasn't them",     "Cardholder says the shilajit order wasn't his", "esc",  "none",
      ""),
-    (12, "Loomcraft Textiles",   "Says charged twice",      "Statement lists the saree twice",     "send", "2 proofs",
+    (12, "Aparna V.",  "Says charged twice",      "Statement lists the turmeric powder twice", "send", "2 proofs",
      "The payment and the bill tie this order to one charge; the second line never went through."),
-    (9,  "Bumblebee Mobility",   "Says it never arrived",   "Helmet order marked undelivered",     "send", "1 proof",
+    (9,  "Yash D.",    "Says it never arrived",   "Moringa capsules marked undelivered",    "send", "1 proof",
      "The courier's scan puts the parcel at the address they gave, signed for on the spot."),
-    (7,  "Northgate Fresh Mart", "",                        "Asking to change the delivery slot",  "skip", "",
+    (7,  "Kiran L.",   "",                        "Asking to change the refill date",       "skip", "",
      ""),
-    (5,  "Sundar Studio Prints", "Says it never arrived",   "Wedding-card box never showed",       "send", "2 proofs",
+    (5,  "Neelam J.",  "Says it never arrived",   "Karela jamun juice box never showed",    "send", "2 proofs",
      "Delivery proof plus the buyer's own WhatsApp message from the day it arrived. Both go with the reply."),
-    (2,  "Verve Wellness",       "Says it was wrong",       "Serum shade differs from photos",     "send", "2 proofs",
-     "The listing and the buyer's own return photos show the same box and the same batch."),
+    (2,  "Ganesh A.",  "Says they had cancelled", "Says the amla refill was cancelled first", "send", "2 proofs",
+     "The refill log timestamps the cancellation after the parcel left the warehouse, and the policy that day credits the next cycle."),
 ]
 
 
@@ -2925,9 +3070,10 @@ def settings_content(tid: str, s: str = "team") -> str:
         by_dept: dict[str, list] = {}
         for tid_, name, role, dept, enrolled in TEAM:
             by_dept.setdefault(dept, []).append((name, role, enrolled))
-        body = ('<div class="pagehint">The people your team works with. '
-                '&ldquo;Says yes or no&rdquo; means this person can approve a '
-                'reply before it goes out.</div>')
+        body = (f'<div class="pagehint">Everyone at {BUSINESS}, and the Relay '
+                f'people who pick up whatever the agents hand over. '
+                f'&ldquo;Says yes or no&rdquo; means this person can approve a '
+                f'reply before it goes out.</div>')
         for dept, members in by_dept.items():
             rows = "".join(
                 f'<div class="trow slim"><span class="ico">{ICONS["bot" if enrolled else "bm"]}</span>'
@@ -2959,10 +3105,17 @@ def settings_content(tid: str, s: str = "team") -> str:
                 ("Every dispute gets worked", "no experiments here &mdash; a "
                  "missed deadline is your money, not a test"),
                 ("Your record is yours", "one click, everything, in a "
-                 "spreadsheet (arriving with the first real business)"),
+                 "spreadsheet"),
                 ("Your keys are never in a file", "they live in the Mac "
                  "keychain and nowhere else")]))
-    return '<h1 class="page">Settings</h1>' + tabs + body
+    ident = (f'<div class="trow slim"><span class="ico">{ICONS["bm"]}</span>'
+             f'<span class="tdesc"><b>{BUSINESS}</b> '
+             f'<span class="mut">{BUSINESS_TAG} &middot; sells on '
+             f'{BUSINESS_CHANNELS}</span></span>'
+             f'<span class="st ok">this workspace</span></div>')
+    return ('<h1 class="page">Settings</h1>'
+            '<div class="pagehint">The business Relay is working for.</div>'
+            + ident + tabs + body)
 
 
 # ---------------------------------------------------------------- http
@@ -3035,9 +3188,10 @@ class Handler(BaseHTTPRequestHandler):
             led = WORLD.d.ledger
             buf = io.StringIO()
             w = csv.writer(buf)
-            w.writerow(["run_id", "occurred_at", "source", "merchant",
-                        "dispute_reason", "claim", "state", "gate_action",
-                        "gate_actor", "edit_material", "won", "amount_paise"])
+            w.writerow(["run_id", "occurred_at", "source", "customer",
+                        "product", "dispute_reason", "claim", "state",
+                        "gate_action", "gate_actor", "edit_material", "won",
+                        "amount_paise"])
             for r in sorted((x for x in led.runs.values()
                              if x.tenant_id == sess["tenant_id"]),
                             key=lambda x: x.occurred_at):
@@ -3045,7 +3199,8 @@ class Handler(BaseHTTPRequestHandler):
                 v = (out.outcome_value or {}) if out else {}
                 w.writerow([
                     r.run_id, r.occurred_at.isoformat(), r.trigger_source,
-                    _account_label(r), COMP.get(r.reason_code, r.reason_code),
+                    _account_label(r), bought(r.order_id),
+                    COMP.get(r.reason_code, r.reason_code),
                     r.claim_text or "", r.state.value,
                     r.gate_action.value if r.gate_action else "",
                     r.gate_actor or "", r.gate_is_material,
@@ -3471,8 +3626,8 @@ def _mini_run(r) -> str:
     counter = esc((r.decision or {}).get("counter_text", ""))
     return (f'<div class="mrun"><div class="mhead">'
             f'<span class="comp">{PLAIN_REASON.get(r.reason_code, "Dispute")}</span>'
-            f'<span class="meta">{esc(REP.get(r.merchant_id, r.merchant_id or "–"))}'
-            f' · {_logo(_account_label(r))}{esc(_account_label(r) or "–")}</span>'
+            f'<span class="meta">{_logo(_account_label(r))}'
+            f'{esc(_account_label(r))} · {esc(bought(r.order_id))}</span>'
             f'<span class="st {cls}">{label}</span></div>'
             f'<div class="mclaim">“{esc(r.claim_text)}”</div>'
             f'<div class="mcounter">{counter}</div></div>')
@@ -3560,7 +3715,8 @@ def _t_escalations(_):
     if not posts:
         return "Nothing needs a person right now.", ""
     rows = "".join(f'<div class="mrow"><b class="warn">!</b>'
-                   f'<span>{esc(b["reason"])}</span><i>“{esc(b.get("claim") or "—")[:60]}”</i></div>'
+                   f'<span>{plain_detail(b["reason"])}</span>'
+                   f'<i>“{esc(b.get("claim") or "—")[:60]}”</i></div>'
                    for _, b in posts)
     return f"{len(posts)} thing{'s' if len(posts) != 1 else ''} a person needs to look at.", \
            f'<div class="mcard">{rows}</div>'
@@ -3714,30 +3870,34 @@ def confirm(pid: str) -> dict:
 # experienceable before any keys exist. Each further call simulates one more
 # dispute webhook. Everything is labeled sample via trigger_source.
 _SAMPLE_SCENARIOS = [
-    # (merchant, reason_code, claim, dispute narrative, drafted response)
-    ("Anokhi Threads", "RG", "Buyer says the lehenga order never arrived",
-     "Chargeback filed: buyer says the lehenga order never arrived.",
-     "The courier proof-of-delivery is signed and GPS-stamped at the "
-     "registered address two days before this dispute was filed; the "
-     "WhatsApp thread includes the buyer's own delivery-day confirmation. "
-     "Both documents are attached to this filing."),
-    ("Dosa Junction", "RD", "Buyer says one order was charged twice",
+    # (customer, product, channel, reason_code, claim, narrative, response)
+    ("Rekha S.", "A2 Desi Ghee 500ml", "our store", "RG",
+     "Says the ghee order never arrived",
+     "Chargeback filed: buyer says the A2 Desi Ghee order never arrived.",
+     "The courier proof-of-delivery is signed and GPS-stamped at the address "
+     "on file two days before this dispute was filed, and the WhatsApp thread "
+     "carries the buyer's own delivery-day confirmation. Both documents are "
+     "attached to this reply."),
+    ("Jatin M.", "Amla Juice 1L", "Amazon", "RD",
+     "Says one juice order was charged twice",
      "Chargeback filed: the buyer's statement shows two debits for one order.",
-     "The invoice and the payment gateway agree on a single transaction id "
-     "for this order, and the bank settlement excerpt confirms one debit "
-     "cleared. The second line on the statement is an authorization hold "
-     "that reverses automatically."),
-    ("Meraki Skincare", "RG", "Buyer says the serum refill never showed up",
-     "Chargeback filed: buyer claims the monthly refill was never delivered.",
+     "The invoice and the payment gateway agree on a single reference for this "
+     "Amla Juice order, and the bank settlement excerpt confirms one debit "
+     "cleared. The second line on the statement is an authorisation hold that "
+     "reverses on its own."),
+    ("Deepika A.", "Ashwagandha Gold capsules", "monthly refill", "RG",
+     "Says the ashwagandha refill never showed up",
+     "Chargeback filed: buyer says the monthly refill was never delivered.",
      "Delivery proof for the refill shipment is signed and dated, and the "
-     "communication log shows the buyer acknowledging receipt that evening. "
-     "Both attach to this response."),
-    ("Trailhead Gear", "RD", "Buyer's bank flagged a repeat charge",
+     "WhatsApp thread shows the buyer acknowledging the parcel that evening. "
+     "Both are attached to this reply."),
+    ("Mohit R.", "Shilajit Resin 20g", "our store", "RD",
+     "Bank flagged a repeat charge on the shilajit order",
      "Chargeback filed: the issuing bank flagged a duplicate charge on the "
-     "trekking-pole order.",
-     "One gateway transaction id maps to one settled debit for this order; "
-     "the invoice and the bank excerpt agree, and no second capture exists "
-     "in the settlement record."),
+     "Shilajit Resin order.",
+     "One payment reference maps to one settled debit on this order; the "
+     "invoice and the bank excerpt agree, and no second capture exists in the "
+     "settlement record."),
 ]
 _sample_counters: dict[str, int] = {}
 
@@ -3771,9 +3931,13 @@ def load_sample(tid: str, email: str) -> str:
     if n is None:
         n = sum(1 for r in d.ledger.runs.values()
                 if r.tenant_id == tid and r.trigger_source == "sample")
-    acct, reason_code, claim, text, counter = _SAMPLE_SCENARIOS[n % len(_SAMPLE_SCENARIOS)]
+    (acct, product, channel, reason_code, claim, text,
+     counter) = _SAMPLE_SCENARIOS[n % len(_SAMPLE_SCENARIOS)]
     _sample_counters[tid] = n + 1
     order = f"order_{tid[:6]}_{n}"
+    # the buyer is display-only demo data, registered against the order —
+    # exactly like the seeded ones, and never a field on the run
+    CUSTOMERS[order] = (acct, product, channel)
     d.crm.opportunities[order] = {"stage": "evaluation", "amount_band": "1k-3k"}
     d.clock.advance(hours=2)
     d.llm.mention = {"is_competitive": True, "claim_text": claim, "confidence": .9}
@@ -3784,7 +3948,8 @@ def load_sample(tid: str, email: str) -> str:
                    "confidence": .82, "escalate": False}
     run = pipe.handle_event(TriggerEvent(
         tenant_id=tid, source="sample", source_ref=f"sample_{tid}_{n}",
-        occurred_at=d.clock.now(), order_id=order, merchant_id=email,
+        occurred_at=d.clock.now(), order_id=order,
+        merchant_id=BUSINESS_ID if tid == "t1" else email,
         dispute_id=f"dp_sample_{tid[:6]}_{n}", reason_code=reason_code,
         text=text))
     return run.run_id if run else ""
@@ -3887,14 +4052,25 @@ def seed_conversations() -> None:
         "and stamped with where it was dropped, and the <b>buyer&rsquo;s own "
         "WhatsApp message</b> from the day it arrived. That pair went out "
         "unchanged every time but two, and both of those were just reworded. "
-        "The delivery proof on its own wins less often.")
+        "The delivery proof on its own wins less often, especially on the "
+        "juice and ghee orders that go out cash on delivery.")
     authored(
-        "Who rewords the replies?", "Which businesses reword the replies most?",
-        "<b>Kavali Kitchens</b> most &mdash; about one reply in three, and "
-        "almost always just the wording. <b>Loomcraft Textiles</b> sends them "
-        "as they come. One real fix this quarter: a bank reference number the "
-        "reply was missing. That got written down, so no later reply left it "
-        "out again. Real fixes are how it learns; rewording costs you nothing.")
+        "Which claims do I reword?", "Which replies do I end up rewording?",
+        "The <b>charged-twice</b> ones, mostly &mdash; about one in three, and "
+        "almost always just the wording. The <b>never-arrived</b> replies go "
+        "out as they come. One real fix this quarter: a bank reference number "
+        "the reply was missing on a refill dispute. That got written down, so "
+        "no later reply left it out again. Real fixes are how it learns; "
+        "rewording costs you nothing.")
+    authored(
+        "Do the refill disputes look different?",
+        "Are the subscription disputes different from the rest?",
+        "Yes. On a monthly refill the argument is almost never about delivery "
+        "&mdash; it is <b>when the buyer cancelled</b>. So the reply leans on "
+        "the refill log, which timestamps the cancellation to the minute, and "
+        "on the policy page as it read that day. Two of the refill claims this "
+        "quarter were cancelled after the parcel had already left, and both "
+        "were answered with those two pieces of proof.")
     live("The never-arrived ones", "Show me the never-arrived ones")
     live("What needs a person", "what needs a person")
 
@@ -3946,7 +4122,11 @@ border-right:1px solid #ECECF1;padding:14px 12px;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:12px}
 .logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
 font-size:13px;display:grid;place-items:center}
-.brand b{font-size:14px;color:var(--ink);font-weight:600}
+.brand b{font-size:14px;color:var(--ink);font-weight:600;line-height:1.15}
+.brand .bname{display:flex;flex-direction:column;gap:1px}
+.brand .biz{font-size:11px;color:var(--mut);font-weight:500;letter-spacing:.2px}
+.bizchip{border:1px solid var(--hair);border-radius:999px;padding:3px 10px;
+font-size:12px;color:var(--ink);background:#fff;white-space:nowrap}
 .pro{margin-left:auto;background:#21232E;color:#fff;font-size:10.5px;font-weight:600;
 border-radius:6px;padding:2px 7px}
 .nav{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:8px;
@@ -4131,7 +4311,7 @@ __SIDEBAR__
 <div class="main">
   <div class="convhead" id="convhead"><span id="ctitle">__CONVTITLE__</span>
     <a class="newchat" id="newchat" href="/">+&ensp;New chat</a>
-    <span class="uwrap"><span class="uemail">__USER__</span>
+    <span class="uwrap"><span class="bizchip">__BIZ__</span><span class="uemail">__USER__</span>
     <a class="logout" href="/logout">Log out</a>
     <span class="avatar">__INITIAL__</span></span></div>
   <main id="main"><div class="thread" id="thread">__THREAD__
@@ -4401,10 +4581,11 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     rows = "".join(
         f'<a class="arow" href="/approvals">{ICONS["bolt"]}'
         f'<span>Wrote the reply to the bank for '
-        f'{esc(_account_label(r))}. '
+        f'{esc(_account_label(r))} &mdash; {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
         f'<span class="sub">Waiting on you &middot; '
-        f'{_logo(_account_label(r))}{esc(_account_label(r))}</span></span>'
+        f'{_logo(_account_label(r))}{esc(_account_label(r))} &middot; '
+        f'{esc(channel_of(r.order_id))}</span></span>'
         f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>'
         for r in waiting)
     active = (f'<div class="active-h"><span>What your team did today</span>'
@@ -4421,6 +4602,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__BRIEF__", brief)
             .replace("__CHIPS__", chips_html)
             .replace("__ACTIVE__", active)
+            .replace("__BIZ__", BUSINESS)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0]))
             .replace("__THREAD__", thread))

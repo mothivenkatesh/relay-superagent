@@ -399,3 +399,79 @@ worth revisiting before any pricing work.
 - *Distribution:* these owners are not in Apollo/Clay and often not on
   LinkedIn. A job posting for an accounts executive or telecaller is a
   direct buying signal for the agent that replaces it.
+
+## D26 — The demo workspace IS one business: Ojas Wellness (2026-08-05)
+
+The seed carried five merchants (Loomcraft Textiles, Kavali Kitchens,
+Verve Wellness, Bumblebee Mobility, Northgate Fresh Mart, Sundar Studio
+Prints) with disputes spread across them. That reads as an agency
+managing a client portfolio, which is the opposite of the positioning:
+one small business of five to ten people delegating its back office to a
+team of agents. Reseeded as a single invented Indian D2C Ayurvedic brand
+— **Ojas Wellness**, eight people, own store plus Amazon, Flipkart and
+quick commerce, monthly juice and capsule refills, heavy COD — and every
+dispute now comes from one of *its own buyers*.
+
+**The domain-model line that was not crossed.** `Run.merchant_id` means
+"whose business is this", so it is now a single constant (`m_ojas`) for
+the tenant. The buyer is display-only and lives in the demo seed layer
+(`CUSTOMERS`, keyed by order id), never a field on
+`domain/models.py`. Engine, pipeline, ledger, policy, SQL and tests are
+untouched. Everywhere the UI said "merchant" it now says "customer".
+
+**One deliberate second merchant_id.** `m_ojas_marketplace_unlinked`
+exists solely so the `merchant_not_enrolled` suppression still has an
+honest example — a marketplace account not yet connected to Relay. It is
+by definition not the tenant's own business, which is why it is not the
+constant.
+
+**`per_merchant_per_day` raised to 200 in the demo world's policy
+object.** With one merchant_id the default of 5 would have collapsed most
+of the seed into "suppressed: over limit". The cap is tenant config —
+data on the run, not a constant — and its purpose (stop one business
+flooding an operator's day) does not translate when the workspace *is*
+one business. `policy.py` itself is unchanged; the safety check still
+runs and still bites.
+
+**Verified, not assumed.** Seeded states counted off the ledger: 7
+awaiting the gate, 7 acted, 5 resolved, 5 suppressed (one per reason), 3
+rejected, 1 timed out, 1 blocked by QA. Every route plus all 42 agent
+tabs and all 29 run pages return 200, and no rendered page contains an
+old merchant name or the word "merchant".
+
+## D27 — Payment Forms agent, grounded in the May 21 memo (2026-08-05)
+
+Captain: "include agents generating custom payment forms on the fly" and
+"refer what Reeju also discussed about KYC use cases & payment forms."
+
+Grounding found in Arivu, not invented: Mothi's own memo **"Cashfree Relay
+- Use cases" (2026-05-21)** defines two template families —
+**Payment Forms** (verification and checkout inline, canonical example a
+jeweller taking a PAN above Rs 2L) and **KYC Journeys** (compliance-mapped
+API bundles). It names four sellable components — Lead Screening (<10s),
+CDD (<30s), EDD (2-7 days, 200+ watchlists) and Mule Detection
+(MuleHunter.ai consortium, score >70 blocks) — plus 11 journey templates
+including Low-Risk CDD Video-KYC bypass, Gold Verify & Pay and GIFT City
+VideoKYC, and a vision of a peer-contributed template gallery ("Figma
+community for KYC workflows"). The repo's own relay-* skills mirror those
+templates one-for-one.
+
+**Added: Payment Forms** (role Billing Executive, under the accounts
+manager). Builds a payment form on the fly for anything that is not normal
+checkout — a bulk order, a part advance, a subscription mandate — with the
+required verification built into the same form. That inline
+verify-then-pay shape is the memo's distinguishing idea and is what makes
+this different from "generate a payment link". Replaces the billing
+executive who hand-builds links.
+
+**Sharpened: KYC Desk** from a flat list of document types to the memo's
+four components — screen in seconds, standard checks, escalate to deeper
+review on risk, block mules before money moves — kept in plain words, no
+CDD/EDD jargon on a shop owner's screen.
+
+Roster is now 15 agents under 6 managers.
+
+**Not built, worth noting:** the memo's template-gallery vision (peer
+contributed, Figma-community-style) is a real product surface and has no
+representation here. If Payment Forms and KYC Journeys become templates
+others can publish, that is a distribution mechanism, not just a feature.

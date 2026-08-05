@@ -99,6 +99,7 @@ class AgentType(StrEnum):
     SETTLEMENT_INSIGHTS = "settlement_insights"
     CASHFLOW_FORECAST = "cashflow_forecast"
     PAYOUTS_DESK = "payouts_desk"
+    PAYMENT_FORMS = "payment_forms"
     # Your inventory manager
     STOCK_WATCH = "stock_watch"
     # Your risk & compliance manager
