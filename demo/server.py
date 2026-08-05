@@ -2054,6 +2054,8 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .stile{display:block;background:#fff;border:1px solid var(--hair);
   border-radius:14px;padding:16px 20px;color:var(--ink)}
 .stile:hover{border-color:#C7CDF3}
+.stile.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.filein{flex:1;font:inherit;font-size:13px;padding:8px;background:#fff;border:1.5px solid var(--hair);border-radius:10px}
 .stile b{display:block;font-size:26px;font-weight:600;letter-spacing:-.01em}
 .stile span{display:block;font-size:13px;font-weight:500;margin-top:4px}
 .stile i{display:block;font-style:normal;font-size:11.5px;
@@ -4448,7 +4450,7 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
             f'fifteen hands.</b> Every agent reads and writes the same '
             f'order record, so each one you switch on makes the rest '
             f'sharper.</span>'
-            f'<a href="/memory#teach">see what they teach each other '
+            f'<a href="/memory?t=teach">see what they teach each other '
             f'&rarr;</a></div>'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
@@ -5573,65 +5575,112 @@ function routineCancel(el){
 
 
 # ------------------------------------------------------------- memory
-def memory_content(tid: str) -> str:
-    """One page answering one worry: does this thing actually know my
-    business, and can I see (and correct) what it thinks it knows. Facts
-    are never overwritten: new ones sit on top, the old ones stay legible."""
+# Files the founder gives the team: price lists, policies, courier
+# agreements. Names and sizes only in the demo; agents cite them by name.
+KFILES: dict[str, list] = {}
+
+
+def seed_kfiles(tid: str) -> list:
+    return KFILES.setdefault(tid, [
+        dict(name="Refund policy Jan 2026.pdf", size="184 KB",
+             when="12 Jul", used="Cited in 9 dispute replies"),
+        dict(name="Courier agreement Bluedart.pdf", size="1.2 MB",
+             when="2 Jul", used="Backs the delivery-scan proof"),
+        dict(name="Price list Aug.xlsx", size="96 KB",
+             when="1 Aug", used="Read by the callers before offers"),
+    ])
+
+
+def memory_content(tid: str, tab: str = "voice") -> str:
+    """Knowledge, structured to grow: counts up top, tabs beneath. Every
+    tab is a list that can hold hundreds of rows without changing shape."""
     led = WORLD.d.ledger
     notes = [m for m in led.memory if m.tenant_id == tid
              and m.superseded_by is None]
     ev = [e for e in WORLD.d.evidence if e.tenant_id == tid]
+    files = seed_kfiles(tid)
     outcomes = [led.outcome_for(r.run_id) for r in led.runs.values()
                 if r.tenant_id == tid]
     n_ended = sum(1 for o in outcomes if o is not None)
 
-    voice_rows = "".join(
-        f'<div class="trow slim"><span class="ico">{ICONS["pen"]}</span>'
-        f'<span class="tdesc"><b>{esc((m.body or {}).get("changed") or "A rewording you made")}</b> '
-        f'<span class="mut">{esc((m.body or {}).get("implies") or "kept as a style note")}</span></span>'
-        f'<span class="st ok">kept</span></div>'
-        for m in notes) or ('<div class="empty">Nothing yet: the first '
-                            'time you reword a reply, what it teaches is kept '
-                            'here.</div>')
-    proof_rows = "".join(
-        f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
-        f'<span class="tdesc"><b>{esc(COMP.get(e.reason_code, e.reason_code))}</b> '
-        f'<span class="mut">{esc(e.text[:110])}</span></span></div>'
-        for e in ev[:6])
-    return (f'<h1 class="page">What your team remembers</h1>'
-            f'<div class="pagehint">Your team gets better the longer it works '
-            f'for you, because it keeps what it learns. Nothing here is ever '
-            f'overwritten: new facts sit on top of old ones, so you '
-            f'can always see how it came to know something. And it is yours: '
-            f'anything wrong, tell it and it is corrected on the spot.</div>'
-            f'<h2 class="sec">How you like things said</h2>'
-            f'<div class="pagehint">Learned from the wording you change. The '
-            f'more replies you touch, the more the next draft sounds like '
-            f'you.</div>{voice_rows}'
-            f'<h2 class="sec">Proof it keeps on file</h2>'
-            f'<div class="pagehint">Everything a reply might need to point '
-            f'at, checked for freshness every Monday. '
-            f'<a href="/knowledge"><b>See all of it &rarr;</b></a></div>'
-            f'{proof_rows}'
-            + teachings_html() +
-            f'<h2 class="sec">How things turned out</h2>'
-            f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
-            f'<span class="tdesc"><b>{n_ended} finished '
-            f'dispute{"s" if n_ended != 1 else ""} remembered</b> '
-            f'<span class="mut">how each one ended, and for how much. '
-            f'so the next similar one starts from what worked</span></span>'
-            f'<span class="st ok">kept for good</span></div>'
-            f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
-            f'<span class="tdesc"><b>Every night, it goes over the day</b> '
-            f'<span class="mut">what repeated, what worked, what to do '
-            f'differently: kept as notes you can read, never as a '
-            f'black box</span></span>'
-            f'<span class="st ok">every night</span></div>')
+    TABS = [("voice", "How you speak", len(notes)),
+            ("proof", "Proof on file", len(ev)),
+            ("files", "Files", len(files)),
+            ("teach", "What they teach each other", len(TEACHINGS)),
+            ("outcomes", "How things ended", n_ended)]
+    if tab not in {k for k, _, _ in TABS}:
+        tab = "voice"
 
+    tiles = ('<div class="stattiles">'
+             + "".join(
+        f'<a class="stile{" on" if tab == k else ""}" href="/memory?t={k}">'
+        f'<b>{n}</b><span>{lbl}</span></a>'
+        for k, lbl, n in TABS) + '</div>')
 
-# Every decision leaves a line: who, what, when, and where to see it.
-# Endpoints write here as they act; dispute yeses come straight off
-# the ledger so the trail and the money can never disagree.
+    if tab == "voice":
+        body = ('<div class="pagehint">Learned from the wording you '
+                'change. The more you touch, the more it sounds like '
+                'you.</div>'
+                + ("".join(
+            f'<div class="trow slim"><span class="ico">{ICONS["pen"]}</span>'
+            f'<span class="tdesc"><b>{esc((m.body or {}).get("changed") or "A rewording you made")}</b> '
+            f'<span class="mut">{esc((m.body or {}).get("implies") or "kept as a style note")}</span></span>'
+            f'<span class="st ok">kept</span></div>'
+            for m in notes)
+                or '<div class="empty">The first time you reword a '
+                   'reply, what it teaches lands here.</div>'))
+    elif tab == "proof":
+        by_reason = {}
+        for e in ev:
+            by_reason.setdefault(
+                COMP.get(e.reason_code, e.reason_code), []).append(e)
+        body = ('<div class="pagehint">Checked for freshness every '
+                'Monday. Every reply cites from here.</div>')
+        for reason, items in by_reason.items():
+            body += f'<h2 class="sec">{esc(reason)}</h2>'
+            body += "".join(
+                f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
+                f'<span class="tdesc"><b>{EV_TYPE.get(e.evidence_type, esc(e.evidence_type))}</b> '
+                f'<span class="mut">{esc(e.text)}</span></span>'
+                f'<span class="st ok">fresh</span></div>'
+                for e in items)
+    elif tab == "files":
+        body = ('<div class="pagehint">Anything you upload, the whole '
+                'team can read and cite.</div>'
+                + "".join(
+            f'<div class="trow slim"><span class="ico">{ICONS["note"]}</span>'
+            f'<span class="tdesc"><b>{esc(f["name"])}</b> '
+            f'<span class="mut">{esc(f["size"])} &middot; added '
+            f'{esc(f["when"])} &middot; {esc(f["used"])}</span></span>'
+            f'<span class="st ok">readable</span></div>'
+            for f in files)
+                + '<form class="notebar" method="post" '
+                'action="/api/file_upload" enctype="multipart/form-data" '
+                'style="max-width:640px;margin-top:16px">'
+                '<input type="file" name="file" class="filein" required>'
+                '<button class="btn primary sm">Upload</button></form>')
+    elif tab == "teach":
+        body = teachings_html()
+    else:
+        body = ('<div class="pagehint">How each finished dispute ended, '
+                'and what the next one starts from.</div>'
+                f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
+                f'<span class="tdesc"><b>{n_ended} finished '
+                f'dispute{"s" if n_ended != 1 else ""} remembered</b> '
+                f'<span class="mut">how each ended, and for how much</span>'
+                f'</span><span class="st ok">kept for good</span></div>'
+                f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
+                f'<span class="tdesc"><b>Every night, it goes over the '
+                f'day</b> <span class="mut">what repeated, what worked, '
+                f'kept as notes you can read</span></span>'
+                f'<span class="st ok">every night</span></div>')
+
+    return (f'<h1 class="page">Knowledge</h1>'
+            f'<div class="pagehint">Everything your team knows about your '
+            f'business. Add to it, correct it; nothing is forgotten.</div>'
+            f'{tiles}{body}')
+
+# Every decision leaves a line: who, what, when, where to see it.
 DECISION_LOG: dict[str, list] = {}
 
 
@@ -6011,11 +6060,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._redirect("/login")
             self._html(_shell(scheduled_content(sess["tenant_id"]), "scheduled",
                               sess["tenant_id"], sess.get("email", "")))
-        elif self.path == "/memory":
+        elif self.path.split("?")[0] == "/memory":
             sess = self._session()
             if not sess:
                 return self._redirect("/login")
-            self._html(_shell(memory_content(sess["tenant_id"]), "memory",
+            from urllib.parse import parse_qs as _pq, urlparse as _up
+            t = (_pq(_up(self.path).query).get("t") or ["voice"])[0]
+            self._html(_shell(memory_content(sess["tenant_id"], t), "memory",
                               sess["tenant_id"], sess.get("email", "")))
         elif self.path == "/shadow":
             sess = self._session()
@@ -6087,7 +6138,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(length).decode()
+        raw = self.rfile.read(length).decode(errors="replace")
         if self.path == "/slack/interactions":
             return self._slack_interaction(raw)
         if self.path.startswith("/webhooks/fathom"):
@@ -6302,6 +6353,31 @@ class Handler(BaseHTTPRequestHandler):
                                      "next run follows the new wording.")
             self.send_response(303)
             self.send_header("Location", "/scheduled")
+            self.end_headers(); return
+        if self.path == "/api/file_upload":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            # Minimal multipart read: the demo keeps the name and size,
+            # which is all the shelf needs to show.
+            import re as _re2
+            m = _re2.search(r'filename="([^"]+)"', raw[:4000])
+            if m:
+                name = m.group(1).split("/")[-1].split("\\")[-1][:80]
+                kb = max(1, length // 1024)
+                size = (f"{kb} KB" if kb < 1024
+                        else f"{kb / 1024:.1f} MB")
+                from datetime import datetime as _dt
+                seed_kfiles(sess["tenant_id"]).append(dict(
+                    name=name, size=size,
+                    when=_dt.now().strftime("%-d %b"),
+                    used="Not cited yet; readable to the whole team"))
+                log_decision(sess["tenant_id"],
+                             (sess.get("email") or "you").split("@")[0],
+                             "Added a file to Knowledge: <b>"
+                             + esc(name) + "</b>", "/memory?t=files")
+            self.send_response(303)
+            self.send_header("Location", "/memory?t=files")
             self.end_headers(); return
         if self.path == "/api/routine":
             sess = self._session()
