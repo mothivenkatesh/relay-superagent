@@ -800,6 +800,12 @@ WORK_CSS = """
 .quietrow .rlabel{color:var(--mut);font-weight:400}
 .quietrow:hover .rlabel{color:var(--ink,#1B1F30)}
 .qword{flex:none;font-size:10.5px;color:#B9BCC7}
+.needshdr{display:flex;align-items:center;gap:8px;margin:12px 8px 4px;
+  font-size:12px;font-weight:600;color:#9A6215}
+.needshdr .rbadge{margin:0}
+.needshdr .nharrow{margin-left:auto;color:var(--mut);opacity:0;
+  transition:opacity .12s}
+.needshdr:hover .nharrow{opacity:1}
 .rstake{flex:none;font-size:12px;font-weight:700;color:#9A6215}
 .st.need2{background:#FBF2E2;color:#9A6215}
 .arow-min .rlabel{font-size:13px}
@@ -1179,7 +1185,10 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
 
     rows = ""
     if needs:
-        rows += '<div class="navsec csec" data-st="hdr">Needs you</div>'
+        rows += (f'<a class="needshdr" href="/approvals" '
+                 f'title="Review everything in one queue">Needs you'
+                 f'<span class="rbadge">{n_need}</span>'
+                 f'<span class="nharrow">&rarr;</span></a>')
         for a, ask, stake, _n, badge in needs:
             b = (f'<span class="rbadge">{badge}</span>' if badge > 1
                  else '<span class="cdot need"></span>')
@@ -1219,9 +1228,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       oninput="railSearch(this.value)"
       onkeydown="if(event.key === 'Escape') railSearchToggle()">
     <div class="raillist" id="railresults" hidden></div>
-    <div class="railhead"><span class="navsec">Agents</span>
-      {f'<a class="rbadge" href="/approvals" title="Everything waiting on your yes">{n_need}</a>' if n_need else ''}
-    </div>
+    <div class="railhead"><span class="navsec">Agents</span></div>
     <div class="raillist" id="raillist">
       {rows}
     </div>
