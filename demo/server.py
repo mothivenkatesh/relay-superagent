@@ -1221,7 +1221,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
       <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New</span></a>
-      <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled">{ICONS["moon"]}<span>Scheduled</span></a>
+      <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
     </div>
     <input class="railsearch" id="railsearch" hidden
       placeholder="Search buyers, agents, files"
