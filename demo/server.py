@@ -1755,16 +1755,22 @@ def case_content(tid: str, order_id: str) -> str:
         opts = "".join(f'<option value="{esc(n)}"'
                        + (' selected' if n == assignee else '')
                        + f'>{esc(n)}</option>' for n in approvers)
+        # One control, no button: pick a name and it is theirs. The label
+        # is the select itself, so the state and the action are one thing.
         assign_ui = (
             f'<div class="assignbar">'
             + (f'<span>Waiting on <b>{esc(assignee)}</b> to say yes.</span>'
                if assignee else
-               '<span>This yes is with you.</span>')
+               '<span>This yes is with <b>you</b>.</span>')
             + f'<form method="post" action="/api/assign">'
+            f'<label class="assignlbl" for="assignsel">Whose yes:</label>'
+            f'<select class="assignsel" id="assignsel" name="name" '
+            f'onchange="this.form.submit()">'
+            f'<option value=""{"" if assignee else " selected"}>You</option>'
+            f'{opts}</select>'
             f'<input type="hidden" name="order" value="{esc(order_id)}">'
-            f'<select class="assignsel" name="name">'
-            f'<option value="">you</option>{opts}</select>'
-            f'<button class="btn ghost sm">Hand it over</button></form></div>')
+            f'<noscript><button class="btn ghost sm">Move it</button>'
+            f'</noscript></form></div>')
     note_box = (
         f'<form class="notebar" method="post" action="/api/note" '
         f'style="max-width:640px;margin-top:14px">'
@@ -2038,6 +2044,29 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
   border:1px solid #F0DCB4;border-radius:12px;padding:12px 16px;
   margin:0 0 16px;font-size:13.5px;flex-wrap:wrap}
 .assignbar form{display:flex;gap:8px;align-items:center;margin-left:auto}
+.assignlbl{font-size:12px;color:var(--mut)}
+.thread2{max-width:640px;background:#fff;border:1px solid var(--hair);
+  border-radius:14px;padding:8px 16px;margin:4px 0 8px}
+.thr{display:flex;gap:10px;align-items:flex-start;padding:11px 0;
+  border-bottom:1px solid #F1F1F5;font-size:13.5px}
+.thr:last-child{border-bottom:0}
+.thr .tht{flex:none;width:98px;font-size:11.5px;color:var(--mut);
+  padding-top:3px;font-variant-numeric:tabular-nums}
+.thr .thb{flex:1;line-height:1.55}
+.thr.open .thb{font-weight:500;color:var(--ink)}
+.thr.close{background:#FAFDF9;margin:0 -16px;padding:11px 16px;
+  border-radius:0 0 14px 14px}
+.chch{flex:none;font-size:11px;font-weight:700;border-radius:7px;
+  padding:3px 9px;margin-top:1px;letter-spacing:.03em}
+.chc{background:#EAEFFB;color:#2B4AA8}
+.chw{background:#E7F6EC;color:#177245}
+.tiers{max-width:640px}
+.tier{background:#fff;border:1px solid var(--hair);border-radius:12px;
+  padding:13px 16px;margin-bottom:8px}
+.tierh{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.tierh b{font-size:14px}
+.tierh .st{margin-left:auto}
+.tier p{margin:0;font-size:13px;color:var(--text);line-height:1.55}
 .assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:6px 10px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
@@ -3049,6 +3078,100 @@ DESK_ACCESS = {
 
 DEMO_ON: dict[str, bool] = {}    # slug -> switched on (demo state, in-memory)
 
+# One rescue, followed through: the multithreaded story a founder needs to
+# see to believe a caller agent. Voice and WhatsApp are one conversation to
+# the buyer; the agent waits, switches channel, retries at a sane hour, and
+# stops when told. Times are offsets, not clock times, so the story is
+# stable however long the demo has been up.
+AGENT_THREADS = {
+    "cart_rescue": dict(
+        opening="6:12 PM. Vikram leaves a &#8377;1,899 Shilajit order at checkout.",
+        closing="Won back &#8377;1,899. Three touches over two days, then it "
+                "stops. A buyer who says stop is never contacted again.",
+        won="&#8377;1,899 paid",
+        rows=[
+            ("+30 min", "call", "Calls Vikram. No answer. It does not ring "
+             "twice in a row.", "missed"),
+            ("+32 min", "wa", "&ldquo;Your cart is saved. Pay in one tap "
+             "whenever you are ready.&rdquo; Payment link attached.", "delivered"),
+            ("next day, 11 AM", "call", "Second call, at a sane hour. Vikram "
+             "answers: he wanted COD. The agent offers the prepaid "
+             "discount instead.", "2 min call"),
+            ("+2 min", "wa", "Fresh link with the discount applied.", "paid"),
+        ]),
+    "payment_rescue": dict(
+        opening="8:41 PM. Sneha&rsquo;s UPI payment fails on a &#8377;549 "
+                "refill. The bank timed out; she does not know if she paid.",
+        closing="Saved the order the same evening. The agent read the "
+                "decline reason first, so every follow-up matched what "
+                "actually went wrong.",
+        won="&#8377;549 paid",
+        rows=[
+            ("+5 min", "wa", "&ldquo;That payment did not go through and "
+             "nothing was charged. Here is a fresh link.&rdquo;", "read"),
+            ("+20 min", "call", "No payment yet, so it calls. Sneha retries "
+             "on the call; her card declines this time (limit).", "3 min call"),
+            ("+1 min", "wa", "New link with UPI and card both open, plus "
+             "&ldquo;pay on delivery&rdquo; as the fallback.", "paid"),
+        ]),
+}
+
+
+def risk_ladder_html() -> str:
+    """Agentic due diligence: the depth of the check follows the risk, and
+    the deep tier is honestly long horizon. The agent holds an open check
+    for days, wakes when a registry answers, and never blocks the buyer
+    with an error screen while it waits."""
+    tiers = [
+        ("Every buyer", "under 10 seconds",
+         "A quiet screen: phone, device, order history. The buyer sees "
+         "nothing and waits for nothing.", "ok"),
+        ("Higher value, or something odd", "under 30 seconds",
+         "The standard checks, inside the payment form. PAN collected "
+         "where the rules ask for it; verify and pay stay one step.", "ok"),
+        ("Real risk", "2 to 7 days",
+         "A deeper look: watchlists, registries, and a person on the "
+         "decision. The agent holds the case open, wakes when each answer "
+         "lands, and keeps you posted. The buyer sees &ldquo;under "
+         "review&rdquo;, never an error.", "wait"),
+        ("A mule score above the line", "instant",
+         "Blocked before any money moves. Said to you plainly, with the "
+         "score and the reason.", "warn"),
+    ]
+    rows = "".join(
+        f'<div class="tier"><div class="tierh"><b>{name}</b>'
+        f'<span class="st {cls}">{t}</span></div>'
+        f'<p>{body}</p></div>'
+        for name, t, body, cls in tiers)
+    return (f'<h2 class="sec">Depth follows risk</h2>'
+            f'<div class="pagehint">Most buyers get seconds. Real risk '
+            f'gets days. The agent does not forget an open check: it '
+            f'wakes when the answer lands, even a week later.</div>'
+            f'<div class="tiers">{rows}</div>')
+
+
+def thread_html(slug: str) -> str:
+    t = AGENT_THREADS.get(slug)
+    if not t:
+        return ""
+    CH = {"call": ("Call", "chc"), "wa": ("WhatsApp", "chw")}
+    rows = "".join(
+        f'<div class="thr"><span class="tht">{when}</span>'
+        f'<span class="chch {CH[ch][1]}">{CH[ch][0]}</span>'
+        f'<span class="thb">{text}</span>'
+        f'<span class="st {"ok" if stat == "paid" else "mut"}">{stat}</span>'
+        f'</div>'
+        for when, ch, text, stat in t["rows"])
+    return (f'<h2 class="sec">One rescue, followed through</h2>'
+            f'<div class="pagehint">Voice and WhatsApp are one conversation '
+            f'to the buyer. The agent waits, switches channel, and picks '
+            f'its hour. This runs over days, not minutes.</div>'
+            f'<div class="thread2">'
+            f'<div class="thr open"><span class="thb">{t["opening"]}</span></div>'
+            f'{rows}'
+            f'<div class="thr close"><span class="thb">{t["closing"]}</span>'
+            f'<span class="st ok">{t["won"]}</span></div></div>')
+
 # One outcome, three-or-four steps. The Razorpay Agent Studio grammar:
 # say what you get, then how, in one glance — never a wall of rows.
 AGENT_STORY = {
@@ -3244,6 +3367,8 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
         f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
+        f'{thread_html(a["slug"])}'
+        f'{risk_ladder_html() if a["slug"] == "kyc_desk" else ""}'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
         f'<h2 class="sec">When a person takes over</h2>{handoff}'
         f'{_kyc_builder(tid) if a["slug"] == "kyc_desk" else ""}'
