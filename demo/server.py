@@ -9015,7 +9015,6 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         f'{mention(_account_label(r))} &middot; {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
         f'<span class="sub">{auto_send_chip(r) or "Waiting on you"} &middot; '
-        f'{_logo(_account_label(r))}{esc(_account_label(r))} &middot; '
         f'{esc(channel_of(r.order_id))}</span></span>'
         f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>'
         for r in waiting)
