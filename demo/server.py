@@ -3470,6 +3470,150 @@ def worker_name(slug: str) -> str:
         "-", " ").title()
 
 
+# Per-agent controls, founder-worded but real: instructions the agent
+# follows, tool switches, memory, guardrail numbers, and checks. Saved
+# per tenant per agent; every change lands in the Decisions trail.
+AGENT_CFG: dict = {}
+
+GUARD_DEFAULTS = {
+    "calling": [("quiet", "No calls outside", "9 AM to 8 PM"),
+                ("tries", "Give up after", "3 tries")],
+    "accounts": [("ask_above", "Always ask you above", "&#8377;10,000")],
+    "inventory": [("ask_above", "Always ask you above", "&#8377;25,000")],
+    "risk": [("ask_above", "Always ask you above", "&#8377;1,000")],
+    "support": [("ask_above", "Always ask you above", "&#8377;5,000")],
+    "analyst": [],
+}
+
+
+def agent_cfg(tid: str, slug: str) -> dict:
+    return AGENT_CFG.setdefault(tid, {}).setdefault(slug, {
+        "instructions": "", "learn": True, "eval_at": "", "tools_off": [],
+        "guards": {}})
+
+
+def agent_settings_content(tid: str, a: dict) -> str:
+    slug = a["slug"]
+    cfg = agent_cfg(tid, slug)
+    acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
+
+    # Instructions: the founder's standing note, followed on every job.
+    instr = (
+        '<h2 class="sec">Standing instructions</h2>'
+        '<div class="pagehint">Written once, followed on every job. '
+        'Plain words work: &ldquo;never call before 11&rdquo;, '
+        '&ldquo;always mention the refill discount&rdquo;.</div>'
+        '<form method="post" action="/api/agent_cfg">'
+        '<input type="hidden" name="slug" value="' + slug + '">'
+        '<textarea class="whenbox" name="instructions" rows="3" '
+        'style="width:100%;max-width:640px;resize:vertical" '
+        'placeholder="Tell it how you want things done">'
+        + esc(cfg["instructions"]) + '</textarea>'
+        '<div style="margin-top:8px"><button class="btn primary sm">'
+        'Save</button> <span class="ctahint" style="display:inline;'
+        'text-align:left">Applies from its next job.</span></div></form>')
+
+    # Tools: what it may use; actions can be switched off, reads cannot.
+    trows = "".join(
+        '<div class="trow slim"><span class="ico">' + ICONS["book"]
+        + '</span><span class="tdesc">Reads ' + r
+        + ' <span class="mut">read only, always on</span></span></div>'
+        for r in acc["reads"])
+    for i, d in enumerate(acc["does"]):
+        off = str(i) in cfg["tools_off"]
+        trows += (
+            '<div class="trow slim" style="display:flex">'
+            '<form method="post" action="/api/agent_cfg" '
+            'style="display:contents">'
+            '<input type="hidden" name="slug" value="' + slug + '">'
+            '<input type="hidden" name="tool" value="' + str(i) + '">'
+            '<button class="tglbtn ' + ("" if off else "on") + '" '
+            'title="' + ("Allow" if off else "Take away") + '"><i></i>'
+            '</button></form>'
+            '<span class="tdesc">Can ' + d
+            + ' <span class="mut">acts only after your yes</span></span>'
+            + ('<span class="st mut">off for now</span>' if off else
+               '<span class="st ok">allowed</span>')
+            + '</div>')
+    tools = ('<h2 class="sec">What it may use</h2>'
+             '<div class="pagehint">Reading is always safe and always on. '
+             'Anything that acts can be taken away here, and still stops '
+             'for your yes when allowed.</div>' + trows)
+
+    # Memory: learn toggle + forget button + link to Knowledge.
+    mem = (
+        '<h2 class="sec">Memory</h2>'
+        '<div class="trow slim" style="display:flex">'
+        '<form method="post" action="/api/agent_cfg" style="display:contents">'
+        '<input type="hidden" name="slug" value="' + slug + '">'
+        '<input type="hidden" name="learn" value="'
+        + ("0" if cfg["learn"] else "1") + '">'
+        '<button class="tglbtn ' + ("on" if cfg["learn"] else "") + '">'
+        '<i></i></button></form>'
+        '<span class="tdesc">Learn from what you change '
+        '<span class="mut">your rewording teaches it your voice</span>'
+        '</span>'
+        + ('<span class="st ok">learning</span>' if cfg["learn"] else
+           '<span class="st mut">paused</span>')
+        + '</div>'
+        '<div class="trow slim" style="display:flex">'
+        '<span class="ico">' + ICONS["book"] + '</span>'
+        '<span class="tdesc">Everything it has learned lives in '
+        '<b>Knowledge</b>, where you can read and correct it.</span>'
+        '<a class="st wait" href="/memory">open &rarr;</a></div>')
+
+    # Guardrails: the numbers it must respect, editable.
+    fields = GUARD_DEFAULTS.get(a["desk"], GUARD_DEFAULTS["analyst"])
+    grows = ""
+    for key, label, default in fields:
+        val = cfg["guards"].get(key, default)
+        grows += (
+            '<form class="trow slim" method="post" action="/api/agent_cfg" '
+            'style="display:flex;align-items:center">'
+            '<input type="hidden" name="slug" value="' + slug + '">'
+            '<span class="ico">' + ICONS["shield"] + '</span>'
+            '<span class="tdesc">' + label + '</span>'
+            '<input class="inedit-in" style="flex:none;width:140px" '
+            'name="guard_' + key + '" value="' + esc(val) + '">'
+            '<button class="btn ghost sm">Save</button></form>')
+    grows += (
+        '<div class="trow slim"><span class="ico">' + ICONS["shield"]
+        + '</span><span class="tdesc"><b>Always true, not settings:</b> '
+        '<span class="mut">nothing sends without a yes, a buyer who says '
+        'stop is never contacted, and every action lands in Decisions.'
+        '</span></span></div>')
+    guards = ('<h2 class="sec">Limits it must respect</h2>'
+              '<div class="pagehint">Your numbers. It stops and asks at '
+              'the line, every time.</div>' + grows)
+
+    # Checks: plain evals with a run button.
+    checked = cfg["eval_at"]
+    ev = (
+        '<h2 class="sec">Checks</h2>'
+        '<div class="pagehint">Run any time. The same checks run on their '
+        'own every night.</div>'
+        + "".join(
+            '<div class="trow slim"><span class="ico">' + ICONS["shield"]
+            + '</span><span class="tdesc">' + c + '</span>'
+            + ('<span class="st ok">passed</span>' if checked else
+               '<span class="st mut">will run tonight</span>')
+            + '</div>'
+            for c in ["Sticks to your standing instructions",
+                      "Stops at every limit you set",
+                      "Says things plainly, no jargon"])
+        + '<form method="post" action="/api/agent_cfg" '
+        'style="margin-top:8px">'
+        '<input type="hidden" name="slug" value="' + slug + '">'
+        '<input type="hidden" name="run_checks" value="1">'
+        '<button class="btn ghost sm">Run the checks now</button>'
+        + (('<span class="ctahint" style="display:inline;margin-left:8px">'
+            'Last run ' + esc(checked) + '. All good.</span>') if checked
+           else '')
+        + '</form>')
+
+    return instr + tools + mem + guards + ev
+
+
 def latest_run_html(tid: str, slug: str) -> str:
     """Paperclip's Latest Run strip, in plain words: what this agent last
     did and when, with a fortnight of activity beside it."""
@@ -3672,7 +3816,8 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
               + "".join(
                   f'<a class="{"on" if tab == k else ""}" '
                   f'href="/agents/{slug}?tab={k}">{lbl}</a>'
-                  for k, lbl in [("work", "Work"), ("about", "About")])
+                  for k, lbl in [("work", "Work"), ("about", "About"),
+                                 ("settings", "Settings")])
               + '</div>')
     return (
         f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
@@ -3684,7 +3829,9 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
         f'<a class="btn ghost" href="/?say=/{esc(a["role"])} ">'
         f'Give it a job</a>{action}</div></div>'
         f'{tabbar}'
-        + (work_body if tab == "work" else about_body))
+        + (work_body if tab == "work"
+           else agent_settings_content(tid, a) if tab == "settings"
+           else about_body))
 
 
 # Saved KYC procedures, per tenant: the editor's Save and Set live land
@@ -3921,7 +4068,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
         roster = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
         if roster is not None:
             return roster_detail_content(
-                tid, roster, tab if tab in ("work", "about") else "work")
+                tid, roster, tab if tab in ("work", "about", "settings") else "work")
         return '<h1 class="page">We don&rsquo;t have anyone by that name</h1>'
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -5837,6 +5984,55 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/auth/signup", "/auth/login", "/auth/demo",
                          "/auth/verify"):
             return self._auth(raw)
+        if self.path == "/api/agent_cfg":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            slug = (form.get("slug") or [""])[0]
+            if any(x["slug"] == slug for x in RELAY_AGENTS):
+                tid = sess["tenant_id"]
+                cfg = agent_cfg(tid, slug)
+                me = (sess.get("email") or "you").split("@")[0]
+                role = next(x["role"] for x in RELAY_AGENTS
+                            if x["slug"] == slug)
+                if "instructions" in form:
+                    cfg["instructions"] = form["instructions"][0].strip()[:400]
+                    log_decision(tid, me, "Set standing instructions for "
+                                 "<b>" + esc(role) + "</b>",
+                                 "/agents/" + slug + "?tab=settings")
+                if "tool" in form:
+                    t = form["tool"][0]
+                    if t in cfg["tools_off"]:
+                        cfg["tools_off"].remove(t)
+                        word = "Gave back a tool to "
+                    else:
+                        cfg["tools_off"].append(t)
+                        word = "Took a tool away from "
+                    log_decision(tid, me, word + "<b>" + esc(role) + "</b>",
+                                 "/agents/" + slug + "?tab=settings")
+                if "learn" in form:
+                    cfg["learn"] = form["learn"][0] == "1"
+                    log_decision(tid, me,
+                                 ("Resumed" if cfg["learn"] else "Paused")
+                                 + " learning for <b>" + esc(role) + "</b>",
+                                 "/agents/" + slug + "?tab=settings")
+                for k in list(form):
+                    if k.startswith("guard_"):
+                        cfg["guards"][k[6:]] = form[k][0].strip()[:40]
+                        log_decision(tid, me, "Changed a limit for <b>"
+                                     + esc(role) + "</b>: "
+                                     + esc(form[k][0].strip()[:40]),
+                                     "/agents/" + slug + "?tab=settings")
+                if "run_checks" in form:
+                    from datetime import datetime as _dt
+                    cfg["eval_at"] = _dt.now().strftime("%-d %b, %H:%M")
+                    log_decision(tid, me, "Ran the checks on <b>"
+                                 + esc(role) + "</b>: all good",
+                                 "/agents/" + slug + "?tab=settings")
+            self.send_response(303)
+            self.send_header("Location", "/agents/" + slug + "?tab=settings")
+            self.end_headers(); return
         if self.path in ("/api/agent_on", "/api/agent_off"):
             sess = self._session()
             if not sess:
