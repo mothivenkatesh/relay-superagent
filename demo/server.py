@@ -800,6 +800,36 @@ WORK_CSS = """
 .quietrow .rlabel{color:var(--mut);font-weight:400}
 .quietrow:hover .rlabel{color:var(--ink,#1B1F30)}
 .qword{flex:none;font-size:10.5px;color:#B9BCC7}
+.spot-scrim{position:fixed;inset:0;background:rgba(24,25,32,.4);z-index:80;
+  display:none}
+.spot-scrim.open{display:block}
+.spot{position:fixed;top:12vh;left:50%;transform:translateX(-50%);
+  width:min(640px,94vw);background:#fff;border-radius:16px;z-index:81;
+  box-shadow:0 24px 80px rgba(24,25,32,.3);overflow:hidden;display:none}
+.spot.open{display:block}
+.spot-head{display:flex;align-items:center;gap:12px;padding:16px 20px;
+  border-bottom:1px solid var(--hair,#E8E9EF)}
+.spot-head svg{width:18px;height:18px;color:#8A8D9C;flex:none}
+.spot-in{flex:1;border:0;outline:none;font:inherit;font-size:16px;
+  color:var(--ink,#1B1F30)}
+.spot-in::placeholder{color:#9A9DAB}
+.spot-x{border:0;background:none;font-size:16px;color:#8A8D9C;
+  cursor:pointer;padding:4px}
+.spot-res{max-height:56vh;overflow-y:auto;padding:8px}
+.spot-sec{font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:#9A9DAB;padding:10px 12px 4px}
+.spot-row{display:flex;align-items:center;gap:12px;padding:10px 12px;
+  border-radius:10px;cursor:pointer}
+.spot-row.sel{background:#F4F5F9}
+.sr-av{width:28px;height:28px;border-radius:8px;flex:none;display:grid;
+  place-items:center;font-weight:700;font-size:13px}
+.sr-t{flex:1;min-width:0;font-size:14px;color:var(--ink,#1B1F30)}
+.sr-t b{font-weight:500}
+.sr-sub{display:block;font-size:12px;color:#8A8D9C;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.sr-enter{flex:none;color:#B9BCC7;opacity:0}
+.spot-row.sel .sr-enter{opacity:1}
+.spot-empty{padding:24px;text-align:center;color:#8A8D9C;font-size:13.5px}
 .needshdr{display:flex;align-items:center;gap:8px;margin:12px 8px 4px;
   font-size:12px;font-weight:600;color:#9A6215}
 .needshdr .rbadge{margin:0}
@@ -1223,11 +1253,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
     </div>
-    <input class="railsearch" id="railsearch" hidden
-      placeholder="Search buyers, agents, files"
-      oninput="railSearch(this.value)"
-      onkeydown="if(event.key === 'Escape') railSearchToggle()">
-    <div class="raillist" id="railresults" hidden></div>
+
 
     <div class="raillist" id="raillist">
       {rows}
@@ -1239,6 +1265,16 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
   </aside>
+  <div class="spot-scrim" id="spotscrim" onclick="closeSpot()"></div>
+  <div class="spot" id="spot" role="dialog" aria-label="Search">
+    <div class="spot-head">
+      {ICONS["search"]}
+      <input class="spot-in" id="spotin" placeholder="Search buyers, agents, files"
+        oninput="spotQuery(this.value)" onkeydown="spotKeys(event)">
+      <button class="spot-x" onclick="closeSpot()" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="spot-res" id="spotres"></div>
+  </div>
   <script>
   function railFilter(b){{
     document.querySelectorAll('.rf').forEach(x => x.classList.toggle('on', x === b));
@@ -1246,44 +1282,84 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     document.querySelectorAll('#raillist [data-st]')
       .forEach(el => {{ el.hidden = need && el.dataset.st !== 'need'; }});
   }}
-  function railSearchToggle(){{
-    const s = document.getElementById('railsearch');
-    s.hidden = !s.hidden;
-    if (!s.hidden) s.focus(); else {{ s.value = ''; railSearch(''); }}
+  const SPOT_COLORS = ["#5266EB", "#E8590C", "#0CA678", "#B33AB3",
+                       "#E0A800", "#2B8A9E", "#D6336C", "#6741D9"];
+  let spotItems = [], spotSel = 0, spotT = null;
+  const QUICK = [
+    {{kind: "Go", title: "Everything waiting on your yes", sub: "the approvals queue", href: "/approvals"}},
+    {{kind: "Go", title: "Morning brief", sub: "what the office did", href: "/briefs/morning"}},
+    {{kind: "Go", title: "Knowledge", sub: "what your team knows", href: "/memory"}}];
+  function railSearchToggle(){{ openSpot(); }}
+  function openSpot(){{
+    document.getElementById('spotscrim').classList.add('open');
+    document.getElementById('spot').classList.add('open');
+    const i = document.getElementById('spotin');
+    i.value = ''; spotRender(QUICK); i.focus();
   }}
-  let _st = null;
-  function railSearch(v){{
-    v = v.trim();
-    const list = document.getElementById('raillist');
-    const res = document.getElementById('railresults');
-    const hd = document.querySelector('.railhead');
-    if (!v){{ list.hidden = false; res.hidden = true;
-      if (hd) hd.style.display = ''; return; }}
-    if (hd) hd.style.display = 'none';
-    clearTimeout(_st);
-    _st = setTimeout(async () => {{
-      const r = await fetch('/api/search?q=' + encodeURIComponent(v));
-      const items = await r.json();
-      list.hidden = true; res.hidden = false;
-      if (!items.length){{
-        res.innerHTML = '<div class="cempty">Nothing matches "'
-          + v.replace(/</g, '&lt;') + '".</div>';
-        return;
-      }}
-      let html = '', last = '';
-      for (const it of items){{
-        if (it.kind !== last){{
-          html += '<div class="navsec csec">' + it.kind + 's</div>';
-          last = it.kind;
-        }}
-        html += '<a class="rail arow-min" href="' + it.href + '">'
-          + '<span class="rlabel"><b>' + it.title + '</b><br>'
-          + '<span class="mut" style="font-size:11.5px">' + it.sub
-          + '</span></span></a>';
-      }}
-      res.innerHTML = html;
-    }}, 160);
+  function closeSpot(){{
+    document.getElementById('spotscrim').classList.remove('open');
+    document.getElementById('spot').classList.remove('open');
   }}
+  function spotColor(t){{
+    let n = 0;
+    for (const ch of t) n += ch.charCodeAt(0);
+    return SPOT_COLORS[n % SPOT_COLORS.length];
+  }}
+  function spotRender(items){{
+    spotItems = items; spotSel = 0;
+    const res = document.getElementById('spotres');
+    if (!items.length){{
+      res.innerHTML = '<div class="spot-empty">Nothing matches. Try a buyer, an agent, or a file.</div>';
+      return;
+    }}
+    let html = '', last = '';
+    items.forEach((it, i) => {{
+      if (it.kind !== last && it.kind !== 'Go'){{
+        html += '<div class="spot-sec">' + it.kind + 's</div>';
+        last = it.kind;
+      }}
+      html += '<div class="spot-row' + (i === spotSel ? ' sel' : '')
+        + '" data-i="' + i + '" onclick="spotGo(' + i + ')">'
+        + '<span class="sr-av" style="background:' + spotColor(it.title) + '1c;color:'
+        + spotColor(it.title) + '">' + it.title[0].toUpperCase() + '</span>'
+        + '<span class="sr-t"><b>' + it.title + '</b>'
+        + '<span class="sr-sub">' + it.sub + '</span></span>'
+        + '<span class="sr-enter">&#8617;</span></div>';
+    }});
+    res.innerHTML = html;
+  }}
+  function spotQuery(v){{
+    clearTimeout(spotT);
+    if (!v.trim()){{ spotRender(QUICK); return; }}
+    spotT = setTimeout(async () => {{
+      const r = await fetch('/api/search?q=' + encodeURIComponent(v.trim()));
+      spotRender(await r.json());
+    }}, 140);
+  }}
+  function spotMove(d){{
+    if (!spotItems.length) return;
+    spotSel = (spotSel + d + spotItems.length) % spotItems.length;
+    document.querySelectorAll('.spot-row').forEach(r =>
+      r.classList.toggle('sel', +r.dataset.i === spotSel));
+    document.querySelector('.spot-row.sel')?.scrollIntoView({{block: 'nearest'}});
+  }}
+  function spotGo(i){{
+    const it = spotItems[i === undefined ? spotSel : i];
+    if (it) location.href = it.href;
+  }}
+  function spotKeys(e){{
+    if (e.key === 'ArrowDown'){{ e.preventDefault(); spotMove(1); }}
+    else if (e.key === 'ArrowUp'){{ e.preventDefault(); spotMove(-1); }}
+    else if (e.key === 'Enter'){{ e.preventDefault(); spotGo(); }}
+    else if (e.key === 'Escape'){{ closeSpot(); }}
+  }}
+  addEventListener('keydown', e => {{
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){{
+      e.preventDefault();
+      document.getElementById('spot').classList.contains('open')
+        ? closeSpot() : openSpot();
+    }}
+  }});
   </script>"""
 
 
