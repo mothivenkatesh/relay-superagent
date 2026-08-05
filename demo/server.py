@@ -1102,7 +1102,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       {convs if convs is not None else ''}
     </div>
     <div class="railsys">
-      <a class="nav{' on' if active == 'journeys' else ''}" href="/journeys">{ICONS["ledger"]}<span>History</span></a>
+      <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
       <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
   </aside>
@@ -1694,14 +1694,12 @@ def case_content(tid: str, order_id: str) -> str:
            else mile("cur", "Bank reviewing", "in progress") if filed
            else mile("todo", "Bank review", "&mdash;"))
         + '</div>')
-    return (
-        f'<a class="jback" href="/">&lsaquo; Back</a>'
-        f'<div class="casehead"><div>'
-        f'<div class="wp-kicker">Case {esc(case_no(order_id))}</div>'
-        f'<h1 class="page casename">{_logo(who, 26)}{esc(who)}</h1>'
-        f'<div class="casemeta">{meta}</div></div>'
-        f'<span class="casest {skey}">{sword}</span></div>'
-        f'{miles}'
+    # The founder's job on a waiting case is one thing: read the reply,
+    # say yes or no. So on a waiting case the reply comes FIRST — right
+    # under the milestones — and the story moves below it. Nobody should
+    # scroll past a twelve-step timeline to do their only job.
+    reply_sec = f'<h2 class="sec">The reply</h2>{work_product(latest, mode="page")}'
+    story = (
         f'<div class="casegrid">'
         f'<div><h2 class="sec">What happened, start to finish</h2>'
         f'<ol class="ctimeline">{tl}</ol></div>'
@@ -1711,8 +1709,17 @@ def case_content(tid: str, order_id: str) -> str:
         f'<div class="pcard">{prows}</div>'
         f'<h2 class="sec">Everything, one by one</h2>'
         + "".join(ledger_row(r) for r in reversed(runs))
-        + '</div></div>'
-        f'<h2 class="sec">The reply</h2>{work_product(latest, mode="page")}')
+        + '</div></div>')
+    body = (reply_sec + story) if waiting else (story + reply_sec)
+    return (
+        f'<a class="jback" href="/">&lsaquo; Back</a>'
+        f'<div class="casehead"><div>'
+        f'<div class="wp-kicker">Case {esc(case_no(order_id))}</div>'
+        f'<h1 class="page casename">{_logo(who, 26)}{esc(who)}</h1>'
+        f'<div class="casemeta">{meta}</div></div>'
+        f'<span class="casest {skey}">{sword}</span></div>'
+        f'{miles}'
+        + body)
 
 
 HOME_CONTENT = """
@@ -1933,6 +1940,18 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .mbar.done{background:var(--accent)}
 .ctahint{display:block;font-size:11.5px;color:var(--mut);margin-top:6px;
   text-align:right}
+.tglbtn{width:34px;height:20px;border-radius:10px;background:#D9DBE4;border:0;
+  position:relative;flex:none;cursor:pointer;padding:0}
+.tglbtn.on{background:var(--accent)}
+.tglbtn i{position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:#fff;transition:left .12s}
+.tglbtn.on i{left:16px}
+.rtools{display:flex;gap:4px;flex:none;opacity:0;transition:opacity .12s}
+.trow:hover .rtools{opacity:1}
+.rtool{font:inherit;font-size:12px;color:var(--mut);background:none;border:0;
+  cursor:pointer;padding:4px 8px;border-radius:7px}
+.rtool:hover{background:#F0F0F5;color:var(--ink)}
+.rtool.danger:hover{color:#C0392B}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -4167,23 +4186,54 @@ if (!localStorage.getItem('relay_seen_scheduled')){
 
 
 def scheduled_content(tid: str) -> str:
+    # A real list, not a painting: every routine can be paused, reworded
+    # or removed, and a fresh one says when its first run comes.
     rows = ""
-    for r in routines_for(tid):
-        stat = (f'<span class="st ok">on &middot; {r["last"]}</span>' if r["on"] and r["last"]
-                else '<span class="st ok">on</span>' if r["on"]
-                else '<span class="st mut">not switched on</span>')
-        inner = (f'<span class="ico">{ICONS["moon"]}</span>'
-                 f'<span class="tdesc"><b>{esc(r["name"])}</b> '
+    for i, r in enumerate(routines_for(tid)):
+        if r["on"] and r["last"]:
+            stat = f'<span class="st ok">{r["last"]}</span>'
+        elif r["on"]:
+            stat = '<span class="st wait">first run tonight</span>'
+        else:
+            stat = '<span class="st mut">paused</span>'
+        toggle = (f'<form method="post" action="/api/routine_toggle" '
+                  f'style="display:contents"><input type="hidden" name="i" '
+                  f'value="{i}"><button class="tglbtn {"on" if r["on"] else ""}" '
+                  f'title="{"Pause" if r["on"] else "Resume"}" '
+                  f'aria-label="{"Pause" if r["on"] else "Resume"}">'
+                  f'<i></i></button></form>')
+        tools = (f'<span class="rtools">'
+                 f'<button class="rtool" title="Reword" '
+                 f'onclick="routineEdit({i}, this)">Edit</button>'
+                 f'<form method="post" action="/api/routine_del" '
+                 f'style="display:contents"><input type="hidden" name="i" '
+                 f'value="{i}"><button class="rtool danger" title="Remove">'
+                 f'Remove</button></form></span>')
+        inner = (f'{toggle}'
+                 f'<span class="tdesc" data-name="{esc(r["name"])}">'
+                 f'<b>{esc(r["name"])}</b> '
                  f'<span class="mut">{r["when"]} &mdash; {r["what"]}</span></span>'
-                 f'{stat}')
+                 f'{stat}{tools}')
         if r["name"] == "Morning brief":
             # The run leaves a note; the row opens it. This is the promise
             # from the intro cards, kept.
-            rows += (f'<a class="trow slim" style="display:flex" '
-                     f'href="/briefs/morning">{inner}'
-                     f'<span class="go2">&rsaquo;</span></a>')
+            rows += (f'<div class="trow slim" style="display:flex">{inner}'
+                     f'<a class="st wait" href="/briefs/morning">read it '
+                     f'&rarr;</a></div>')
         else:
-            rows += f'<div class="trow slim">{inner}</div>'
+            rows += f'<div class="trow slim" style="display:flex">{inner}</div>'
+    rows += """<script>
+function routineEdit(i, btn){
+  const cur = btn.closest('.trow').querySelector('.tdesc').dataset.name;
+  const t = prompt('Say it the way you want it:', cur);
+  if (!t || t === cur) return;
+  const f = document.createElement('form');
+  f.method = 'post'; f.action = '/api/routine_edit';
+  f.innerHTML = '<input type="hidden" name="i" value="' + i + '">'
+    + '<input type="hidden" name="text" value="' + t.replace(/"/g, '&quot;') + '">';
+  document.body.appendChild(f); f.submit();
+}
+</script>"""
     return (f'<h1 class="page">Scheduled</h1>'
             f'<div class="pagehint">Work your team does on its own clock '
             f'&mdash; while you sleep, over the weekend, on the first of the '
@@ -4588,6 +4638,32 @@ class Handler(BaseHTTPRequestHandler):
                 AUTONOMY[tid] = "all"
             self.send_response(303)
             self.send_header("Location", "/")
+            self.end_headers(); return
+        if self.path in ("/api/routine_toggle", "/api/routine_del",
+                         "/api/routine_edit"):
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            lst = routines_for(sess["tenant_id"])
+            try:
+                i = int((form.get("i") or ["-1"])[0])
+                r = lst[i] if 0 <= i < len(lst) else None
+            except ValueError:
+                r = None
+            if r is not None:
+                if self.path.endswith("_toggle"):
+                    r["on"] = not r["on"]
+                elif self.path.endswith("_del"):
+                    lst.pop(i)
+                else:
+                    text = (form.get("text") or [""])[0].strip()[:200]
+                    if text:
+                        r["name"] = text[:64]
+                        r["what"] = ("Reworded just now, in your words. Its "
+                                     "next run follows the new wording.")
+            self.send_response(303)
+            self.send_header("Location", "/scheduled")
             self.end_headers(); return
         if self.path == "/api/routine":
             sess = self._session()
