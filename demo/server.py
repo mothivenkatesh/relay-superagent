@@ -3246,62 +3246,235 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<div class="capwrap">{caps}</div>'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
         f'<h2 class="sec">When a person takes over</h2>{handoff}'
-        f'{_kyc_builder() if a["slug"] == "kyc_desk" else ""}'
+        f'{_kyc_builder(tid) if a["slug"] == "kyc_desk" else ""}'
         f'{helpers}')
 
 
-def _kyc_builder() -> str:
-    """Describe-it-and-it-builds, for onboarding journeys: the founder says
-    what they need in one sentence and watches the journey assemble. Demo
-    plays the moment; the plan it reveals is a real journey shape."""
-    return """
-<h2 class="sec">Or describe the onboarding you need</h2>
-<div class="pagehint">Say it the way you would to a person: the
-journey builds itself, and nothing goes live until you say yes.</div>
-<form class="notebar" style="max-width:640px" onsubmit="event.preventDefault();kycBuild()">
-  <input class="jfind notein" id="kycask" maxlength="140"
-    placeholder="e.g. checks for buyers above &#8377;2 lakh, PAN before payment">
-  <button class="btn primary sm">Build</button></form>
-<div id="kycgen" hidden style="max-width:640px;margin-top:14px">
-  <div class="mut" style="font-size:13px;margin-bottom:10px">&#10022; Putting it together&hellip;</div>
-  <div class="shimmer"></div><div class="shimmer" style="width:82%"></div>
-  <div class="shimmer" style="width:90%"></div>
-</div>
-<div id="kycplan" hidden style="max-width:640px;margin-top:14px">
-  <div class="pane-detail"><h3 id="kyctitle">Your onboarding journey</h3>
-  <div class="hsteps" style="margin-top:8px">
-    <div class="hstep"><span class="hdot"></span><div><b>Screen</b>
-      <span class="mut">the buyer in seconds, before any money moves</span></div></div>
-    <div class="hstep"><span class="hdot"></span><div><b>Verify</b>
-      <span class="mut">the checks your rules require, built into one form</span></div></div>
-    <div class="hstep"><span class="hdot"></span><div><b>Escalate</b>
-      <span class="mut">a deeper look only when the risk calls for it</span></div></div>
-    <div class="hstep"><span class="hdot"></span><div><b>Collect</b>
-      <span class="mut">verify and pay in the same form: one step for the buyer</span></div></div>
+# Saved KYC procedures, per tenant: the editor's Save and Set live land
+# here, and the KYC Desk page lists them the way Fin lists what is live.
+KYC_PROCS: dict[str, list[dict]] = {}
+
+
+def procedure_editor_content(tid: str, ask: str) -> str:
+    """The Fin procedures editor, in Relay's plain voice: when to use it,
+    numbered steps with tool tokens you can swap, an IF and its ELSE, a
+    Test that runs a simulated buyer in a side panel, and Set live."""
+    ask = (ask or "checks for buyers above ₹2 lakh").strip()[:90]
+    title = esc(ask[0].upper() + ask[1:])
+    TOOLS = ["Verify PAN", "Video KYC", "Check for mule accounts",
+             "Collect the payment", "Tag the case", "Hand to a person"]
+    menu = "".join(f'<div class="tmenu-it" onclick="toolPick(this)">{t}</div>'
+                   for t in TOOLS) + (
+           '<div class="tmenu-it new">+ Ask for a new tool</div>')
+
+    def tok(label):
+        return (f'<span class="ttok" onclick="toolMenu(event, this)">'
+                f'{ICONS["bolt"]}<b>Use</b> <span class="tlab">{label}</span>'
+                f'<i>&#8942;</i></span>')
+
+    return f"""
+<div class="dhead" style="margin-bottom:4px">
+  <a class="back2" href="/agents/kyc_desk">&lsaquo;</a>
+  <div><h1>Procedure: {title}</h1>
+  <div class="meta"><span class="st mut">draft</span><span>&middot;</span>
+  <span>KYC Desk</span></div></div>
+  <div class="prochdr">
+    <button class="btn ghost" onclick="simOpen()">Test</button>
+    <button class="btn ghost" onclick="procSave('draft')">Save</button>
+    <button class="btn live" onclick="procSave('live')">Set live</button>
   </div>
-  <p class="mut" style="font-size:12.5px;margin-top:10px">Built from what
-  you said. It goes live only after you read it and say yes.</p></div>
+</div>
+<div class="proc" id="proc">
+  <h2 class="sec proc-reveal">When to use this procedure</h2>
+  <div class="whenbox proc-reveal" contenteditable="plaintext-only"
+    id="whenbox">Use this when {esc(ask)}. The buyer should never leave the payment form to get verified.</div>
+  <div class="proc-reveal" style="margin:10px 0 24px">
+    <span class="capchip">{ICONS["bot"]} Every buyer at checkout</span>
+    <span class="capchip">{ICONS["shield"]} Nothing goes live until you say yes</span>
+  </div>
+  <h2 class="sec proc-reveal">Steps</h2>
+  <ol class="psteps">
+    <li class="proc-reveal"><span class="pstep" contenteditable="plaintext-only">Read the order and its value the moment the buyer reaches payment.</span></li>
+    <li class="proc-reveal"><span class="pif">IF</span>
+      <span class="pcond" contenteditable="plaintext-only">the order is above &#8377;2,00,000</span>
+      <ol class="psub">
+        <li><span class="pstep" contenteditable="plaintext-only">Collect the PAN inside the payment form.</span> {tok("Verify PAN")}</li>
+        <li><span class="pstep" contenteditable="plaintext-only">Run the standard checks while the buyer types.</span> {tok("Check for mule accounts")}</li>
+        <li><span class="pif">IF</span>
+          <span class="pcond" contenteditable="plaintext-only">anything looks risky</span>
+          <ol class="psub">
+            <li><span class="pstep" contenteditable="plaintext-only">Hold the payment and hand the case over. A person decides, the buyer sees &ldquo;under review&rdquo;, never an error.</span>
+              {tok("Hand to a person")}</li>
+          </ol>
+          <span class="pelse">ELSE</span>
+          <ol class="psub">
+            <li><span class="pstep" contenteditable="plaintext-only">Take the payment in the same form. Verify and pay is one step for the buyer.</span> {tok("Collect the payment")}</li>
+          </ol>
+        </li>
+      </ol>
+      <span class="pelse">ELSE</span>
+      <ol class="psub">
+        <li><span class="pstep" contenteditable="plaintext-only">Go straight to payment. No checks the order does not call for.</span>
+          {tok("Collect the payment")}</li>
+      </ol>
+    </li>
+    <li class="proc-reveal"><span class="pstep" contenteditable="plaintext-only">Write what happened into the case history, either way.</span>
+      {tok("Tag the case")}</li>
+  </ol>
+</div>
+<div class="tmenu" id="tmenu" hidden>{menu}</div>
+<form method="post" action="/api/procedure_save" id="procform" hidden>
+  <input type="hidden" name="title" id="pf_title" value="{title}">
+  <input type="hidden" name="when" id="pf_when" value="">
+  <input type="hidden" name="mode" id="pf_mode" value="draft">
+</form>
+<div class="simpanel" id="simpanel" hidden>
+  <div class="simhead"><b>Simulations</b>
+    <button class="rtool" onclick="simClose()">&#10005;</button></div>
+  <div class="simcard"><b>High-value gold order</b>
+    <span class="st ok" id="simbadge" hidden>Passed &middot; just now</span></div>
+  <div id="simrows"></div>
 </div>
 <script>
-function kycBuild(){
-  const q = document.getElementById('kycask').value.trim();
-  if (!q) return;
-  document.getElementById('kycgen').hidden = false;
-  document.getElementById('kycplan').hidden = true;
-  setTimeout(() => {
-    document.getElementById('kycgen').hidden = true;
-    document.getElementById('kyctitle').textContent =
-      'Your onboarding journey. ' + q.slice(0, 60);
-    document.getElementById('kycplan').hidden = false;
-  }, 1600);
-}
+let tokTarget = null;
+function toolMenu(ev, el){{
+  ev.stopPropagation();
+  tokTarget = el;
+  const m = document.getElementById('tmenu');
+  m.hidden = false;
+  const r = el.getBoundingClientRect();
+  m.style.left = Math.min(r.left, innerWidth - 260) + 'px';
+  m.style.top = (r.bottom + 6) + 'px';
+  setTimeout(() => addEventListener('click',
+    () => {{ m.hidden = true; }}, {{once: true}}));
+}}
+function toolPick(it){{
+  if (tokTarget) tokTarget.querySelector('.tlab').textContent = it.textContent;
+}}
+function procSave(mode){{
+  document.getElementById('pf_mode').value = mode;
+  document.getElementById('pf_when').value =
+    document.getElementById('whenbox').textContent.slice(0, 300);
+  document.getElementById('procform').submit();
+}}
+const SIM = [
+  ['user', 'Simulated buyer: a ₹2.4 lakh gold order, paying by card.'],
+  ['ok', 'High-value order triggered'],
+  ['think', 'Step 1 thinking'],
+  ['ok', 'PAN collected inside the payment form'],
+  ['ok', 'Checks passed, nothing risky'],
+  ['agent', 'Verified. The form moves straight to payment; the buyer never left the page.'],
+  ['ok', 'Payment collected in the same form'],
+  ['ok', 'Case history written']];
+async function simOpen(){{
+  const p = document.getElementById('simpanel');
+  p.hidden = false;
+  const rows = document.getElementById('simrows');
+  rows.innerHTML = '';
+  document.getElementById('simbadge').hidden = true;
+  for (const [kind, text] of SIM){{
+    const d = document.createElement('div');
+    d.className = 'simrow ' + kind;
+    d.innerHTML = kind === 'ok' ? '&#10003; ' + text : text;
+    rows.appendChild(d);
+    await new Promise(r => setTimeout(r, kind === 'think' ? 700 : 450));
+  }}
+  document.getElementById('simbadge').hidden = false;
+}}
+function simClose(){{ document.getElementById('simpanel').hidden = true; }}
 </script>
 <style>
-.shimmer{height:14px;border-radius:99px;margin-bottom:10px;
-  background:linear-gradient(90deg,#E4E0F7 25%,#F4F2FC 50%,#E4E0F7 75%);
-  background-size:200% 100%;animation:shim 1.2s linear infinite}
-@keyframes shim{to{background-position:-200% 0}}
+.prochdr{{margin-left:auto;display:flex;gap:8px;align-items:center}}
+.btn.live{{background:#1E9E5A;border-color:#1E9E5A;color:#fff}}
+.btn.live:hover{{background:#177245}}
+.proc{{max-width:720px}}
+.whenbox{{background:#fff;border:1px solid var(--hair);border-radius:12px;
+  padding:14px 16px;font-size:14px;line-height:1.55;outline:none}}
+.whenbox:focus{{border-color:var(--accent)}}
+.psteps{{list-style:none;counter-reset:ps;margin:0;padding:0}}
+.psteps > li{{counter-increment:ps;position:relative;padding:10px 0 10px 34px;
+  font-size:14.5px;line-height:1.6}}
+.psteps > li::before{{content:counter(ps) ".";position:absolute;left:2px;
+  top:10px;color:var(--mut);font-size:12.5px;font-family:ui-monospace,monospace}}
+.psub{{list-style:none;counter-reset:pa;margin:6px 0 2px;padding-left:26px;
+  border-left:2px solid #ECECF1}}
+.psub > li{{counter-increment:pa;position:relative;padding:7px 0 7px 26px}}
+.psub > li::before{{content:counter(pa, upper-alpha) ".";position:absolute;
+  left:0;top:7px;color:var(--mut);font-size:12px;
+  font-family:ui-monospace,monospace}}
+.pstep{{outline:none;border-radius:6px;padding:1px 3px}}
+.pstep:focus{{background:#F4F5FB}}
+.pif,.pelse{{display:inline-block;background:var(--accent-soft,#E9EBF8);
+  color:#3A46A8;font-size:11.5px;font-weight:700;letter-spacing:.06em;
+  border-radius:7px;padding:3px 9px;margin:2px 8px 2px 0}}
+.pelse{{margin-top:8px}}
+.pcond{{display:inline-block;background:#fff;border:1px solid var(--hair);
+  border-radius:9px;padding:6px 12px;font-size:13.5px;outline:none}}
+.pcond:focus{{border-color:var(--accent)}}
+.ttok{{display:inline-flex;align-items:center;gap:6px;background:#F0F1F7;
+  border-radius:8px;padding:4px 10px;font-size:12.5px;cursor:pointer;
+  white-space:nowrap;vertical-align:middle}}
+.ttok svg{{width:12px;height:12px;color:#3A46A8}}
+.ttok b{{font-weight:600}}
+.ttok i{{color:var(--mut);font-style:normal}}
+.ttok:hover{{background:#E7E9F3}}
+.tmenu{{position:fixed;background:#fff;border:1px solid var(--hair);
+  border-radius:12px;box-shadow:0 12px 40px rgba(27,31,48,.14);padding:6px;
+  min-width:240px;z-index:40}}
+.tmenu-it{{padding:9px 12px;border-radius:8px;font-size:13.5px;cursor:pointer}}
+.tmenu-it:hover{{background:#F5F5F8}}
+.tmenu-it.new{{border-top:1px solid var(--hair);color:var(--mut);
+  margin-top:4px}}
+.simpanel{{position:fixed;top:0;right:0;bottom:0;width:380px;background:#fff;
+  border-left:1px solid var(--hair);box-shadow:-14px 0 44px rgba(27,31,48,.10);
+  padding:20px 22px;z-index:45;overflow-y:auto}}
+.simhead{{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:14px;font-size:15px}}
+.simcard{{background:#FAFAFC;border:1px solid var(--hair);border-radius:12px;
+  padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;
+  align-items:center;font-size:13.5px}}
+.simrow{{font-size:13px;padding:7px 10px;border-radius:9px;margin-bottom:7px;
+  animation:fadeup .3s ease both}}
+.simrow.ok{{background:#E9F7EF;color:#177245;font-weight:500}}
+.simrow.user{{background:#F0F1F7}}
+.simrow.agent{{background:#fff;border:1px solid var(--hair)}}
+.simrow.think{{color:var(--mut);font-size:12px;padding:2px 10px}}
+.proc-reveal{{animation:fadeup .4s ease both}}
+.proc-reveal:nth-child(2){{animation-delay:.1s}}
+.psteps .proc-reveal:nth-child(1){{animation-delay:.25s}}
+.psteps .proc-reveal:nth-child(2){{animation-delay:.45s}}
+.psteps .proc-reveal:nth-child(3){{animation-delay:.7s}}
 </style>"""
+
+
+def _kyc_builder(tid: str = "t1") -> str:
+    """The way in: saved procedures first (Live or draft, like Fin's
+    Guidance cards), then one sentence that opens the full editor."""
+    procs = KYC_PROCS.get(tid, [])
+    rows = "".join(
+        f'<a class="trow slim" style="display:flex" '
+        f'href="/procedures/new?ask={esc(p["title"])}">'
+        f'<span class="ico">{ICONS["note"]}</span>'
+        f'<span class="tdesc"><b>{esc(p["title"])}</b> '
+        f'<span class="mut">{esc((p.get("when") or "")[:90])}</span></span>'
+        + ('<span class="st ok">Live</span>' if p["mode"] == "live"
+           else '<span class="st mut">draft</span>')
+        + '<span class="go2">&rsaquo;</span></a>'
+        for p in procs)
+    if rows:
+        rows = ('<h2 class="sec">Journeys this desk runs</h2>'
+                '<div class="pagehint">Open one to read or change it. '
+                'Changes are drafts until you set them live.</div>' + rows)
+    return (rows +
+        '<h2 class="sec">Or describe the onboarding you need</h2>'
+        '<div class="pagehint">One sentence opens the full procedure: '
+        'steps, tools, the checks, and a test run. Nothing goes live '
+        'until you say yes.</div>'
+        '<form class="notebar" style="max-width:640px" method="get" '
+        'action="/procedures/new">'
+        '<input class="jfind notein" name="ask" maxlength="90" '
+        'placeholder="e.g. checks for buyers above &#8377;2 lakh, PAN before payment">'
+        '<button class="btn primary sm">Build</button></form>')
 
 
 def agent_detail_content(tid: str, slug: str, tab: str = "overview",
@@ -4773,6 +4946,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._redirect("/login")
             self._html(_shell(brief_note_content(sess["tenant_id"]), "scheduled",
                               sess["tenant_id"], sess.get("email", "")))
+        elif self.path.split("?")[0] == "/procedures/new":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            from urllib.parse import parse_qs as _pq, urlparse as _up
+            ask = (_pq(_up(self.path).query).get("ask") or [""])[0]
+            self._html(_shell(procedure_editor_content(sess["tenant_id"], ask),
+                              "agents", sess["tenant_id"],
+                              sess.get("email", "")))
         elif self.path == "/scheduled":
             sess = self._session()
             if not sess:
@@ -4887,6 +5069,29 @@ class Handler(BaseHTTPRequestHandler):
                 AUTONOMY[tid] = "all"
             self.send_response(303)
             self.send_header("Location", "/")
+            self.end_headers(); return
+        if self.path == "/api/procedure_save":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            title = (form.get("title") or [""])[0].strip()[:90]
+            when = (form.get("when") or [""])[0].strip()[:300]
+            mode = (form.get("mode") or ["draft"])[0]
+            if title:
+                lst = KYC_PROCS.setdefault(sess["tenant_id"], [])
+                # saving the same title again updates it in place
+                for p in lst:
+                    if p["title"] == title:
+                        p.update(when=when, mode=mode if mode == "live"
+                                 else p["mode"] if p["mode"] == "live"
+                                 else "draft")
+                        break
+                else:
+                    lst.append(dict(title=title, when=when,
+                                    mode="live" if mode == "live" else "draft"))
+            self.send_response(303)
+            self.send_header("Location", "/agents/kyc_desk")
             self.end_headers(); return
         if self.path == "/api/assign":
             sess = self._session()
