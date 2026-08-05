@@ -797,6 +797,11 @@ WORK_CSS = """
 .railsys{flex:none;padding-top:8px;margin-top:8px;border-top:1px solid #ECECF1}
 .railsys .nav{margin-bottom:1px}
 .arow-min{padding:6px 10px;gap:8px}
+.quietrow .rlabel{color:var(--mut);font-weight:400}
+.quietrow:hover .rlabel{color:var(--ink,#1B1F30)}
+.qword{flex:none;font-size:10.5px;color:#B9BCC7}
+.rstake{flex:none;font-size:12px;font-weight:700;color:#9A6215}
+.st.need2{background:#FBF2E2;color:#9A6215}
 .arow-min .rlabel{font-size:13px}
 .arow-min.unread .rlabel{font-weight:600;color:var(--ink,#1B1F30)}
 .rbadge{flex:none;min-width:18px;height:18px;border-radius:99px;
@@ -919,6 +924,24 @@ WORK_CSS = """
 .onemem a{color:var(--accent);font-size:12.5px;flex:none}
 .mention{display:inline-block;border-radius:8px;padding:0 6px;
   font-weight:600;font-size:.95em;white-space:nowrap;line-height:1.5}
+.burger{display:none;position:fixed;top:12px;left:12px;z-index:70;
+  width:40px;height:40px;border-radius:12px;border:1px solid #E8E9EF;
+  background:#fff;font-size:17px;cursor:pointer;
+  box-shadow:0 2px 12px rgba(27,31,48,.08)}
+@media (max-width:760px){
+  .burger{display:grid;place-items:center}
+  .sidebar{transform:translateX(-100%);transition:transform .18s ease;
+    width:290px;z-index:60;box-shadow:none}
+  .sidebar.open{transform:none;box-shadow:16px 0 44px rgba(27,31,48,.18)}
+  .main{margin-left:0 !important}
+  h1.page{font-size:24px;margin-top:48px}
+  .convhead{padding:14px 16px 14px 60px}
+  .stattiles{grid-template-columns:1fr 1fr}
+  .dhead{flex-wrap:wrap;row-gap:8px;margin-top:44px}
+  .composer{padding:8px 12px 16px}
+  .hero{margin-top:52px}
+  .miles{overflow-x:auto}
+}
 @keyframes wfadein{to{opacity:1}}
 """
 
@@ -1114,24 +1137,69 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     STAFF. One row per agent, unread-bold when it needs your yes, and the
     work aggregates under the agent responsible: 7 disputes are one
     Disputes Officer row carrying a 7, not seven rows."""
-    # Paperclip's AGENTS section: a flat, calm list. One line per agent,
-    # an amber count only where a yes is waiting, a status dot otherwise.
+    # Ten UX rules in one list: attention groups beat roster order,
+    # money beats counts, quiet is a feature. Needs-you rows are two-line
+    # with the ask and the stake, sorted by rupees; everyone else is one
+    # calm muted line with no dot at all.
+    led_r = WORLD.d.ledger
+    d_wait = [r for r in led_r.runs.values()
+              if r.tenant_id == tid and r.state is RunState.AWAITING_GATE]
+    needs, quiet = [], []
     n_need = 0
-    rows = ""
     for a in RELAY_AGENTS:
-        on = a["status"] == "live" or bool(DEMO_ON.get(a["slug"]))
-        _preview, need, badge = agent_rail_state(tid, a)
-        if need:
-            n_need += badge
-        right = (f'<span class="rbadge">{badge}</span>' if need else
-                 f'<span class="cdot {"work" if on else "off"}"></span>')
-        rows += (
-            f'<a class="rail arow-min{" active" if active == a["slug"] else ""}'
-            f'{" unread" if need else ""}" href="/agents/{a["slug"]}" '
-            f'title="{esc(a["role"])}">'
-            f'{_identicon(a["slug"], 22)}'
-            f'<span class="rlabel">{esc(a["role"])}</span>{right}</a>')
+        slug = a["slug"]
+        if slug == "dispute_defender":
+            if d_wait:
+                total = sum(price_of(r.order_id) for r in d_wait)
+                needs.append((a, f'{len(d_wait)} replies to the bank',
+                              f'&#8377;{inr(total)}', total // 100,
+                              len(d_wait)))
+                n_need += len(d_wait)
+            else:
+                quiet.append((a, "all disputes answered"))
+        elif slug in PROPS_DEF:
+            d = PROPS_DEF[slug]
+            p = prop_state(tid, slug)
+            if p["state"] == "waiting":
+                needs.append((a, d["rail"], d["stake"], d["stake_n"], 1))
+                n_need += 1
+            else:
+                quiet.append((a, "done for today"))
+        elif slug in REPORT_AGENTS:
+            quiet.append((a, "note in your brief"))
+        else:
+            quiet.append((a, "watching"))
+    needs.sort(key=lambda t: -t[3])
+
+    rows = ""
+    if needs:
+        rows += '<div class="navsec csec" data-st="hdr">Needs you</div>'
+        for a, ask, stake, _n, badge in needs:
+            b = (f'<span class="rbadge">{badge}</span>' if badge > 1
+                 else '<span class="cdot need"></span>')
+            rows += (
+                f'<a class="rail unread{" active" if active == a["slug"] else ""}" '
+                f'data-st="need" href="/agents/{a["slug"]}" '
+                f'title="{esc(a["role"])}">'
+                f'{_identicon(a["slug"], 30)}'
+                f'<span class="rbody"><span class="rtop"><span class="rname">'
+                f'{esc(a["role"])}</span>'
+                f'<span class="rstake">{stake}</span></span>'
+                f'<span class="rsub"><span class="rprev">{ask}</span>'
+                f'{b}</span></span></a>')
+    if quiet:
+        rows += '<div class="navsec csec" data-st="hdr">All quiet</div>'
+        for a, word in quiet:
+            rows += (
+                f'<a class="rail arow-min quietrow'
+                f'{" active" if active == a["slug"] else ""}" '
+                f'href="/agents/{a["slug"]}" title="{esc(a["role"])}">'
+                f'{_identicon(a["slug"], 22)}'
+                f'<span class="rlabel">{esc(a["role"])}</span>'
+                f'<span class="qword">{word}</span></a>')
     return f"""
+  <button class="burger" aria-label="Menu"
+    onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
       <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
@@ -1143,7 +1211,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     <input class="railsearch" id="railsearch" hidden placeholder="Search chats"
       oninput="railSearch(this.value)">
     <div class="railhead"><span class="navsec">Agents</span>
-      {f'<span class="rbadge">{n_need}</span>' if n_need else ''}
+      {f'<a class="rbadge" href="/approvals" title="Everything waiting on your yes">{n_need}</a>' if n_need else ''}
     </div>
     <div class="raillist" id="raillist">
       {rows}
@@ -4403,16 +4471,31 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         ("Relay for Trust", ("risk",),
          "The checks: refund fraud, filings, KYC, mule accounts."),
     ]
+    def _needs(a):
+        sl = a["slug"]
+        if sl == "dispute_defender":
+            led3 = WORLD.d.ledger
+            return any(r.tenant_id == tid
+                       and r.state is RunState.AWAITING_GATE
+                       for r in led3.runs.values())
+        return (sl in PROPS_DEF
+                and prop_state(tid, sl)["state"] == "waiting")
+
     desks = ""
     for title, keys, line in FAMILIES:
         mine = [a for a in agents if a["desk"] in keys]
         if not mine:
             continue
+        mine.sort(key=lambda a: (not _needs(a), a["status"] != "live"))
         n_on_fam = sum(1 for a in mine
                        if a["status"] == "live" or DEMO_ON.get(a["slug"]))
+        n_need_fam = sum(1 for a in mine if _needs(a))
         desks += (f'<h2 class="sec fam">{title}'
                   f'<span class="st {"ok" if n_on_fam else "mut"}">'
-                  f'{n_on_fam} of {len(mine)} on</span></h2>'
+                  f'{n_on_fam} of {len(mine)} on</span>'
+                  + (f'<span class="st need2">{n_need_fam} need you</span>'
+                     if n_need_fam else '')
+                  + '</h2>'
                   f'<div class="pagehint">{line}</div>'
                   f'<div class="atable" style="grid-template-columns:1fr">'
                   + "".join(_relay_agent_card(a, tid) for a in mine) + '</div>')
@@ -5082,6 +5165,7 @@ function shstart(){
 # re-decided. Reporting agents close their loop in the morning note instead.
 PROPS_DEF = {
     "cashflow_forecast": dict(
+        stake="&#8377;48,200", stake_n=48200,
         ifno="Thursday dips to &minus;&#8377;12,400", ifyes="Thursday stays at +&#8377;35,800",
         kicker="Cash call", rail="Payout move",
         title="Move the courier payout by two days",
@@ -5101,6 +5185,7 @@ PROPS_DEF = {
         declined="Left as it was. Thursday will run tight; the planner "
                  "warns you again the day before."),
     "stock_watch": dict(
+        stake="&#8377;68,400", stake_n=68400,
         ifno="Out of Amla Juice in 6 days", ifyes="Covered for six weeks",
         kicker="Reorder", rail="Reorder draft",
         title="Reorder Amla Juice before it runs out",
@@ -5114,6 +5199,7 @@ PROPS_DEF = {
         approved="Order placed with Vasudha Farms. Delivery expected Tuesday.",
         declined="No order placed. It warns again at 4 days of stock."),
     "payouts_desk": dict(
+        stake="&#8377;1,12,350", stake_n=112350,
         ifno="14 payments go out late", ifyes="Everyone paid on time, morning",
         kicker="Payment day", rail="Tomorrow&rsquo;s payments",
         title="Tomorrow&rsquo;s 14 payments, one yes",
@@ -5128,6 +5214,7 @@ PROPS_DEF = {
                  "bill.",
         declined="Held. Nothing goes out until you say so."),
     "refund_shield": dict(
+        stake="&#8377;1,249", stake_n=1249,
         ifno="&#8377;1,249 paid to a likely fraud", ifyes="Refused with proof, replacement offered",
         kicker="Refund check", rail="A claim to refuse",
         title="Refuse the broken-bottle claim, with proof",
@@ -5144,6 +5231,7 @@ PROPS_DEF = {
                  "offered instead.",
         declined="Refund paid as claimed. The pattern is noted."),
     "cod_guard": dict(
+        stake="&#8377;2,141", stake_n=2141,
         ifno="&#8377;2,141 shipped at a 40% bounce risk", ifyes="3 held; slots go to confirmed orders",
         kicker="Dispatch hold", rail="3 COD orders held",
         title="Hold 3 COD orders that never picked up",
@@ -5159,6 +5247,7 @@ PROPS_DEF = {
         declined="Shipped as normal. The bounce risk is noted against the "
                  "pincode."),
     "returns_desk": dict(
+        stake="&#8377;1,899", stake_n=1899,
         ifno="The buyer waits and chases you", ifyes="&#8377;1,899 back today, case closed",
         kicker="Refund release", rail="A refund to release",
         title="Release the &#8377;1,899 refund: the item is back",
@@ -5171,6 +5260,7 @@ PROPS_DEF = {
         approved="Refund released the same hour. Case closed.",
         declined="Held. A person takes a look first."),
     "payment_forms": dict(
+        stake="&#8377;1,04,000", stake_n=104000,
         ifno="A &#8377;2.6 lakh order sits unpaid", ifyes="Advance collected in one step",
         kicker="Payment form", rail="An advance form to send",
         title="Send the &#8377;2.6 lakh advance form",
@@ -5185,6 +5275,7 @@ PROPS_DEF = {
                  "and the books already know.",
         declined="Not sent. The draft stays here."),
     "kyc_desk": dict(
+        stake="&#8377;2,40,000", stake_n=240000,
         ifno="A clean buyer stays blocked", ifyes="The buyer pays; the check is on record",
         kicker="Deep check done", rail="A buyer to clear",
         title="Clear the flagged buyer: the deep check came back clean",
@@ -5197,6 +5288,7 @@ PROPS_DEF = {
         declined="Refused politely and the order cancelled. Written down "
                  "with the reason."),
     "gst_compliance": dict(
+        stake="", stake_n=0,
         ifno="The 18th scramble, again", ifyes="Your CA has the file today",
         kicker="Filing pack", rail="The month&rsquo;s file",
         title="Send the month&rsquo;s file to your CA",
@@ -5209,6 +5301,7 @@ PROPS_DEF = {
         approved="Sent. Your CA has it well before the 20th.",
         declined="Held. It stays ready whenever you are."),
     "cart_rescue": dict(
+        stake="&#8377;31,240", stake_n=31240,
         ifno="&#8377;31,240 in carts goes cold", ifyes="12 buyers called back tonight",
         kicker="Tonight&rsquo;s calls", rail="12 carts to call",
         title="Tonight&rsquo;s rescue list: 12 dropped carts",
@@ -5221,6 +5314,7 @@ PROPS_DEF = {
         approved="Calling starts at 6. Every outcome lands in your chats.",
         declined="Nobody is called tonight. The list stays."),
     "payment_rescue": dict(
+        stake="&#8377;4,890", stake_n=4890,
         ifno="&#8377;4,890 stays unpaid", ifyes="Fresh links out within the hour",
         kicker="Failed payments", rail="5 payments to chase",
         title="Chase today&rsquo;s 5 failed payments",
@@ -5657,7 +5751,11 @@ def memory_content(tid: str, tab: str = "voice") -> str:
                 + '<form class="notebar" method="post" '
                 'action="/api/file_upload" enctype="multipart/form-data" '
                 'style="max-width:640px;margin-top:16px">'
-                '<input type="file" name="file" class="filein" required>'
+                '<label class="btn ghost sm" style="cursor:pointer">Choose a file'
+                '<input type="file" name="file" required hidden '
+                'onchange="this.closest(\'form\').querySelector(\'.fname\').textContent = this.files[0] ? this.files[0].name : \'\'">'
+                '</label>'
+                '<span class="fname mut" style="flex:1;font-size:13px"></span>'
                 '<button class="btn primary sm">Upload</button></form>')
     elif tab == "teach":
         body = teachings_html()
