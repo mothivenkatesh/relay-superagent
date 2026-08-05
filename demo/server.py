@@ -796,6 +796,15 @@ WORK_CSS = """
 .rlabel{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .railsys{flex:none;padding-top:8px;margin-top:8px;border-top:1px solid #ECECF1}
 .railsys .nav{margin-bottom:1px}
+.rbadge{flex:none;min-width:18px;height:18px;border-radius:99px;
+  background:#E8A33D;color:#fff;font-size:11px;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0 5px}
+.caselist{max-width:640px;background:#fff;border:1px solid var(--hair);
+  border-radius:14px;padding:4px 12px;margin:4px 0 8px}
+.caselist .rail{border-bottom:1px solid #F4F4F7;border-radius:0;
+  margin:0;padding:10px 4px}
+.caselist .rail:last-child{border-bottom:0}
 .cdot{width:8px;height:8px;border-radius:50%;flex:none}
 .cdot.need{background:#E8A33D}
 .cdot.work{background:var(--accent,#5266EB)}
@@ -1061,65 +1070,68 @@ def rail_cases(tid: str, limit: int = 18) -> list[dict]:
     return out[:limit]
 
 
+def agent_rail_state(tid: str, a: dict) -> tuple:
+    """(preview, needs_yes, badge_count) for one agent's rail row. Work
+    items aggregate under the agent responsible for them, the way messages
+    aggregate under a contact."""
+    slug = a["slug"]
+    if slug == "dispute_defender":
+        led = WORLD.d.ledger
+        n = sum(1 for r in led.runs.values()
+                if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
+        if n:
+            return (f'{n} repl{"ies" if n != 1 else "y"} waiting on your yes',
+                    True, n)
+        return ("Every dispute answered. Watching the mail.", False, 0)
+    if slug in PROPS_DEF:
+        p = prop_state(tid, slug)
+        d = PROPS_DEF[slug]
+        if p["state"] == "waiting":
+            return (f'{d["rail"]} &middot; needs your yes', True, 1)
+        if p["state"] == "approved":
+            return (d["approved"], False, 0)
+        return (d["declined"], False, 0)
+    if slug in REPORT_AGENTS:
+        return ("Wrote today&rsquo;s note into your brief", False, 0)
+    return ("Watching &middot; learning your business", False, 0)
+
+
 def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
-    """ChatGPT's rail, Harvey's matter list: what is going on, not where to
-    click. Cases and conversations in one stream, newest first, each with a
-    dot saying where it stands. "Needs you" filters this list in place.
-    it was never a place of its own."""
-    cases = rail_cases(tid)
-    n_need = sum(1 for c in cases if c["key"] == "need") + props_waiting(tid)
-    # Every agent's finished work sits in the same list as everything else
-    # that needs a yes: one queue, no side doors.
-    cash_row = ""
-    for slug, d in PROPS_DEF.items():
-        if prop_state(tid, slug)["state"] != "waiting":
-            continue
-        role = next((a["role"] for a in RELAY_AGENTS
-                     if a["slug"] == slug), slug)
-        cash_row += (
-            f'<a class="rail unread" data-st="need" '
-            f'href="/agents/{slug}#prop-{slug}" '
-            f'title="{role}: needs your yes">'
+    """The Paperclip read of a chat rail: the persistent contacts are your
+    STAFF. One row per agent, unread-bold when it needs your yes, and the
+    work aggregates under the agent responsible: 7 disputes are one
+    Disputes Officer row carrying a 7, not seven rows."""
+    rows_data = []
+    n_need = 0
+    for a in RELAY_AGENTS:
+        on = a["status"] == "live" or bool(DEMO_ON.get(a["slug"]))
+        preview, need, badge = agent_rail_state(tid, a)
+        if need:
+            n_need += badge
+        rows_data.append((a, on, preview, need, badge))
+    # Needs-you first, then working, then the rest: the phone-at-9-PM sort.
+    rows_data.sort(key=lambda t: (not t[3], t[0]["status"] != "live",
+                                  not t[1]))
+
+    def agent_row(a, on, preview, need, badge):
+        slug = a["slug"]
+        badge_html = (f'<span class="rbadge">{badge}</span>'
+                      if need and badge > 1 else
+                      '<span class="cdot need"></span>' if need else
+                      f'<span class="cdot {"work" if on else "off"}"></span>')
+        return (
+            f'<a class="rail{" active" if active == slug else ""}'
+            f'{" unread" if need else ""}" '
+            f'data-st="{"need" if need else "work"}" '
+            f'href="/agents/{slug}" title="{esc(a["role"])}">'
             f'{_identicon(slug, 30)}'
             f'<span class="rbody"><span class="rtop"><span class="rname">'
-            f'{role}</span><span class="rwhen">today</span></span>'
-            f'<span class="rsub"><span class="rprev">{d["rail"]} &middot; '
-            f'Needs your yes</span><span class="cdot need"></span>'
-            f'</span></span></a>')
+            f'{esc(a["role"])}</span>'
+            f'<span class="rwhen">{"today" if need else ""}</span></span>'
+            f'<span class="rsub"><span class="rprev">{preview}</span>'
+            f'{badge_html}</span></span></a>')
 
-    def case_row(c):
-        # WhatsApp's chat-row grammar: avatar, name (bold when it needs
-        # you, the way unread is bold), muted preview, time on the right.
-        name, _, product = c["label"].partition(" · ")
-        need = c["key"] == "need"
-        return (
-            f'<a class="rail{" active" if active == c["order"] else ""}'
-            f'{" unread" if need else ""}" data-st="{c["key"]}" '
-            f'href="/cases/{esc(c["order"])}" '
-            f'title="{esc(c["label"])}. {c["word"]}">'
-            f'{_logo(name, 30)}'
-            f'<span class="rbody"><span class="rtop"><span class="rname">'
-            f'{esc(name)}</span><span class="rwhen">'
-            f'{c["last"].strftime("%b %-d")}</span></span>'
-            f'<span class="rsub"><span class="rprev">{esc(product)} &middot; '
-            f'{c["word"]}</span><span class="cdot {c["key"]}"></span>'
-            f'</span></span></a>')
-
-    # Fin's Operator grouping: chats bucketed by when they last moved, so
-    # the list reads as a day, not an archive.
-    from datetime import datetime as _dt, timedelta as _td
-    today = _dt.utcnow().date()
-    week_ago = today - _td(days=7)
-    groups = [("Today", [c for c in cases if c["last"].date() >= today]),
-              ("Previous 7 days", [c for c in cases
-                                   if week_ago <= c["last"].date() < today]),
-              ("Older", [c for c in cases if c["last"].date() < week_ago])]
-    rows = cash_row + ("".join(
-        (f'<div class="navsec csec" data-st="hdr">{label}</div>'
-         + "".join(case_row(c) for c in cs))
-        for label, cs in groups if cs) or (
-        '' if cash_row else
-        '<div class="cempty">Chats appear here as work comes in.</div>'))
+    rows = "".join(agent_row(*t) for t in rows_data)
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
@@ -1131,7 +1143,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     </div>
     <input class="railsearch" id="railsearch" hidden placeholder="Search chats"
       oninput="railSearch(this.value)">
-    <div class="railhead"><span class="navsec">Chats</span>
+    <div class="railhead"><span class="navsec">Agents</span>
       <span class="railfilter">
       <button class="rf on" data-f="all" onclick="railFilter(this)">All</button>
       <button class="rf" data-f="need" onclick="railFilter(this)">Needs you
@@ -3624,6 +3636,25 @@ def roster_detail_content(tid: str, a: dict) -> str:
            f'{"Waiting on your yes" if prop_state(tid, a["slug"])["state"] == "waiting" else "Its last call"}'
            f'</h2>{prop_card(tid, a["slug"])}'
            if a["slug"] in PROPS_DEF else "")
+        + (('<h2 class="sec">Its cases</h2>'
+            '<div class="pagehint">Every buyer dispute this agent is '
+            'working, newest first. The ones waiting on your yes come '
+            'first.</div><div class="caselist">'
+            + "".join(
+                f'<a class="rail{" unread" if c["key"] == "need" else ""}" '
+                f'href="/cases/{esc(c["order"])}">'
+                f'{_logo(c["label"].partition(" · ")[0], 30)}'
+                f'<span class="rbody"><span class="rtop"><span class="rname">'
+                f'{esc(c["label"].partition(" · ")[0])}</span>'
+                f'<span class="rwhen">{c["last"].strftime("%b %-d")}</span>'
+                f'</span><span class="rsub"><span class="rprev">'
+                f'{esc(c["label"].partition(" · ")[2])} &middot; {c["word"]}'
+                f'</span><span class="cdot {c["key"]}"></span></span>'
+                f'</span></a>'
+                for c in sorted(rail_cases(tid),
+                                key=lambda c: c["key"] != "need"))
+            + '</div>')
+           if a["slug"] == "dispute_defender" else "")
         + (f'<h2 class="sec">Where its work lands</h2>'
            f'<div class="trow slim" style="display:flex">'
            f'<span class="ico">{ICONS["flow"]}</span>'
