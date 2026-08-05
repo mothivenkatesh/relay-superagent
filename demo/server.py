@@ -5272,26 +5272,6 @@ __SIDEBAR__
       __MONEY__
       <div class="brief">__BRIEF__</div>
       __NEEDS__
-      <form class="hcomposer" onsubmit="event.preventDefault();send(hbox.value)">
-        <input id="hbox" placeholder="Ask anything, or tell Relay what to do" autofocus autocomplete="off">
-        <div class="hrow">
-          <details class="mode" id="mode">
-            <summary>""" + ICONS["gear"] + """<span>You approve everything</span></summary>
-            <div class="menu">
-              <div class="mopt" onclick="document.getElementById('mode').open=false">
-                You say yes to everything<span class="tick">&#10003;</span></div>
-              <div class="mopt off"><div>Let Relay send small ones itself
-                <small>Opens up after you have said yes 20 times without changing the wording.</small></div></div>
-              <div class="mopt off"><div>Skip approvals entirely
-                <small>Never. Nothing sends without you &mdash; by design.</small></div></div>
-            </div>
-          </details>
-          <button class="sendbtn" aria-label="Send">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-          </button>
-        </div>
-      </form>
       __SAMPLE__
       __ACTIVE__
       <div class="tryline">Try one of these:</div>
@@ -5300,7 +5280,7 @@ __SIDEBAR__
   </div></main>
   <div class="composer" id="composer">
   <form class="hcomposer" onsubmit="event.preventDefault();send(box.value)">
-    <input id="box" placeholder="Ask anything, or tell Relay what to do" autocomplete="off">
+    <input id="box" placeholder="Ask anything, or tell Relay what to do" autofocus autocomplete="off">
     <div class="hrow">
       <details class="mode" id="mode2">
         <summary>""" + ICONS["gear"] + """<span>You approve everything</span></summary>
@@ -5326,7 +5306,6 @@ const thread = document.getElementById('thread');
 const box = document.getElementById('box');
 if (CONV) document.getElementById('empty')?.remove();
 if (!CONV){
-  document.getElementById('composer').style.display = 'none';
   document.getElementById('ctitle').style.visibility = 'hidden';
   document.getElementById('newchat').style.visibility = 'hidden';
 }
@@ -5382,7 +5361,6 @@ async function runSteps(steps){
 async function send(text){
   text = (text || '').trim(); if(!text) return;
   document.getElementById('empty')?.remove();
-  document.getElementById('composer').style.display = '';
   bubble('msg user', text.replace(/</g,'&lt;')); box.value = '';
   const res = await fetch('/api/chat', {method:'POST',
     headers:{'Content-Type':'application/json'},
