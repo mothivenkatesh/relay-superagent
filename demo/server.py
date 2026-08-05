@@ -1208,8 +1208,11 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled">{ICONS["moon"]}<span>Scheduled</span></a>
     </div>
-    <input class="railsearch" id="railsearch" hidden placeholder="Search chats"
-      oninput="railSearch(this.value)">
+    <input class="railsearch" id="railsearch" hidden
+      placeholder="Search buyers, agents, files"
+      oninput="railSearch(this.value)"
+      onkeydown="if(event.key === 'Escape') railSearchToggle()">
+    <div class="raillist" id="railresults" hidden></div>
     <div class="railhead"><span class="navsec">Agents</span>
       {f'<a class="rbadge" href="/approvals" title="Everything waiting on your yes">{n_need}</a>' if n_need else ''}
     </div>
@@ -1235,12 +1238,38 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     s.hidden = !s.hidden;
     if (!s.hidden) s.focus(); else {{ s.value = ''; railSearch(''); }}
   }}
+  let _st = null;
   function railSearch(v){{
-    v = v.trim().toLowerCase();
-    document.querySelectorAll('#raillist .rail, #raillist .conv')
-      .forEach(el => {{ el.hidden = !!v && !el.textContent.toLowerCase().includes(v); }});
-    document.querySelectorAll('#raillist .navsec')
-      .forEach(el => {{ el.hidden = !!v; }});
+    v = v.trim();
+    const list = document.getElementById('raillist');
+    const res = document.getElementById('railresults');
+    const hd = document.querySelector('.railhead');
+    if (!v){{ list.hidden = false; res.hidden = true;
+      if (hd) hd.style.display = ''; return; }}
+    if (hd) hd.style.display = 'none';
+    clearTimeout(_st);
+    _st = setTimeout(async () => {{
+      const r = await fetch('/api/search?q=' + encodeURIComponent(v));
+      const items = await r.json();
+      list.hidden = true; res.hidden = false;
+      if (!items.length){{
+        res.innerHTML = '<div class="cempty">Nothing matches "'
+          + v.replace(/</g, '&lt;') + '".</div>';
+        return;
+      }}
+      let html = '', last = '';
+      for (const it of items){{
+        if (it.kind !== last){{
+          html += '<div class="navsec csec">' + it.kind + 's</div>';
+          last = it.kind;
+        }}
+        html += '<a class="rail arow-min" href="' + it.href + '">'
+          + '<span class="rlabel"><b>' + it.title + '</b><br>'
+          + '<span class="mut" style="font-size:11.5px">' + it.sub
+          + '</span></span></a>';
+      }}
+      res.innerHTML = html;
+    }}, 160);
   }}
   </script>"""
 
@@ -6218,10 +6247,57 @@ class Handler(BaseHTTPRequestHandler):
             return self._redirect("/settings#vault")
         elif self.path == "/chat":
             return self._redirect("/")
-        elif self.path.startswith("/api/") and self.path != "/api/runs":
+        elif (self.path.startswith("/api/")
+                and self.path != "/api/runs"
+                and not self.path.startswith("/api/search")):
             # A POST endpoint opened in a browser tab should never show the
             # raw Python error page — nothing here is for reading anyway.
             return self._redirect("/")
+        elif self.path.split("?")[0] == "/api/search":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            from urllib.parse import parse_qs as _pq, urlparse as _up
+            q = (_pq(_up(self.path).query).get("q")
+                 or [""])[0].strip().lower()
+            tid = sess["tenant_id"]
+            out = []
+            if q:
+                for a in RELAY_AGENTS:
+                    if q in a["role"].lower() or q in a["name"].lower():
+                        out.append(dict(kind="Agent", title=a["role"],
+                                        sub=a["name"],
+                                        href="/agents/" + a["slug"]))
+                for c in rail_cases(tid, limit=50):
+                    if q in c["label"].lower():
+                        nm, _, prod = c["label"].partition(" · ")
+                        out.append(dict(kind="Buyer", title=nm,
+                                        sub=prod + " · " + c["word"],
+                                        href="/cases/" + c["order"]))
+                for f in seed_kfiles(tid):
+                    if q in f["name"].lower():
+                        out.append(dict(kind="File", title=f["name"],
+                                        sub=f["used"],
+                                        href="/memory?t=files"))
+                for r in routines_for(tid):
+                    if q in r["name"].lower() or q in r["what"].lower():
+                        out.append(dict(kind="Routine", title=r["name"],
+                                        sub=r["when"],
+                                        href="/scheduled"))
+                for p in people_for(tid):
+                    if (q in p["name"].lower()
+                            or q in p["role"].lower()):
+                        out.append(dict(
+                            kind="Teammate", title=p["name"],
+                            sub=p["role"] + (" · can say yes"
+                                             if p["approver"] else ""),
+                            href="/settings?s=team"))
+            body = json.dumps(out[:20]).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/api/runs":
             led = WORLD.d.ledger
             body = json.dumps([{ "run_id": r.run_id, "state": r.state.value,
