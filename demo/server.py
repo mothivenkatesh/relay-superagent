@@ -796,6 +796,9 @@ WORK_CSS = """
 .rlabel{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .railsys{flex:none;padding-top:8px;margin-top:8px;border-top:1px solid #ECECF1}
 .railsys .nav{margin-bottom:1px}
+.arow-min{padding:6px 10px;gap:8px}
+.arow-min .rlabel{font-size:13px}
+.arow-min.unread .rlabel{font-weight:600;color:var(--ink,#1B1F30)}
 .rbadge{flex:none;min-width:18px;height:18px;border-radius:99px;
   background:#E8A33D;color:#fff;font-size:11px;font-weight:700;
   display:inline-flex;align-items:center;justify-content:center;
@@ -1101,45 +1104,23 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     STAFF. One row per agent, unread-bold when it needs your yes, and the
     work aggregates under the agent responsible: 7 disputes are one
     Disputes Officer row carrying a 7, not seven rows."""
-    # A chat list, not a contact book: only agents with something live
-    # appear here: a pending yes, or a call you decided today. The full
-    # roster is one tap away under Your team. (WhatsApp shows chats with
-    # activity; the address book is a different screen.)
-    rows_data = []
+    # Paperclip's AGENTS section: a flat, calm list. One line per agent,
+    # an amber count only where a yes is waiting, a status dot otherwise.
     n_need = 0
+    rows = ""
     for a in RELAY_AGENTS:
         on = a["status"] == "live" or bool(DEMO_ON.get(a["slug"]))
-        preview, need, badge = agent_rail_state(tid, a)
+        _preview, need, badge = agent_rail_state(tid, a)
         if need:
             n_need += badge
-        decided_today = (a["slug"] in PROPS_DEF and
-                         prop_state(tid, a["slug"])["state"] != "waiting")
-        if need or decided_today:
-            rows_data.append((a, on, preview, need, badge))
-    # Needs-you first, then the rest: the phone-at-9-PM sort.
-    rows_data.sort(key=lambda t: (not t[3], t[0]["status"] != "live"))
-
-    def agent_row(a, on, preview, need, badge):
-        slug = a["slug"]
-        badge_html = (f'<span class="rbadge">{badge}</span>'
-                      if need and badge > 1 else
-                      '<span class="cdot need"></span>' if need else
-                      f'<span class="cdot {"work" if on else "off"}"></span>')
-        return (
-            f'<a class="rail{" active" if active == slug else ""}'
-            f'{" unread" if need else ""}" '
-            f'data-st="{"need" if need else "done"}" '
-            f'href="/agents/{slug}" title="{esc(a["role"])}">'
-            f'{_identicon(slug, 30)}'
-            f'<span class="rbody"><span class="rtop"><span class="rname">'
-            f'{esc(a["role"])}</span>'
-            f'<span class="rwhen">{"today" if need else ""}</span></span>'
-            f'<span class="rsub"><span class="rprev">{preview}</span>'
-            f'{badge_html}</span></span></a>')
-
-    rows = "".join(agent_row(*t) for t in rows_data) or (
-        '<div class="cempty">All quiet. Your team is working; anything '
-        'that needs you lands here.</div>')
+        right = (f'<span class="rbadge">{badge}</span>' if need else
+                 f'<span class="cdot {"work" if on else "off"}"></span>')
+        rows += (
+            f'<a class="rail arow-min{" active" if active == a["slug"] else ""}'
+            f'{" unread" if need else ""}" href="/agents/{a["slug"]}" '
+            f'title="{esc(a["role"])}">'
+            f'{_identicon(a["slug"], 22)}'
+            f'<span class="rlabel">{esc(a["role"])}</span>{right}</a>')
     return f"""
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
@@ -1152,18 +1133,14 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     <input class="railsearch" id="railsearch" hidden placeholder="Search chats"
       oninput="railSearch(this.value)">
     <div class="railhead"><span class="navsec">Agents</span>
-      <span class="railfilter">
-      <button class="rf on" data-f="all" onclick="railFilter(this)">All</button>
-      <button class="rf" data-f="need" onclick="railFilter(this)">Needs you
-        {f'<i>{n_need}</i>' if n_need else ''}</button></span>
+      {f'<span class="rbadge">{n_need}</span>' if n_need else ''}
     </div>
     <div class="raillist" id="raillist">
       {rows}
-      {convs if convs is not None else ''}
     </div>
     <div class="railsys">
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Your team</span></a>
-      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Memory</span></a>
+      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Knowledge</span></a>
       <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
       <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
@@ -4202,10 +4179,8 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         f'<span>Jobs done</span><i>every one in History</i></a>'
         f'</div>')
     return (f'<h1 class="page">Your team</h1>'
-            f'<div class="pagehint">{n_all} agents in three families: the '
-            f'people you would otherwise hire. Nothing that touches money '
-            f'or a customer goes out until you say yes. '
-            f'{n_on} working; open any of the rest to switch it on.</div>'
+            f'<div class="pagehint">The people you would hire, as '
+            f'agents. Nothing goes out without your yes.</div>'
             f'{tiles}'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
