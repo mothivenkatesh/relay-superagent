@@ -1764,9 +1764,9 @@ def case_content(tid: str, order_id: str) -> str:
     elif won is False:
         settle = mile("done", "Settled", '<span class="st mut">Lost</span>')
     elif filed:
-        settle = mile("todo", "Settled", ".")
+        settle = mile("todo", "Settled", "not yet")
     else:
-        settle = mile("todo", "Settled", ".")
+        settle = mile("todo", "Settled", "not yet")
     miles = (
         '<div class="miles">'
         + mile("done", "Dispute came in", d0.strftime("%-d %b"))
@@ -1783,7 +1783,7 @@ def case_content(tid: str, order_id: str) -> str:
         + f'<span class="mbar {"done" if res_out is not None else ""}"></span>'
         + (settle if res_out is not None
            else mile("cur", "Bank reviewing", "in progress") if filed
-           else mile("todo", "Bank review", "."))
+           else mile("todo", "Bank review", "not yet"))
         + '</div>')
     # The founder's job on a waiting case is one thing: read the reply,
     # say yes or no. So on a waiting case the reply comes FIRST — right
@@ -1943,7 +1943,8 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   vertical-align:-4px;margin:0 4px 0 2px}
 img.alogo{background:#fff;border:1px solid var(--hair);object-fit:contain;padding:1px}
 h1.page{font-size:32px;font-weight:450;color:var(--ink);letter-spacing:-.01em;margin:8px 0 16px}
-.pagehint{color:var(--mut);font-size:13.5px;margin:-8px 0 16px}
+.pagehint{color:var(--mut);font-size:13.5px;margin:0 0 16px;line-height:1.55}
+h1.page + .pagehint{margin-top:-8px}
 .impactline{background:#E5F4EC;color:#177245;border-radius:10px;padding:12px 16px;
   font-size:13.5px;margin-bottom:16px}
 .impactline b{font-weight:650}
@@ -1992,7 +1993,7 @@ border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,235,.13)}
 .jfind::placeholder,.whyin::placeholder,.editbox textarea::placeholder{color:#9A9DAB}
 .jfind:disabled,.whyin:disabled,.editbox textarea:disabled{opacity:.45;cursor:not-allowed}
 .editbox textarea{width:100%;font-size:13.5px;padding:8px 12px;margin-bottom:8px}
-h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 2px}
+h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .st{font-size:12px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap;flex:none}
 .st.ok{background:#E5F4EC;color:#177245}
 .st.warn{background:#FCEED8;color:#9A6215}
