@@ -18,53 +18,55 @@ Millions of small merchants running on teams of five to ten. Non-technical. No A
 
 **An agent only earns a place if it replaces a real job and costs less than that job does.** Not "assists with," not "speeds up" — replaces. Every card in the product names the job it takes over and roughly what that job costs, because if it can't beat the labour it is displacing, it shouldn't ship.
 
-## The office: 14 agents doing the work of 6 hires
+## The team: 14 agents, each with a named role
 
-A founder thinks "I need an accounts person," never "I need a finance desk." So the office is organised as the people you would otherwise put on payroll.
+Every agent holds a named role, so what you are looking at is a staff roster, not a feature list: a team running the business day to day. They work unattended and never stop — but nothing touching money or a customer goes out until you say yes.
+
+A founder thinks "I need an accounts person," never "I need a finance desk," so they report to the manager you would otherwise put on payroll.
 
 **Your accounts manager**
 
-| Agent | Does | Replaces |
+| Role | Does | Replaces |
 |---|---|---|
-| **3-Way Reconciliation** | Matches every order to the payout to the bank credit | An accounts executive tying out the bank, ₹20–30k/mo |
-| **Settlement Insights** | What's landing, when, what was deducted, what's stuck | The part of the accounts job spent reading statements |
-| **Cashflow Forecast** | What cash lands this week, what's committed, when it gets tight | The finance person keeping the cash sheet, ₹25–40k/mo |
-| **Payouts Desk** | Pays vendors, staff and refunds on time, each their way | The accounts payable clerk, ₹20–28k/mo |
+| **Reconciliation Officer** <br>_3-Way Reconciliation_ | Matches every order to the payout to the bank credit | An accounts executive tying out the bank, ₹20–30k/mo |
+| **Settlement Analyst** <br>_Settlement Insights_ | What's landing, when, what was deducted, what's stuck | The part of the accounts job spent reading statements |
+| **Cashflow Planner** <br>_Cashflow Forecast_ | What cash lands this week, what's committed, when it gets tight | The finance person keeping the cash sheet, ₹25–40k/mo |
+| **Payouts Clerk** <br>_Payouts Desk_ | Pays vendors, staff and refunds on time, each their way | The accounts payable clerk, ₹20–28k/mo |
 
 **Your inventory manager**
 
-| Agent | Does | Replaces |
+| Role | Does | Replaces |
 |---|---|---|
-| **Stock Watch** | Watches stock across channels, stops you selling what you don't have | An inventory executive, ₹18–25k/mo |
+| **Inventory Controller** <br>_Stock Watch_ | Watches stock across channels, stops you selling what you don't have | An inventory executive, ₹18–25k/mo |
 
 **Your risk & compliance manager**
 
-| Agent | Does | Replaces |
+| Role | Does | Replaces |
 |---|---|---|
-| **Refund Shield** | Scores every refund claim for fraud before you pay | A fraud reviewer you almost certainly never hired |
-| **GST & Compliance** | Ties GST, TDS and e-invoices to real orders before filing | The monthly compliance scramble your CA bills for |
-| **KYC Desk** | Verifies PAN, Aadhaar, GST, RC or DL in seconds, keeps the proof | A KYC executive checking documents by hand, ₹18–25k/mo |
+| **Refund Risk Officer** <br>_Refund Shield_ | Scores every refund claim for fraud before you pay | A fraud reviewer you almost certainly never hired |
+| **Compliance Officer** <br>_GST & Compliance_ | Ties GST, TDS and e-invoices to real orders before filing | The monthly compliance scramble your CA bills for |
+| **KYC Verifier** <br>_KYC Desk_ | Verifies PAN, Aadhaar, GST, RC or DL in seconds, keeps the proof | A KYC executive checking documents by hand, ₹18–25k/mo |
 
 **Your support manager**
 
-| Agent | Does | Replaces |
+| Role | Does | Replaces |
 |---|---|---|
-| **Dispute Defender** *(wired end-to-end)* | Gathers proof, writes the reply, files before the deadline | The support executive chasing proof, ₹18–25k/mo |
-| **Returns Desk** | Follows a return from pickup to restock, then releases the refund | The returns coordinator between courier, warehouse and refund |
+| **Disputes Officer** <br>_Dispute Defender_ — **wired end-to-end** | Gathers proof, writes the reply, files before the deadline | The support executive chasing proof, ₹18–25k/mo |
+| **Returns Coordinator** <br>_Returns Desk_ | Follows a return from pickup to restock, then releases the refund | The returns coordinator between courier, warehouse and refund |
 
 **Your telecaller**
 
-| Agent | Does | Replaces |
+| Role | Does | Replaces |
 |---|---|---|
-| **Cart Rescue** | Calls buyers who left without paying, sends a payment link | A telecaller, ₹15–22k/mo |
-| **Payment Rescue** | Reads the decline reason, waits, calls, sends a fresh link | A telecaller, ₹15–22k/mo |
-| **COD Guard** | Confirms COD before dispatch, blocks addresses that keep failing | The morning COD calling shift, ₹15–22k/mo |
+| **Cart Recovery Caller** <br>_Cart Rescue_ | Calls buyers who left without paying, sends a payment link | A telecaller, ₹15–22k/mo |
+| **Payment Recovery Caller** <br>_Payment Rescue_ | Reads the decline reason, waits, calls, sends a fresh link | A telecaller, ₹15–22k/mo |
+| **COD Confirmation Caller** <br>_COD Guard_ | Confirms COD before dispatch, blocks addresses that keep failing | The morning COD calling shift, ₹15–22k/mo |
 
 **Your MIS analyst**
 
-| Agent | Does | Replaces |
+| Role | Does | Replaces |
 |---|---|---|
-| **Daily MIS** | The numbers that matter each morning, and what changed and why | An MIS executive, ₹25–35k/mo |
+| **MIS Analyst** <br>_Daily MIS_ | The numbers that matter each morning, and what changed and why | An MIS executive, ₹25–35k/mo |
 
 Salary bands are indicative Indian small-business ranges for framing the arbitrage, not sourced figures — replace them with real data before any external use.
 

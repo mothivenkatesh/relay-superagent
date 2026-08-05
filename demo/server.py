@@ -1506,6 +1506,7 @@ RELAY_AGENTS = [
     # --- Your accounts manager -------------------------------------------
     dict(slug="three_way_recon", name="3-Way Reconciliation", icon="ledger",
         status="roadmap", desk="accounts",
+        role="Reconciliation Officer",
         desc="Matches every order to the payout to the bank credit. Tells "
              "you what didn&rsquo;t tie.",
         today="Someone ties out lines by hand every day. Tools get to about "
@@ -1513,6 +1514,7 @@ RELAY_AGENTS = [
         replaces="an accounts executive tying out the bank, &#8377;20&ndash;30k a month"),
     dict(slug="settlement_insights", name="Settlement Insights", icon="chart",
         status="roadmap", desk="accounts",
+        role="Settlement Analyst",
         desc="Tells you what&rsquo;s landing, when, what was deducted, and "
              "what&rsquo;s stuck.",
         today="You find out what you were actually paid by opening a "
@@ -1520,6 +1522,7 @@ RELAY_AGENTS = [
         replaces="the part of the accounts job spent reading statements"),
     dict(slug="cashflow_forecast", name="Cashflow Forecast", icon="flow",
         status="roadmap", desk="accounts",
+        role="Cashflow Planner",
         desc="Tells you what cash lands this week, what is already spoken "
              "for, and when it gets tight.",
         today="You find out you are short in the week you are short. The "
@@ -1527,6 +1530,7 @@ RELAY_AGENTS = [
         replaces="the finance person who keeps the cash sheet, &#8377;25&ndash;40k a month"),
     dict(slug="payouts_desk", name="Payouts Desk", icon="send",
         status="roadmap", desk="accounts",
+        role="Payouts Clerk",
         desc="Pays vendors, staff and refunds on time, each in the way they "
              "want to be paid.",
         today="Payment day is one person with a bank tab open, copying "
@@ -1535,6 +1539,7 @@ RELAY_AGENTS = [
     # --- Your inventory manager ------------------------------------------
     dict(slug="stock_watch", name="Stock Watch", icon="folder",
         status="roadmap", desk="inventory",
+        role="Inventory Controller",
         desc="Watches stock across every channel, warns you before you run "
              "out, and stops you selling what you don&rsquo;t have.",
         today="You oversell on one channel and sit on dead stock in "
@@ -1544,12 +1549,14 @@ RELAY_AGENTS = [
     # --- Your risk manager -----------------------------------------------
     dict(slug="refund_shield", name="Refund Shield", icon="moon",
         status="roadmap", desk="risk",
+        role="Refund Risk Officer",
         desc="Checks every refund claim for fraud before you pay it.",
         today="Claims get paid before anyone looks, because looking at every "
               "claim costs more than the fraud does.",
         replaces="a fraud reviewer you almost certainly never hired"),
     dict(slug="gst_compliance", name="GST &amp; Compliance", icon="funnel",
         status="roadmap", desk="risk",
+        role="Compliance Officer",
         desc="Keeps GST, TDS and e-invoices tied to real orders, and flags "
              "what won&rsquo;t match before you file.",
         today="Your CA asks for the file on the 18th. Someone spends two "
@@ -1557,6 +1564,7 @@ RELAY_AGENTS = [
         replaces="the monthly compliance scramble your CA bills you for"),
     dict(slug="kyc_desk", name="KYC Desk", icon="lock",
         status="roadmap", desk="risk",
+        role="KYC Verifier",
         desc="Verifies PAN, Aadhaar, GST, RC or driving licence in seconds, "
              "and keeps the proof for audit.",
         today="The jewellery counter needs a PAN before a &#8377;2L sale. "
@@ -1567,6 +1575,7 @@ RELAY_AGENTS = [
     # --- Your support manager --------------------------------------------
     dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
         status="live", desk="support",
+        role="Disputes Officer",
         desc="Gathers the proof, writes the reply, and files it before the "
              "deadline.",
         today="Proof sits across your store, the courier and your inbox. By "
@@ -1574,6 +1583,7 @@ RELAY_AGENTS = [
         replaces="the support executive who chases proof, &#8377;18&ndash;25k a month"),
     dict(slug="returns_desk", name="Returns Desk", icon="baton",
         status="roadmap", desk="support",
+        role="Returns Coordinator",
         desc="Follows every return from pickup to restock, and releases the "
              "refund once the goods are actually back.",
         today="Refunds go out before the item returns, or the customer "
@@ -1583,6 +1593,7 @@ RELAY_AGENTS = [
     # --- Your telecaller --------------------------------------------------
     dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
         status="roadmap", desk="calling",
+        role="Cart Recovery Caller",
         desc="Calls buyers who left without paying and sends them a payment "
              "link.",
         today="A WhatsApp blast gets a fraction back. Nobody can call 400 "
@@ -1590,6 +1601,7 @@ RELAY_AGENTS = [
         replaces="a telecaller, &#8377;15&ndash;22k a month"),
     dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
         status="roadmap", desk="calling",
+        role="Payment Recovery Caller",
         desc="Reads why a payment failed, waits a few minutes, then calls "
              "and sends a fresh link.",
         today="A failed UPI payment is just a lost order. Nobody reads a "
@@ -1597,6 +1609,7 @@ RELAY_AGENTS = [
         replaces="a telecaller, &#8377;15&ndash;22k a month"),
     dict(slug="cod_guard", name="COD Guard", icon="note",
         status="roadmap", desk="calling",
+        role="COD Confirmation Caller",
         desc="Confirms COD orders before dispatch and blocks addresses that "
              "keep failing.",
         today="Someone works the COD list every morning. COD is half your "
@@ -1605,6 +1618,7 @@ RELAY_AGENTS = [
     # --- Your MIS analyst -------------------------------------------------
     dict(slug="daily_mis", name="Daily MIS", icon="book",
         status="roadmap", desk="analyst",
+        role="MIS Analyst",
         desc="Sends you the numbers that matter each morning, and flags what "
              "changed and why.",
         today="Someone rebuilds the MIS sheet every morning. It tells you "
@@ -2185,7 +2199,8 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
              f'row-gap:6px">'
              f'<span class="tile">{ICONS[a["icon"]]}</span>'
              f'<span class="dot2 {"on" if live else "off"}"></span>'
-             f'<b style="font-size:15px">{a["name"]}</b>'
+             f'<b style="font-size:15px">{a["role"]}</b>'
+             f'<span class="st mut" style="flex:none">{a["name"]}</span>'
              f'<span style="margin-left:auto;flex:none">{switch}</span></div>'
              f'<div style="margin:2px 0 10px">{a["desc"]}</div>'
              f'<div class="mut" style="margin:0 0 10px;font-size:12.5px;'
@@ -2249,13 +2264,13 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     n_on = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
     n_desks = len({a["desk"] for a in RELAY_AGENTS})
     return (f'<h1 class="page">Your team</h1>'
-            f'<div class="pagehint">{n_all} agents doing the work of '
-            f'{n_desks} people you would otherwise have to hire. Every one '
-            f'of them replaces a real job and costs less than that job does '
-            f'&mdash; that is the whole point. Delegate the work and they '
-            f'handle the rest, and they keep working while you don&rsquo;t. '
-            f'In this demo {n_on} is switched on; the other {n_all - n_on} '
-            f'are off. You approve before anything sends.</div>'
+            f'<div class="pagehint">A team of {n_all} agents running the '
+            f'business day to day, under {n_desks} managers you would '
+            f'otherwise have to hire. Each one holds a named role and '
+            f'replaces a real job for less than that job costs. They work '
+            f'unattended and never stop &mdash; but nothing that touches '
+            f'money or a customer goes out until you say yes. In this demo '
+            f'{n_on} is switched on; the other {n_all - n_on} are off.</div>'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span></div>'

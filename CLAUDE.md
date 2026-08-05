@@ -33,6 +33,19 @@ are value-added services on top, never the core.
   "I need an accounts person", never "I need a finance desk". Use common
   Indian commerce job titles (telecaller, MIS executive, accounts
   executive), not American corporate ones (CFO, VP Ops).
+- **Every agent holds a named role** (captain, 2026-08-05), so the roster
+  reads as staff, not features: Reconciliation Officer, Settlement
+  Analyst, Cashflow Planner, Payouts Clerk, Inventory Controller, Refund
+  Risk Officer, Compliance Officer, KYC Verifier, Disputes Officer,
+  Returns Coordinator, Cart Recovery Caller, Payment Recovery Caller,
+  COD Confirmation Caller, MIS Analyst. Cards lead with the ROLE; the
+  product name (Dispute Defender etc.) is the secondary chip. The pitch
+  is "a team of agents running the business".
+- **Autonomy wording, handle with care:** "running the business
+  autonomously" contradicts the standing trust line. Settled phrasing:
+  they "work unattended and never stop, but nothing that touches money
+  or a customer goes out until you say yes." Never drop the gate to make
+  the autonomy claim louder.
 - **The rule every agent must pass (captain, 2026-08-05):** an agent
   earns a place ONLY if it replaces a real job and beats that job on
   cost. Not "assists", not "speeds up" — replaces. Every agent therefore
