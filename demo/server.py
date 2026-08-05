@@ -2245,6 +2245,11 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .inedit-in{flex:1;font:inherit;font-size:13.5px;border:1.5px solid #C7CDF3;
   border-radius:9px;padding:8px 12px;outline:none}
 .inedit-in:focus{border-color:var(--accent)}
+.cfgbox{font:inherit;font-size:13.5px;line-height:1.55;color:var(--ink);
+  background:#fff;border:1.5px solid var(--hair);border-radius:12px;
+  padding:12px 16px;outline:none}
+.cfgbox:focus{border-color:var(--accent)}
+.cfgbox::placeholder{color:#9A9DAB}
 .ctitle[contenteditable]{outline:1.5px solid var(--accent);border-radius:6px;
   padding:1px 8px;background:#fff}
 .assignbar{display:flex;align-items:center;gap:12px;background:#FFF8EC;
@@ -3633,7 +3638,7 @@ def agent_settings_content(tid: str, a: dict) -> str:
         '<h2 class="sec">Instructions</h2>'
         '<form method="post" action="/api/agent_cfg">'
         '<input type="hidden" name="slug" value="' + slug + '">'
-        '<textarea class="whenbox" name="instructions" rows="2" '
+        '<textarea class="cfgbox" name="instructions" rows="2" '
         'style="width:100%;max-width:640px;resize:vertical" '
         'placeholder="e.g. never call before 11 AM. It follows this on '
         'every job.">'
