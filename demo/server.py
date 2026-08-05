@@ -809,6 +809,28 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .conv:hover .kebab{visibility:visible}
 .conv.active{background:#ECECF1;color:var(--ink,#1B1F30)}
 .cbadge{flex:none;font-size:11px}
+.qlist{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:4px 20px;margin:4px 0 8px}
+.qrow{border-bottom:1px solid #F1F1F5}
+.qrow:last-child{border-bottom:0}
+.qmain{display:flex;align-items:center;gap:12px;padding:12px 0}
+.qtext{flex:1;min-width:0}
+.qtext b{display:block;font-size:14px;color:var(--ink)}
+.qsub{display:flex;gap:8px;align-items:baseline;font-size:12.5px;
+  margin-top:2px;flex-wrap:wrap}
+.qno{color:#A63A2B}
+.qarr{color:#B9BCC7}
+.qyes{color:#177245}
+.qacts{display:flex;gap:8px;align-items:center;flex:none}
+.qmore{border:0;background:none;color:var(--mut);cursor:pointer;
+  font-size:15px;padding:4px 8px;border-radius:8px}
+.qmore:hover{background:#F0F0F5}
+.qmore.open{transform:rotate(180deg)}
+.qdetail{padding:0 0 16px 42px}
+@media (max-width:760px){
+  .qmain{flex-wrap:wrap}
+  .qacts{width:100%;justify-content:flex-end}
+}
 .needsrow{display:flex;align-items:center;gap:10px;margin:4px 0 12px;
   padding:10px 12px;border-radius:12px;background:#FBF2E2;color:#9A6215}
 .needsrow .rbadge{margin:0}
@@ -1455,7 +1477,7 @@ def task_row(r) -> str:
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
     <span class="tdesc">{auto} Reply to the bank for
-      <a href="/cases/{esc(r.order_id or "")}"><b>{customer}</b></a>.
+      <a href="/cases/{esc(r.order_id or "")}"><b>{customer}</b></a> &middot;
       {esc(bought(r.order_id))}. {plain}.
       <a class="mut" href="/cases/{esc(r.order_id or "")}">{esc(case_no(r.order_id))} &rarr;</a>
       <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span></span>
@@ -2029,10 +2051,11 @@ def case_content(tid: str, order_id: str) -> str:
 
 HOME_CONTENT = """
     <h1 class="page" id="tasks">Needs you</h1>
-    <div class="pagehint">Your team wrote these. Nothing goes to the bank
-      until you say yes.
+    <div class="pagehint">__QSUMMARY__ Nothing moves until you say yes.
       <form method="post" action="/api/sample" style="display:inline;margin-left:8px">
       <button class="btn ghost sm">Try a sample</button></form></div>
+    __PROPS__
+    __DHEAD__
     <div id="bulkbar" class="bulkbar" hidden>
       <b id="bcount"></b>
       <input id="bwhy" class="whyin" style="width:190px" maxlength="200"
@@ -2041,7 +2064,14 @@ HOME_CONTENT = """
       <button class="btn ghost sm" onclick="bulk('reject', this)">Don&rsquo;t send these</button>
       <span class="mut" style="font-size:12px">j/k move &middot; x pick &middot; a yes &middot; d no &middot; e change</span>
     </div>
-    __TASKS__"""
+    __TASKS__
+    <script>
+    function qToggle(b){
+      const det = b.closest('.qrow').querySelector('.qdetail');
+      det.hidden = !det.hidden;
+      b.classList.toggle('open', !det.hidden);
+    }
+    </script>"""
 
 def render(tid: str = "t1", email: str = "") -> str:
     led = WORLD.d.ledger
@@ -2050,11 +2080,27 @@ def render(tid: str = "t1", email: str = "") -> str:
     waiting = [r for r in runs if r.state is RunState.AWAITING_GATE]
     # Every agent's finished work queues with the dispute replies: one
     # list of yeses, whatever kind of work produced them.
-    cash = "".join(prop_card(tid, slug) for slug in PROPS_DEF
-                   if prop_state(tid, slug)["state"] == "waiting")
-    tasks = cash + ("\n".join(task_row(r) for r in waiting) or (
-        '' if cash else
+    waiting_props = [sl for sl in PROPS_DEF
+                     if prop_state(tid, sl)["state"] == "waiting"]
+    waiting_props.sort(key=lambda sl: -PROPS_DEF[sl].get("stake_n", 0))
+    stake_total = sum(PROPS_DEF[sl].get("stake_n", 0)
+                      for sl in waiting_props) * 100
+    props = ""
+    if waiting_props:
+        props = (f'<h2 class="sec">From your agents ({len(waiting_props)})'
+                 f'</h2><div class="qlist">'
+                 + "".join(prop_row(tid, sl) for sl in waiting_props)
+                 + '</div>')
+    dhead = (f'<h2 class="sec">Replies to the bank ({len(waiting)})</h2>'
+             if waiting else '')
+    tasks = ("\n".join(task_row(r) for r in waiting) or (
+        '' if props else
         '<div class="empty">All clear: nothing needs review.</div>'))
+    n_all_q = len(waiting_props) + len(waiting)
+    d_stake = sum(price_of(r.order_id) for r in waiting)
+    summary = (f'<b>{n_all_q}</b> decisions, '
+               f'<b>&#8377;{inr(stake_total + d_stake)}</b> riding on them.'
+               if n_all_q else 'All clear.')
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
             .replace("__SIDEBAR__", sidebar_html("tasks", tid,
@@ -2063,7 +2109,10 @@ def render(tid: str = "t1", email: str = "") -> str:
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0]))
             .replace("__NWAIT__", str(len(waiting) + cash_waiting(tid)))
-            .replace("__TASKS__", tasks))
+            .replace("__TASKS__", tasks)
+            .replace("__PROPS__", props)
+            .replace("__DHEAD__", dhead)
+            .replace("__QSUMMARY__", summary))
 
 
 TEMPLATE = """<!DOCTYPE html>
@@ -5471,6 +5520,40 @@ def props_waiting(tid: str) -> int:
                if prop_state(tid, slug)["state"] == "waiting")
 
 
+def prop_row(tid: str, slug: str) -> str:
+    """The queue grammar: one glance, one decision. A compact row with
+    the ask, the compressed consequence pair, and the two verbs. Depth
+    (the full card) unfolds only on demand."""
+    d = PROPS_DEF[slug]
+    role = next((a["role"] for a in RELAY_AGENTS if a["slug"] == slug), slug)
+    return (
+        f'<div class="qrow" id="q-{slug}">'
+        f'<div class="qmain">'
+        f'{avatar(slug, 30, True)}'
+        f'<div class="qtext"><b>{d["title"]}</b>'
+        f'<span class="qsub"><span class="qno">{d["ifno"]}</span>'
+        f'<span class="qarr">&rarr;</span>'
+        f'<span class="qyes">{d["ifyes"]}</span></span></div>'
+        f'<div class="qacts">'
+        f'<form method="post" action="/api/prop_act" style="display:contents">'
+        f'<input type="hidden" name="slug" value="{slug}">'
+        f'<input type="hidden" name="action" value="approve">'
+        f'<button class="btn primary sm">{d["yes"]}</button></form>'
+        f'<form method="post" action="/api/prop_act" style="display:contents">'
+        f'<input type="hidden" name="slug" value="{slug}">'
+        f'<input type="hidden" name="action" value="decline">'
+        f'<button class="btn ghost sm">{d["no"]}</button></form>'
+        f'<button class="qmore" onclick="qToggle(this)" '
+        f'aria-label="Details">&#8964;</button>'
+        f'</div></div>'
+        f'<div class="qdetail" hidden>'
+        f'<div class="wp-kicker">{d["kicker"]} &middot; {role}</div>'
+        f'<div class="cashwhy">{d["why"]}</div>'
+        + "".join(f'<div class="cashrow"><span>{lbl}</span>{txt}</div>'
+                  for lbl, txt in d["rows"])
+        + '</div></div>')
+
+
 def prop_card(tid: str, slug: str) -> str:
     d = PROPS_DEF[slug]
     p = prop_state(tid, slug)
@@ -5502,7 +5585,6 @@ def prop_card(tid: str, slug: str) -> str:
             f'<input type="hidden" name="slug" value="{slug}">'
             f'<input type="hidden" name="action" value="decline">'
             f'<button class="btn ghost">{d["no"]}</button></form>'
-            f'<span class="wp-trust">Nothing moves until you say yes.</span>'
             f'</div>')
     rows = "".join(f'<div class="cashrow"><span>{lbl}</span>{txt}</div>'
                    for lbl, txt in d["rows"])
@@ -5512,7 +5594,7 @@ def prop_card(tid: str, slug: str) -> str:
         f'<b>{d["ifno"]}</b></div>'
         f'<div class="ab yes"><span>If you say yes</span>'
         f'<b>{d["ifyes"]}</b></div></div>')
-    details = (f'<details class="cashmore"><summary>The details</summary>'
+    details = (f'<details class="cashmore"><summary>Details</summary>'
                f'<div class="cashwhy">{d["why"]}</div>{rows}</details>')
     return (f'<div class="cashcard" id="prop-{slug}">'
             f'<div class="wp-kicker">{d["kicker"]} &middot; {role}</div>'
