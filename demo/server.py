@@ -4632,6 +4632,9 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
          "The money side: settlements, cash, payouts, the daily numbers."),
         ("Relay for Trust", ("risk",),
          "The checks: refund fraud, filings, KYC, mule accounts."),
+        ("Built by you", ("custom",),
+         "Described in chat, drafted by Relay. Same rule: nothing sends "
+         "without your yes."),
     ]
     def _needs(a):
         sl = a["slug"]
@@ -6876,7 +6879,10 @@ class Handler(BaseHTTPRequestHandler):
                       if "@" + p["name"].lower() in msg.lower()]
             for t in tagged:
                 msg = _re.sub("@" + _re.escape(t), t, msg, flags=_re.I)
-            res = ask(msg)
+            build = (payload.get("mode") == "build"
+                     or bool(_BUILD_PAT.search(msg)))
+            res = (_build_res(sess["tenant_id"], msg) if build
+                   else ask(msg))
             if called:
                 res["reply"] = (f'<b>{esc(called)}</b> here. '
                                 + res.get("reply", ""))
@@ -6885,7 +6891,8 @@ class Handler(BaseHTTPRequestHandler):
                     + '<span class="rmeta">' + " ".join(
                         f'{mention(t)} will see this thread.'
                         for t in tagged) + '</span>')
-            res = _polish_reply(msg, res)
+            if not build:
+                res = _polish_reply(msg, res)
             c = CONVS.get(payload.get("conv_id") or "")
             if c is None or c["tenant"] != sess["tenant_id"]:
                 c = _new_conv(sess["tenant_id"], msg)
@@ -6903,6 +6910,25 @@ class Handler(BaseHTTPRequestHandler):
                         c["pending"] = res[key].split('id="prop-')[1].split('"')[0]
             _touch(c)
             return self._json({**res, "conv_id": c["id"], "title": c["title"]})
+        if self.path == "/api/agent_build_confirm":
+            sess = self._session() or {"tenant_id": "t1"}
+            payload = json.loads(raw)
+            bid = payload.get("bid", "")
+            reply = _build_confirm(sess["tenant_id"], bid)
+            c = CONVS.get(payload.get("conv_id") or "")
+            if c and c["tenant"] == sess["tenant_id"]:
+                for m in c["msgs"]:
+                    if f'id="bact-{bid}"' in m["html"]:
+                        m["html"] = _re.sub(
+                            r'<div class="bacts" id="bact-' + bid
+                            + r'".*?</div>',
+                            '<span class="st ok">Added</span>',
+                            m["html"], flags=_re.S)
+                c["msgs"].append({"who": "msg user", "html": "Yes, add it"})
+                c["msgs"].append({"who": "msg bot", "html": reply})
+                c["outcome"] = "approved"
+                _touch(c)
+            return self._json({"reply": reply})
         if self.path == "/api/sample":
             sess = self._session()
             if not sess:
@@ -7574,6 +7600,127 @@ def load_sample(tid: str, email: str) -> str:
     return run.run_id if run else ""
 
 
+# ------------------------------------------------------------- build on the fly
+# The composer is a front door, not a question box: describe a job in one
+# sentence and Relay drafts the teammate. The draft is inert until the yes,
+# and the finished agent obeys the same house rule as the shipped fifteen:
+# anything it wants to send or hold lands in Needs you first.
+PENDING_BUILDS: dict[str, dict] = {}
+_build_n = 0
+
+_BUILD_PAT = _re.compile(
+    r"\b(build|create|make|draft|set up|spin up)\b.{0,40}\b(agent|teammate|bot)\b"
+    r"|\bagent (that|to|for|which|who)\b"
+    r"|\bi need (someone|somebody) (to|who)\b",
+    _re.I)
+
+_BUILD_NAMES = [
+    (("cod",), "COD Sentry", "risk"),
+    (("cart",), "Cart Keeper", "calling"),
+    (("refund",), "Refund Referee", "risk"),
+    (("stock", "inventory", "restock"), "Shelf Warden", "inventory"),
+    (("review", "rating", "star"), "Review Reader", "support"),
+    (("gst", "invoice", "filing", "tax"), "Filing Clerk", "accounts"),
+    (("payout", "vendor", "supplier"), "Vendor Payer", "accounts"),
+    (("courier", "delivery", "shipment", "rto"), "Delivery Chaser", "support"),
+    (("payment", "upi", "settlement"), "Payment Sleuth", "accounts"),
+    (("whatsapp", "message", "inbox"), "Inbox Keeper", "support"),
+]
+
+_BUILD_DOES = {
+    "risk": "Holds what looks wrong, releases what checks out.",
+    "calling": "Calls and messages buyers, and writes down every answer.",
+    "accounts": "Gets the numbers and the payments ready for your yes.",
+    "inventory": "Counts ahead so you order before you run out.",
+    "support": "Drafts the replies and keeps the thread until it is settled.",
+}
+
+_BUILD_STEPS = [
+    ("Reading the job", "what to watch, what counts as wrong"),
+    ("Choosing what it may touch", "orders and holds, nothing else"),
+    ("Writing its rules", "it checks with you before anything moves"),
+]
+
+
+def _build_draft(msg: str) -> dict:
+    low = msg.lower()
+    name, kind = "New Teammate", "support"
+    for words, nm, kd in _BUILD_NAMES:
+        if any(w in low for w in words):
+            name, kind = nm, kd
+            break
+    watches = _re.sub(
+        r"^\s*(please\s+)?(build|create|make|draft|set up|spin up)"
+        r"( me)?( up)?( an| a)?( new)? ?(agent|teammate|bot)?"
+        r"( that| to| for| which| who)?\s*", "", msg, flags=_re.I)
+    watches = _re.sub(
+        r"^\s*i need (someone|somebody|an agent)( to| who| that)?\s*",
+        "", watches, flags=_re.I)
+    watches = (watches or msg).strip(" .")
+    if watches:
+        watches = watches[:1].upper() + watches[1:]
+    else:
+        watches = msg
+    slug = _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return dict(name=name, kind=kind, slug=slug, watches=watches)
+
+
+def _build_res(tid: str, msg: str) -> dict:
+    """The chat answer for a described job: three visible steps of drafting,
+    then the teammate as a card with the one yes that makes it real."""
+    global _build_n
+    d = _build_draft(msg)
+    _build_n += 1
+    bid = f"bld{_build_n}"
+    PENDING_BUILDS[bid] = {**d, "tenant": tid}
+    card = (
+        f'<div class="bcard" id="bld-{bid}">'
+        f'<div class="bhead">{avatar(d["slug"], 34, True)}'
+        f'<b>{d["name"]}</b>'
+        f'<span class="st mut">Built by you &middot; draft</span></div>'
+        f'<div class="cashrow"><span>The job</span>{esc(d["watches"])}</div>'
+        f'<div class="cashrow"><span>How</span>{_BUILD_DOES[d["kind"]]}</div>'
+        f'<div class="cashrow"><span>Asks you</span>Anything it wants to '
+        f'send or hold lands in Needs you first.</div>'
+        f'<div class="bacts" id="bact-{bid}">'
+        f'<button class="btn primary sm" onclick="buildAdd(\'{bid}\')">'
+        f'Add to my agents</button>'
+        f'<button class="btn ghost sm" onclick="buildSkip(\'{bid}\')">'
+        f'Not now</button></div></div>')
+    reply = ("Here is who I would put on it. Look it over: it does nothing "
+             "until you add it.")
+    return {"reply": reply, "cards": card, "steps": list(_BUILD_STEPS),
+            "proposal": None, "product": "", "case": ""}
+
+
+def _build_confirm(tid: str, bid: str) -> str:
+    d = PENDING_BUILDS.pop(bid, None)
+    if d is None:
+        return ("That draft is gone. Describe the job again and I will "
+                "redraw it.")
+    slug = d["slug"]
+    if any(a["slug"] == slug for a in RELAY_AGENTS):
+        n = 2
+        while any(a["slug"] == f"{slug}_{n}" for a in RELAY_AGENTS):
+            n += 1
+        slug = f"{slug}_{n}"
+    RELAY_AGENTS.append(dict(
+        slug=slug, name=d["name"], icon="pen", status="roadmap", desk="custom",
+        role=d["name"],
+        desc=esc(d["watches"]) + ". " + _BUILD_DOES[d["kind"]],
+        today="This job lived in your head until you typed it into the chat.",
+        replaces="a job you described in one sentence"))
+    DEMO_ON[slug] = True
+    log_decision(tid, "you",
+                 f"Added agent {d['name']}, built from a chat description",
+                 "/agents/" + slug)
+    return (f'Meet <b>{d["name"]}</b>. It is on the Agents page under '
+            f'<b>Built by you</b>, watching from now. Its first find will '
+            f'land in Needs you.'
+            f'<span class="rmeta"><a href="/agents/{slug}">Open '
+            f'{d["name"]} &rarr;</a></span>')
+
+
 # ------------------------------------------------------------- conversations
 # Server-side chat history: pinned + recents, per tenant. In-memory like the
 # rest of the demo world; rows are (who, html) exactly as rendered.
@@ -7696,6 +7843,37 @@ def seed_conversations() -> None:
         "were answered with those two pieces of proof.")
     live("The never-arrived ones", "Show me the never-arrived ones")
     live("What needs a person", "what needs a person")
+
+    # The two conversations the composer's new powers point at: an insight
+    # that ends already closed, and an agent built from one described job.
+    authored(
+        "Tuesday's payment dip", "Why did payments dip on Tuesday?",
+        "Tuesday closed <b>18% under</b> a normal Tuesday, and it was one "
+        "thing, not many: <b>UPI checkouts between 7 and 9 PM</b> timed out "
+        "at the bank&rsquo;s end. 41 buyers hit a failed screen. 29 paid on "
+        "retry, <b>12 did not</b>, and Payment Rescue messaged all 12 that "
+        "night with a fresh link: <b>7 have paid</b>, 2 said later this "
+        "week, 3 are quiet. The real loss so far is 3 orders, about "
+        "<b>&#8377;4,110</b>. Nothing here is waiting on you; it is "
+        "already handled.")
+    c = _new_conv("t1", "An agent for sale-week COD")
+    q = ("Build me an agent that watches COD orders during sale weeks and "
+         "holds anything over ₹3,000 from a first-time buyer")
+    res = _build_res("t1", q)
+    bid = res["cards"].split('id="bld-')[1].split('"')[0]
+    card_added = _re.sub(r'<div class="bacts".*?</div>',
+                         '<span class="st ok">Added</span>', res["cards"],
+                         flags=_re.S)
+    reply2 = _build_confirm("t1", bid)
+    c["msgs"] += [
+        {"who": "msg user", "html": esc(q)},
+        {"who": "steps", "html": steps_html(list(_BUILD_STEPS), done=True)},
+        {"who": "msg bot", "html": res["reply"]},
+        {"who": "cards", "html": card_added},
+        {"who": "msg user", "html": "Yes, add it"},
+        {"who": "msg bot", "html": reply2},
+    ]
+    c["outcome"] = "approved"
 
 
 _LIVE_LLM = None
@@ -7971,6 +8149,35 @@ box-shadow:0 6px 24px rgba(82,102,235,.10)}
 .cbox input{flex:1;border:none;outline:none;font:inherit;font-size:14.5px;color:var(--ink);
 background:none}
 .cbox input::placeholder{color:#9A9DAB}
+.lcluster{position:relative;display:flex;align-items:center;gap:2px}
+.amchip{border:0;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;
+  color:#8A6A15;background:#F6EFDA;border-radius:9px;padding:5px 10px;
+  margin-right:4px;transition:background .12s}
+.amchip:hover{background:#F0E6C8}
+.amchip.build{color:#3B4CC9;background:var(--accent-soft)}
+.cbtn{border:0;background:none;cursor:pointer;color:#5B5E6B;width:30px;height:30px;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  transition:background .12s}
+.cbtn:hover{background:#F0F0F5}
+.cbtn svg{width:16px;height:16px}
+.cbtn.rec{color:#C0392B;background:#FBEAE7;animation:recpulse 1s infinite}
+@keyframes recpulse{50%{box-shadow:0 0 0 5px rgba(192,57,43,.12)}}
+.ammenu{position:absolute;bottom:calc(100% + 12px);left:0;background:#fff;
+  border:1px solid var(--hair);border-radius:12px;
+  box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:300px;z-index:6}
+.ammenu[hidden]{display:none}
+.ammenu .tick{margin-left:auto;color:var(--accent);font-weight:600}
+.bcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:16px;max-width:520px}
+.bcard .cashrow{display:flex;gap:12px;font-size:13.5px;line-height:1.6;
+  padding:8px 0;border-top:1px solid #F1F1F5}
+.bcard .cashrow span:first-child{flex:none;width:88px;font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--mut);
+  padding-top:2px}
+.bhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.bhead b{font-size:15px;color:var(--ink)}
+.bhead .st{margin-left:auto}
+.bacts{display:flex;gap:8px;margin-top:12px}
 </style></head><body>
 __SIDEBAR__
 <div class="main">
@@ -7997,6 +8204,26 @@ __SIDEBAR__
     <input id="box" placeholder="Ask anything, or tell Relay what to do. / calls an agent, @ tags a teammate" value="__SAYVAL__" autofocus autocomplete="off"
       oninput="mpopScan()" onkeydown="mpopKeys(event)">
     <div class="hrow">
+      <div class="lcluster">
+        <button type="button" class="amchip" id="amchip" onclick="amToggle(event)">Auto</button>
+        <button type="button" class="cbtn" onclick="plusToggle(event)" aria-label="Add to this ask">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button type="button" class="cbtn" id="micbtn" onclick="micGo()" aria-label="Say it instead">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg></button>
+        <button type="button" class="cbtn" onclick="amToggle(event)" aria-label="How Relay answers">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <div class="ammenu" id="ammenu" hidden>
+          <button type="button" class="mopt" onclick="amSet('auto')"><div>Auto<small>Relay reads the ask and picks the right agent to answer.</small></div><span class="tick" id="tk-auto">&#10003;</span></button>
+          <button type="button" class="mopt" onclick="amPick()"><div>One agent<small>You choose who answers. Typing / does the same.</small></div></button>
+          <button type="button" class="mopt" onclick="amSet('build')"><div>Build an agent<small>Describe a job in a sentence. Relay drafts the teammate.</small></div><span class="tick" id="tk-build" hidden>&#10003;</span></button>
+        </div>
+        <div class="ammenu" id="plusmenu" hidden>
+          <button type="button" class="mopt" onclick="plusFilePick()"><div>Add a file<small>Lands in Knowledge; every agent reads it.</small></div></button>
+          <button type="button" class="mopt" onclick="plusOrder()"><div>Find an order or buyer<small>Search everything Relay knows.</small></div></button>
+          <button type="button" class="mopt" onclick="plusSched()"><div>Make this a schedule<small>What you typed runs on its own, under Scheduled.</small></div></button>
+        </div>
+        <input type="file" id="bfile" hidden onchange="plusFile(this)">
+      </div>
       __MODEUI__
       <button class="sendbtn" aria-label="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -8008,6 +8235,98 @@ __SIDEBAR__
 <script>
 let CONV = "__CONVID__";
 const MENT = __MENTIONS__;
+let AMODE = 'auto';
+function closeMenus(){
+  document.getElementById('ammenu').hidden = true;
+  document.getElementById('plusmenu').hidden = true;
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.lcluster')) closeMenus();
+});
+function amToggle(ev){
+  ev.stopPropagation();
+  const m = document.getElementById('ammenu');
+  const show = m.hidden; closeMenus(); m.hidden = !show;
+}
+function plusToggle(ev){
+  ev.stopPropagation();
+  const m = document.getElementById('plusmenu');
+  const show = m.hidden; closeMenus(); m.hidden = !show;
+}
+function amSet(mode){
+  AMODE = mode; closeMenus();
+  const chip = document.getElementById('amchip');
+  chip.textContent = mode === 'build' ? 'Build' : 'Auto';
+  chip.classList.toggle('build', mode === 'build');
+  document.getElementById('tk-auto').hidden = mode !== 'auto';
+  document.getElementById('tk-build').hidden = mode !== 'build';
+  if (!box.dataset.ph) box.dataset.ph = box.placeholder;
+  box.placeholder = mode === 'build'
+    ? 'Describe the job: what to watch, what to do, when to check with you'
+    : box.dataset.ph;
+  box.focus();
+}
+function amPick(){
+  amSet('auto');
+  if (!/\/$/.test(box.value))
+    box.value += (box.value && !/\s$/.test(box.value) ? ' ' : '') + '/';
+  box.focus(); mpopScan();
+}
+function plusFilePick(){ closeMenus(); document.getElementById('bfile').click(); }
+async function plusFile(inp){
+  const f = inp.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  document.getElementById('empty')?.remove();
+  const note = bubble('msg bot',
+    'Reading <b>' + f.name.replace(/</g, '&lt;') + '</b>&hellip;');
+  await fetch('/api/file_upload', {method: 'POST', body: fd});
+  note.innerHTML = 'On the shelf: <b>' + f.name.replace(/</g, '&lt;')
+    + '</b>. Every agent reads it from <a href="/memory?t=files">Knowledge</a>.';
+  inp.value = '';
+}
+function plusOrder(){ closeMenus(); if (typeof openSpot === 'function') openSpot(); }
+async function plusSched(){
+  closeMenus();
+  const t = box.value.trim();
+  if (!t){
+    if (!box.dataset.ph) box.dataset.ph = box.placeholder;
+    box.placeholder = 'Say what and when: every Friday 6 PM, chase pending payments';
+    box.focus(); return;
+  }
+  document.getElementById('empty')?.remove();
+  bubble('msg user', t.replace(/</g, '&lt;')); box.value = '';
+  await fetch('/api/routine', {method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'text=' + encodeURIComponent(t)});
+  bubble('msg bot', 'Scheduled. It runs on its own now, and it lives in '
+    + '<a href="/scheduled">Scheduled</a> if you want to change or stop it.');
+}
+const MIC_LINE = 'I need someone to read every one-star review and draft a reply by morning';
+let micBusy = false;
+async function micGo(){
+  if (micBusy) return; micBusy = true;
+  const b = document.getElementById('micbtn');
+  b.classList.add('rec');
+  await wait(900);
+  box.focus();
+  for (const ch of MIC_LINE){ box.value += ch; await wait(16); }
+  b.classList.remove('rec'); micBusy = false;
+}
+async function buildAdd(bid){
+  const res = await fetch('/api/agent_build_confirm', {method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({bid, conv_id: CONV})});
+  const data = await res.json();
+  const act = document.getElementById('bact-' + bid);
+  if (act) act.outerHTML = '<span class="st ok">Added</span>';
+  bubble('msg user', 'Yes, add it');
+  const bb = bubble('msg bot', '');
+  await streamInto(bb, data.reply);
+}
+function buildSkip(bid){
+  document.getElementById('bld-' + bid)?.remove();
+  bubble('msg bot', 'Left as a draft: nothing was created.');
+}
 function mpopScan(){
   const v = box.value;
   const m = v.match(/(^|\s)([@\/])([\w .]*)$/);
@@ -8154,8 +8473,9 @@ async function send(text){
     '<span class="shl"></span><span class="shl" style="width:72%"></span>');
   const res = await fetch('/api/chat', {method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({message:text, conv_id: CONV})});
+    body: JSON.stringify({message:text, conv_id: CONV, mode: AMODE})});
   const data = await res.json();
+  if (AMODE === 'build') amSet('auto');
   think.remove();
   if (data.conv_id && !CONV){
     CONV = data.conv_id;
