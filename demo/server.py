@@ -1595,7 +1595,10 @@ def case_status(runs: list) -> tuple[str, str]:
     if any(r.state is RunState.AWAITING_GATE for r in runs):
         return ("need", "Needs your yes")
     if any(r.state in (RunState.TIMED_OUT, RunState.FAILED) for r in runs):
-        return ("need", "Needs a person")
+        # A Relay person is on it — that is THEIR queue, not the founder's.
+        # Counting it under "Needs you" hands the founder a job they cannot
+        # do; to them, a case in someone's hands is a case being worked.
+        return ("work", "With a person &mdash; being handled")
     if any(not r.state.terminal for r in runs):
         return ("work", "Working")
     return ("done", "Done")
@@ -1952,6 +1955,12 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
   cursor:pointer;padding:4px 8px;border-radius:7px}
 .rtool:hover{background:#F0F0F5;color:var(--ink)}
 .rtool.danger:hover{color:#C0392B}
+.inedit{display:flex;gap:8px;align-items:center;width:100%}
+.inedit-in{flex:1;font:inherit;font-size:13.5px;border:1.5px solid #C7CDF3;
+  border-radius:9px;padding:7px 12px;outline:none}
+.inedit-in:focus{border-color:var(--accent)}
+.ctitle[contenteditable]{outline:1.5px solid var(--accent);border-radius:6px;
+  padding:1px 6px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -2909,33 +2918,54 @@ DESK_ACCESS = {
         does=["write you a summary", "flag what didn&rsquo;t tie"],
         rules=["It reads statements; it never moves money.",
                "Anything that doesn&rsquo;t tie is shown to you, never patched over.",
-               "Every number can be traced back to a bank line."]),
+               "Every number can be traced back to a bank line."],
+        handoff=["A line that still won&rsquo;t tie after two tries goes to "
+                 "a person, with the working shown.",
+                 "Anything that would move money is never guessed &mdash; a "
+                 "person decides."]),
     "inventory": dict(
         reads=["stock counts", "orders coming in", "supplier lead times"],
         does=["warn you before you run out", "draft a reorder for your yes"],
         rules=["It never places an order itself &mdash; a reorder waits for your yes.",
-               "A warning names the product, the days left, and why."]),
+               "A warning names the product, the days left, and why."],
+        handoff=["A reorder bigger than your usual goes to a person first.",
+                 "Counts that disagree across channels &mdash; a person "
+                 "reconciles them, not a guess."]),
     "risk": dict(
         reads=["refund claims", "filing deadlines", "the rules that apply to you"],
         does=["flag the risky ones", "keep your filings on time"],
         rules=["A doubt goes to you, never a quiet guess.",
-               "Deadlines are watched every day; a near-miss is said out loud."]),
+               "Deadlines are watched every day; a near-miss is said out loud."],
+        handoff=["A claim it cannot prove either way goes to a person, with "
+                 "both readings written down.",
+                 "A filing at risk of missing its date is put in front of a "
+                 "person the same day."]),
     "support": dict(
         reads=["disputes from the bank", "your orders", "the proof on file"],
         does=["write the reply for your yes", "file it once you agree"],
         rules=["Nothing reaches a bank or a buyer without your yes.",
-               "Every claim in a reply points at proof on file."]),
+               "Every claim in a reply points at proof on file."],
+        handoff=["An angry buyer, or any mention of legal action, goes "
+                 "straight to a person.",
+                 "A reply it is not sure of is never sent &mdash; a person "
+                 "reads it first."]),
     "calling": dict(
         reads=["dropped carts", "failed payments", "orders waiting confirmation"],
         does=["call or message the buyer", "bring back the ones worth saving"],
         rules=["It never calls the same buyer twice about one thing.",
                "Calling hours are respected &mdash; no 9 PM calls.",
-               "A buyer who says stop is never contacted again."]),
+               "A buyer who says stop is never contacted again."],
+        handoff=["A buyer who asks for a person gets one &mdash; the agent "
+                 "stops talking, mid-call if needed.",
+                 "Any argument about money on a call is handed over, not "
+                 "argued."]),
     "analyst": dict(
         reads=["everything the other agents record"],
         does=["write your daily one-pager"],
         rules=["Numbers are counted from the record, never guessed.",
-               "Bad news is on page one, not buried."]),
+               "Bad news is on page one, not buried."],
+        handoff=["A number that looks wrong is flagged to a person &mdash; "
+                 "never smoothed over."]),
 }
 
 DEMO_ON: dict[str, bool] = {}    # slug -> switched on (demo state, in-memory)
@@ -3108,6 +3138,19 @@ def roster_detail_content(tid: str, a: dict) -> str:
     rules = "".join(f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
                     f'<span class="tdesc">{r}</span></div>'
                     for r in acc["rules"])
+    # The AOP moment (Fin/Decagon pattern): every agent knows when the job
+    # stops being its to do. The handoff conditions are written per desk,
+    # and the standing rule is the same everywhere: once a person has it,
+    # the agent waits.
+    handoff = "".join(
+        f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
+        f'<span class="tdesc">{h}</span></div>'
+        for h in acc.get("handoff", []))
+    handoff += (
+        '<div class="trow slim"><span class="ico">' + ICONS["shield"] + '</span>'
+        '<span class="tdesc"><b>While a person has it, this agent waits.</b> '
+        '<span class="mut">It never acts on a handed-over case, and the '
+        'handover itself is written into the case history.</span></span></div>')
     return (
         f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
         f'{_identicon(a["slug"], 44)}'
@@ -3123,6 +3166,7 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<h2 class="sec">What it can touch</h2>'
         f'<div class="capwrap">{caps}</div>'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
+        f'<h2 class="sec">When a person takes over</h2>{handoff}'
         f'{_kyc_builder() if a["slug"] == "kyc_desk" else ""}'
         f'{helpers}')
 
@@ -4101,7 +4145,7 @@ def mode_ui(tid: str) -> str:
 ROUTINES: dict[str, list[dict]] = {}
 
 _DEFAULT_ROUTINES = [
-    dict(name="Morning brief", when="Every morning, 8:00",
+    dict(name="Morning brief", brief=True, when="Every morning, 8:00",
          what="What came in overnight, what your team already handled, and "
               "the few things waiting on your yes.",
          last="ran this morning", on=True),
@@ -4214,7 +4258,7 @@ def scheduled_content(tid: str) -> str:
                  f'<b>{esc(r["name"])}</b> '
                  f'<span class="mut">{r["when"]} &mdash; {r["what"]}</span></span>'
                  f'{stat}{tools}')
-        if r["name"] == "Morning brief":
+        if r.get("brief"):
             # The run leaves a note; the row opens it. This is the promise
             # from the intro cards, kept.
             rows += (f'<div class="trow slim" style="display:flex">{inner}'
@@ -4224,14 +4268,24 @@ def scheduled_content(tid: str) -> str:
             rows += f'<div class="trow slim" style="display:flex">{inner}</div>'
     rows += """<script>
 function routineEdit(i, btn){
-  const cur = btn.closest('.trow').querySelector('.tdesc').dataset.name;
-  const t = prompt('Say it the way you want it:', cur);
-  if (!t || t === cur) return;
-  const f = document.createElement('form');
-  f.method = 'post'; f.action = '/api/routine_edit';
-  f.innerHTML = '<input type="hidden" name="i" value="' + i + '">'
-    + '<input type="hidden" name="text" value="' + t.replace(/"/g, '&quot;') + '">';
-  document.body.appendChild(f); f.submit();
+  const row = btn.closest('.trow');
+  if (row.querySelector('.inedit')) return;
+  const td = row.querySelector('.tdesc');
+  td.dataset.prev = td.innerHTML;
+  const cur = td.dataset.name.replace(/"/g, '&quot;');
+  td.innerHTML = '<form class="inedit" method="post" action="/api/routine_edit">'
+    + '<input type="hidden" name="i" value="' + i + '">'
+    + '<input class="inedit-in" name="text" maxlength="140" value="' + cur + '">'
+    + '<button class="btn primary sm">Save</button>'
+    + '<button type="button" class="btn ghost sm" onclick="routineCancel(this)">Cancel</button>'
+    + '</form>';
+  const inp = td.querySelector('.inedit-in');
+  inp.focus(); inp.select();
+  inp.onkeydown = e => { if (e.key === 'Escape') routineCancel(inp); };
+}
+function routineCancel(el){
+  const td = el.closest('.tdesc');
+  td.innerHTML = td.dataset.prev;
 }
 </script>"""
     return (f'<h1 class="page">Scheduled</h1>'
@@ -5846,12 +5900,35 @@ async function convAct(kind, id){
   if (kind === 'delete' && id === CONV) return location.href = '/';
   location.reload();
 }
-async function convRename(id){
-  const t = prompt('Rename conversation:');
-  if (!t) return;
-  await fetch('/api/conv/rename', {method:'POST',
-    headers:{'Content-Type':'application/json'}, body: JSON.stringify({id, title: t})});
-  location.reload();
+function convRename(id){
+  // Inline, in place — never a browser prompt. Enter saves, Escape puts
+  // the old name back, clicking away saves.
+  const a = document.querySelector('.conv[href="/?c=' + id + '"]');
+  const t = a?.querySelector('.ctitle');
+  if (!t || t.isContentEditable) return;
+  const old = t.textContent;
+  a.dataset.edit = '1';
+  t.contentEditable = 'plaintext-only';
+  t.focus();
+  const sel = window.getSelection();
+  sel.selectAllChildren(t);
+  const done = async (save) => {
+    t.contentEditable = 'false';
+    t.onkeydown = t.onblur = null;
+    delete a.dataset.edit;
+    const val = t.textContent.trim().slice(0, 80);
+    if (!save || !val || val === old){ t.textContent = old; return; }
+    t.textContent = val;
+    await fetch('/api/conv/rename', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id, title: val})});
+  };
+  t.onkeydown = e => {
+    if (e.key === 'Enter'){ e.preventDefault(); done(true); }
+    else if (e.key === 'Escape'){ e.preventDefault(); done(false); }
+  };
+  t.onblur = () => done(true);
+  a.onclick = e => { if (a.dataset.edit) e.preventDefault(); };
 }
 function bubble(cls, html){
   const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
