@@ -922,6 +922,12 @@ WORK_CSS = """
 .onemem svg{width:18px;height:18px;color:#3A46A8;flex:none}
 .onemem span{flex:1}
 .onemem a{color:var(--accent);font-size:12.5px;flex:none}
+.avwrap{position:relative;flex:none;display:inline-flex}
+.avwrap .pres{position:absolute;right:-2px;bottom:-2px;width:10px;
+  height:10px;border-radius:50%;border:2px solid #fff}
+.avwrap .pres.on{background:#1E9E5A}
+.avwrap .pres.off{background:#C2C5D2}
+.arow-min .avwrap .pres{width:8px;height:8px;right:-1px;bottom:-1px}
 .mention{display:inline-block;border-radius:8px;padding:0 6px;
   font-weight:600;font-size:.95em;white-space:nowrap;line-height:1.5}
 .burger{display:none;position:fixed;top:12px;left:12px;z-index:70;
@@ -1181,7 +1187,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
                 f'<a class="rail unread{" active" if active == a["slug"] else ""}" '
                 f'data-st="need" href="/agents/{a["slug"]}" '
                 f'title="{esc(a["role"])}">'
-                f'{_identicon(a["slug"], 30)}'
+                f'{avatar(a["slug"], 30, True)}'
                 f'<span class="rbody"><span class="rtop"><span class="rname">'
                 f'{esc(a["role"])}</span>'
                 f'<span class="rstake">{stake}</span></span>'
@@ -1194,7 +1200,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
                 f'<a class="rail arow-min quietrow'
                 f'{" active" if active == a["slug"] else ""}" '
                 f'href="/agents/{a["slug"]}" title="{esc(a["role"])}">'
-                f'{_identicon(a["slug"], 22)}'
+                f'{avatar(a["slug"], 22, True)}'
                 f'<span class="rlabel">{esc(a["role"])}</span>'
                 f'<span class="qword">{word}</span></a>')
     return f"""
@@ -1276,6 +1282,13 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
 
 def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
     return rail_html(tid, active, convs)
+
+
+def avatar(slug: str, size: int = 30, on: bool = True) -> str:
+    """An agent's face with presence where a person expects it: a small
+    dot on the avatar's corner, like any chat app."""
+    return (f'<span class="avwrap">{_identicon(slug, size)}'
+            f'<i class="pres {"on" if on else "off"}"></i></span>')
 
 
 def _identicon(seed: str, size: int = 34) -> str:
@@ -4024,7 +4037,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
               + '</div>')
     return (
         f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
-        f'{_identicon(slug, 44)}'
+        f'{avatar(slug, 44, on)}'
         f'<div><h1>{a["role"]}</h1>'
         f'<div class="meta">{state}<span>&middot;</span>'
         f'<span>{a["name"]}</span></div></div>'
@@ -4475,8 +4488,7 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
             else '<span class="st mut" style="flex:none">Off</span>')
     line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
     return (f'<a class="arow2 slimcard" href="/agents/{a["slug"]}">'
-            f'{_identicon(a["slug"], 28)}'
-            f'<span class="dot2 {"on" if watching else "off"}"></span>'
+            f'{avatar(a["slug"], 28, watching)}'
             f'<b>{a["role"]}</b>'
             f'<span class="mut slimdesc">{line}</span>'
             f'{stat}<span class="go2">&rsaquo;</span></a>')
