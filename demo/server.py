@@ -2183,6 +2183,28 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
   font-size:13.5px;text-decoration:none}
 .acct-out:hover{background:#FBF1EF}
+.goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:16px 20px;margin:0 0 24px;max-width:720px}
+.goaltop{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px}
+.goallbl{font-size:11.5px;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--mut)}
+.goalline{display:flex;gap:16px;align-items:center;margin:4px 0 12px}
+.goalnum{font-size:34px;color:var(--ink);font-weight:650;flex:none}
+.goaltxt b{display:block;font-size:14.5px;color:var(--ink)}
+.goaltxt .mut{font-size:12.5px}
+.goalbar{position:relative;height:8px;border-radius:99px;background:#EEEFF3}
+.goalbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.goalbar em{position:absolute;top:-3px;bottom:-3px;width:2px;
+  background:#1B1F30;border-radius:2px}
+.goalfoot{display:flex;justify-content:space-between;font-size:12px;
+  color:var(--mut);margin-top:6px}
+.goalact{display:flex;gap:12px;align-items:baseline;padding:8px 0;
+  border-bottom:1px solid #F1F1F5;font-size:13.5px}
+.goalact:last-child{border-bottom:0}
+.goalact .tdesc{flex:1}
+.goalmini{font-size:12.5px;color:var(--mut);margin:0 0 8px}
+.goalmini b{color:#177245}
 .content{max-width:1120px;margin:0 auto;padding:8px 44px 88px}
 .alogo{display:inline-flex;width:18px;height:18px;border-radius:5px;color:#fff;
   font-size:10.5px;font-weight:700;align-items:center;justify-content:center;
@@ -4051,6 +4073,239 @@ def latest_run_html(tid: str, slug: str) -> str:
             f'<div class="spark">{bars}</div></div></div>')
 
 
+# ------------------------------------------------------------- agent goals
+# Every agent claims ONE number it is hired to move. The goal is a sentence
+# a founder would say out loud; progress is counted from actions, and every
+# listed action names what it added. Dispute Defender's number is computed
+# from the real record; the rest carry the demo week's numbers, consistent
+# with the morning brief.
+AGENT_GOALS = {
+    "dispute_defender": dict(
+        goal="Win 8 of every 10 disputes", target=80,
+        how="Disputes won, out of disputes answered. Whole record."),
+    "cart_rescue": dict(
+        goal="Recover 7 of every 10 dropped carts", target=70, now=64,
+        how="Carts paid within a day of the call, out of carts called. "
+            "Last 30 days.",
+        actions=[
+            ("Called Meera T. about her ₹4,180 cart; she paid on the "
+             "fresh link", "+1 cart back"),
+            ("WhatsApp follow-up to Rohan D.; paid this morning",
+             "+1 cart back"),
+            ("Called Sana K. twice; no answer, queued for this evening",
+             "still open")]),
+    "payment_rescue": dict(
+        goal="Bring back 6 of every 10 failed payments", target=60, now=58,
+        how="Failed payments completed after its call or message, out of "
+            "failures it chased. Last 30 days.",
+        actions=[
+            ("Messaged the 12 buyers whose UPI timed out on Tuesday; "
+             "7 paid", "+7 payments back"),
+            ("Called Vikram R. about a card decline; paying by Friday",
+             "promised"),
+            ("3 buyers quiet after two tries; parked, not pestered",
+             "still open")]),
+    "cod_guard": dict(
+        goal="Confirm 9 of every 10 COD orders before dispatch",
+        target=90, now=82,
+        how="COD orders confirmed by call or message before they ship, "
+            "out of all COD orders.",
+        actions=[
+            ("Confirmed 31 of today's 38 COD orders before noon",
+             "+31 confirmed"),
+            ("Held 3 orders after two unanswered calls each",
+             "pending approval"),
+            ("Learned pincode 4000xx answers after 6 PM, from Cart "
+             "Rescue's notes", "sharper calls")]),
+    "stock_watch": dict(
+        goal="Keep every fast mover on the shelf", target=100, now=90,
+        how="Fast-moving products in stock, out of the ten that sell "
+            "most. Counted daily.",
+        actions=[
+            ("Spotted Amla Juice down to 6 days at this pace",
+             "caught early"),
+            ("Drafted the reorder for six weeks of cover",
+             "pending approval"),
+            ("Matched the reorder to the sale-week pace, not the quiet "
+             "week's", "right size")]),
+    "three_way_recon": dict(
+        goal="Tie out 99 of every 100 lines without a person",
+        target=99, now=98,
+        how="Order, payout and bank lines matched on their own, out of "
+            "all lines. This month.",
+        actions=[
+            ("Tied out 211 of 214 lines on their own this morning",
+             "+211 tied"),
+            ("Named the one payout short by ₹4,310", "flagged"),
+            ("2 lines waiting on tomorrow's bank statement",
+             "still open")]),
+    "settlement_insights": dict(
+        goal="Explain every deduction the day it lands", target=100, now=96,
+        how="Deductions explained in plain words the same day, out of "
+            "all deductions.",
+        actions=[
+            ("Read yesterday's settlement: 4 deductions, all named",
+             "+4 explained"),
+            ("Flagged a ₹1,120 hold as new, not routine", "flagged"),
+            ("One deduction awaits the bank's own note", "still open")]),
+    "cashflow_forecast": dict(
+        goal="See every cash crunch a week early", target=100, now=100,
+        how="Tight weeks flagged at least 7 days before they hit, out "
+            "of tight weeks that came.",
+        actions=[
+            ("Saw Thursday's dip: vendor day and a GST debit collide",
+             "caught early"),
+            ("Drafted the courier payout move that keeps Thursday "
+             "positive", "pending approval")]),
+    "payouts_desk": dict(
+        goal="Pay every vendor on the day it is due", target=100, now=93,
+        how="Payouts that left on their due day, out of all payouts. "
+            "This month.",
+        actions=[
+            ("Lined up tomorrow's 14 payments for one yes",
+             "pending approval"),
+            ("Caught a changed account number before it burned a "
+             "payment", "saved one"),
+            ("One vendor paid a day late last week; the why is in "
+             "History", "written down")]),
+    "payment_forms": dict(
+        goal="Collect every odd payment within a day of asking",
+        target=100, now=78,
+        how="Bulk orders, advances and mandates paid within a day of "
+            "the form going out.",
+        actions=[
+            ("Built the ₹2.6 lakh advance form, PAN check built in",
+             "pending approval"),
+            ("Last week's part-advance form: paid in 4 hours",
+             "+1 in a day")]),
+    "refund_shield": dict(
+        goal="Catch 9 of every 10 fishy refunds before money leaves",
+        target=90, now=88,
+        how="Refunds flagged before payout that turned out wrong, out "
+            "of wrong refunds.",
+        actions=[
+            ("Flagged two refunds landing in the same UPI handle",
+             "caught"),
+            ("Held one refund until the parcel actually came back",
+             "pending approval"),
+            ("Cleared 9 honest refunds untouched; nobody good was "
+             "slowed", "clean")]),
+    "returns_desk": dict(
+        goal="Refund only after the goods are back", target=100, now=100,
+        how="Refunds released after the return passed its photo check, "
+            "out of all refunds.",
+        actions=[
+            ("Matched 6 returns to their photos this week; all clean",
+             "+6 checked"),
+            ("One return photo shows a different batch seal; held",
+             "pending approval")]),
+    "gst_compliance": dict(
+        goal="File every month with zero last-minute scramble",
+        target=100, now=100,
+        how="Filings ready 3 days before the date, out of all filings.",
+        actions=[
+            ("This month's numbers are already tied to the books",
+             "on track"),
+            ("Set aside the GST debit that hits Thursday, so cash "
+             "planning saw it", "handed over")]),
+    "kyc_desk": dict(
+        goal="Clear 9 of every 10 buyers in under a minute",
+        target=90, now=87,
+        how="Buyers cleared by the quick check alone, out of all "
+            "buyers checked.",
+        actions=[
+            ("Cleared 34 buyers this week in seconds each", "+34 cleared"),
+            ("Sent one flagged buyer through the deep check; came back "
+             "clean", "pending approval"),
+            ("Nobody honest waited at the counter", "clean")]),
+    "daily_mis": dict(
+        goal="Numbers on your phone before you ask, every day",
+        target=100, now=100,
+        how="Morning briefs delivered by 8:00 with the why behind every "
+            "number.",
+        actions=[
+            ("Wrote this morning's brief: 9 lines, every number from "
+             "your own record", "delivered"),
+            ("Put the Thursday cash line on top because it moves money",
+             "sharper brief")]),
+}
+
+
+def goal_block(tid: str, slug: str) -> str:
+    """The number this agent is hired to move, said once and measured in
+    the open: the claim, the honest counting rule, a bar with the goal
+    marked on it, and the actions that moved it, each naming what it
+    added. Dispute Defender's number comes from the real record."""
+    g = AGENT_GOALS.get(slug)
+    if not g:
+        return ""
+    now = g.get("now")
+    if slug == "dispute_defender":
+        led = WORLD.d.ledger
+        won = lost = 0
+        for r in led.runs.values():
+            if r.tenant_id != tid:
+                continue
+            out = led.outcome_for(r.run_id)
+            if out and out.outcome_value:
+                if out.outcome_value.get("won"):
+                    won += 1
+                else:
+                    lost += 1
+        now = (100 * won // (won + lost)) if (won + lost) else 0
+    on_track = now >= g["target"]
+    actions = g.get("actions")
+    if slug == "dispute_defender":
+        actions = [(f"Won {won} of the {won + lost} disputes settled so "
+                    f"far; every reply and outcome is in History",
+                    f"+{won} won"),
+                   ("7 replies are written and waiting on your yes",
+                    "pending approval")]
+    act_rows = "".join(
+        f'<div class="goalact"><span class="tdesc">{txt}</span>'
+        f'<span class="st {"ok" if tag.startswith("+") else "mut"}">'
+        f'{tag}</span></div>'
+        for txt, tag in (actions or []))
+    return (
+        f'<div class="goalcard">'
+        f'<div class="goaltop"><span class="goallbl">The number it is '
+        f'hired to move</span>'
+        f'<span class="st {"ok" if on_track else "wait"}">'
+        f'{"on goal" if on_track else "getting there"}</span></div>'
+        f'<div class="goalline"><b class="goalnum">{now}%</b>'
+        f'<span class="goaltxt"><b>{g["goal"]}</b>'
+        f'<span class="mut">{g["how"]}</span></span></div>'
+        f'<div class="goalbar"><i style="width:{now}%"></i>'
+        f'<em style="left:{g["target"]}%"></em></div>'
+        f'<div class="goalfoot"><span>today <b>{now}%</b></span>'
+        f'<span>goal <b>{g["target"]}%</b></span></div>'
+        + (f'<div class="goallbl" style="margin-top:12px">How it moved '
+           f'the number</div>{act_rows}' if act_rows else '')
+        + '</div>')
+
+
+def goal_mini(tid: str, slug: str) -> str:
+    """One quiet line on the roster card: the claim and where it stands."""
+    g = AGENT_GOALS.get(slug)
+    if not g:
+        return ""
+    now = g.get("now", 0)
+    if slug == "dispute_defender":
+        led = WORLD.d.ledger
+        won = lost = 0
+        for r in led.runs.values():
+            if r.tenant_id != tid:
+                continue
+            out = led.outcome_for(r.run_id)
+            if out and out.outcome_value:
+                won, lost = ((won + 1, lost)
+                             if out.outcome_value.get("won")
+                             else (won, lost + 1))
+        now = (100 * won // (won + lost)) if (won + lost) else 0
+    return (f'<div class="goalmini">Goal: {g["goal"].lower()} &middot; at '
+            f'<b>{now}%</b> of {g["target"]}%</div>')
+
+
 def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
@@ -4169,7 +4424,8 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
             f'brief</b> every day, before you sit down.</span>'
             f'<a class="st wait" href="/briefs/morning">read today&rsquo;s '
             f'&rarr;</a></div>')
-    work_body = (latest_run_html(tid, slug) + prop_sec + cases_sec
+    work_body = (goal_block(tid, slug)
+                 + latest_run_html(tid, slug) + prop_sec + cases_sec
                  + report_sec
                  + (_kyc_builder(tid) if slug == "kyc_desk" else ""))
 
@@ -4625,6 +4881,7 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
                      f'<span class="st mut" style="flex:none">{a["name"]}</span>'
                      f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
                      f'<div style="margin:4px 0 8px">{a["desc"]}</div>'
+                     f'{goal_mini(tid, a["slug"])}'
                      f'<div class="repl">Replaces {a["replaces"]}.</div>'
                      f'{horizon}')
             return (f'<a class="arow2" style="display:block;padding:16px" '
@@ -4639,6 +4896,7 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
                  f'<span class="st mut" style="flex:none">{a["name"]}</span>'
                  f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
                  f'<div style="margin:2px 0 8px">{a["desc"]}</div>'
+                 f'{goal_mini(tid, a["slug"])}'
                  f'<div class="repl">Replaces {a["replaces"]}.</div>'
                  f'<div class="hzn on">{horizon}</div>')
         return (f'<a class="arow2" style="display:block;padding:16px" '
@@ -8137,6 +8395,28 @@ color:var(--mut)}
 .acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
   font-size:13.5px}
 .acct-out:hover{background:#FBF1EF}
+.goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:16px 20px;margin:0 0 24px;max-width:720px}
+.goaltop{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px}
+.goallbl{font-size:11.5px;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--mut)}
+.goalline{display:flex;gap:16px;align-items:center;margin:4px 0 12px}
+.goalnum{font-size:34px;color:var(--ink);font-weight:650;flex:none}
+.goaltxt b{display:block;font-size:14.5px;color:var(--ink)}
+.goaltxt .mut{font-size:12.5px}
+.goalbar{position:relative;height:8px;border-radius:99px;background:#EEEFF3}
+.goalbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.goalbar em{position:absolute;top:-3px;bottom:-3px;width:2px;
+  background:#1B1F30;border-radius:2px}
+.goalfoot{display:flex;justify-content:space-between;font-size:12px;
+  color:var(--mut);margin-top:6px}
+.goalact{display:flex;gap:12px;align-items:baseline;padding:8px 0;
+  border-bottom:1px solid #F1F1F5;font-size:13.5px}
+.goalact:last-child{border-bottom:0}
+.goalact .tdesc{flex:1}
+.goalmini{font-size:12.5px;color:var(--mut);margin:0 0 8px}
+.goalmini b{color:#177245}
 .uwrap .avatar{width:26px;height:26px;border-radius:50%;background:var(--accent);
 color:#fff;display:inline-flex;align-items:center;justify-content:center;
 font-size:12px;font-weight:650;text-transform:uppercase}
