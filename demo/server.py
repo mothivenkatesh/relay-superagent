@@ -1,4 +1,4 @@
-"""The workspace, first design pass — run `uv run python demo/server.py`.
+"""The workspace, first design pass: run `uv run python demo/server.py`.
 
 Serves the merchant operator view on http://localhost:8790 with the REAL pipeline
 running on fakes underneath: every card is a genuine ledger row produced by
@@ -106,7 +106,7 @@ def channel_of(order_id: str | None) -> str:
 
 
 def _make_ledger():
-    """Postgres-backed when the local cluster is up; in-memory otherwise —
+    """Postgres-backed when the local cluster is up; in-memory otherwise.
     and it says which, loudly, at boot."""
     try:
         from demo.persist import PersistentLedger
@@ -114,7 +114,7 @@ def _make_ledger():
         print(f"ledger: postgres (hydrated {len(led.runs)} runs)")
         return led
     except Exception as e:                                  # noqa: BLE001
-        print(f"ledger: IN-MEMORY (postgres unavailable: {str(e)[:80]}) — "
+        print(f"ledger: IN-MEMORY (postgres unavailable: {str(e)[:80]}). "
               f"data will not survive restarts; run `make pg`")
         return Ledger()
 
@@ -222,7 +222,7 @@ def build_world() -> Pipeline:
     def fire(ref, order, reason, text, claim, counter=None, cites=None,
              merchant=BUSINESS_ID):
         """One dispute from one of Ojas Wellness's own buyers. `merchant` is
-        the business, always — the buyer lives in CUSTOMERS, keyed by order."""
+        the business, always: the buyer lives in CUSTOMERS, keyed by order."""
         counter = counter or RESP[reason].format(sku=bought(order))
         cites = cites or CITES[reason]
         deps.llm.mention = {"is_competitive": True, "claim_text": claim, "confidence": .9}
@@ -278,7 +278,7 @@ def build_world() -> Pipeline:
                      "is_material": False,
                      "implies": "tell the buyer when the second line disappears"}
     p.edit(r, BUSINESS_ID,
-           "Only one debit settled on this refill — the payment reference and "
+           "Only one debit settled on this refill: the payment reference and "
            "the bank settlement excerpt both say so. The second line on the "
            "statement is an authorisation hold that was never captured, and "
            "it drops off within a few days.")
@@ -292,7 +292,7 @@ def build_world() -> Pipeline:
 
     # 5) suppressed — same order, same reason again inside the window
     fire("c_dup", "order_2", "RD",
-         "Buyer reopened the case — still says the refill was double charged.",
+         "Buyer reopened the case: still says the refill was double charged.",
          "Reopened the charged-twice claim on the ashwagandha refill")
 
     # 6–8) three live cards awaiting review
@@ -320,7 +320,7 @@ def build_world() -> Pipeline:
         ("q6",  "order_14", "Says the delivery slot came and went",           "RG", "reject",     None),
         ("q7",  "order_15", "Statement lists the amla juice order twice",     "RD", "approve",    None),
         ("q8",  "order_16", "Says the triphala order never left the warehouse","RG", "wait",      None),
-        ("q9",  "order_9",  "Reopened — still says the moringa parcel is missing", "RG", "wait",  None),
+        ("q9",  "order_9",  "Reopened: still says the moringa parcel is missing", "RG", "wait",  None),
         ("q10", "order_11", "Bank is disputing the ashwagandha refill charge","RD", "wait",       None),
     ]
     for ref, order, claim, reason, action, won in QUARTER:
@@ -371,7 +371,7 @@ def build_world() -> Pipeline:
         tenant_id="t1", source="email_forward", source_ref="m_lifecycle_1",
         occurred_at=clock.now(), order_id="order_17",
         merchant_id=BUSINESS_ID, dispute_id="dp_m_lifecycle_1", reason_code="RG",
-        text="Forwarding the chargeback notice — buyer says the juice order never arrived."))
+        text="Forwarding the chargeback notice: buyer says the juice order never arrived."))
     mark("review", r)
 
     # a material edit, then filed
@@ -384,7 +384,7 @@ def build_world() -> Pipeline:
                      "buyer's own bank reference number", "is_material": True,
                      "implies": "quote the buyer's own reference number back"}
     p.edit(r2, BUSINESS_ID,
-           "Only one debit settled on this refill — quote the payment "
+           "Only one debit settled on this refill: quote the payment "
            "reference and the buyer's own bank reference number, both "
            "attached. The second line is an authorisation hold, not a charge, "
            "and it reverses on its own within a few working days.")
@@ -432,7 +432,7 @@ def build_world() -> Pipeline:
         tenant_id="t1", source="bank_webhook", source_ref="lc_noise",
         occurred_at=clock.now(), order_id="order_4",
         merchant_id=BUSINESS_ID, dispute_id="dp_lc_noise", reason_code="RG",
-        text="Duplicate redelivery of a webhook already actioned — no new claim."))
+        text="Duplicate redelivery of a webhook already actioned: no new claim."))
     mark("not_actionable", r5)
 
     deps.llm.mention = {"is_competitive": True,
@@ -671,7 +671,7 @@ def auth_page(mode: str, error: str = "") -> str:
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay — {'Sign up' if signup else 'Log in'}</title>
+<title>Relay &middot; {'Sign up' if signup else 'Log in'}</title>
 <style>
 *{{box-sizing:border-box;margin:0}}
 body{{font-family:'Circular Std',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#FAFAFC;min-height:100vh;
@@ -722,7 +722,7 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay — Verify your email</title>
+<title>Relay &middot; Verify your email</title>
 <style>{style}
 .code input{{font-size:22px;letter-spacing:8px;text-align:center;font-variant-numeric:tabular-nums}}
 .hint{{font-size:12.5px;color:#5a5e6e;margin-bottom:14px}}
@@ -827,7 +827,7 @@ WORK_CSS = """
 .wstep.done .wtick::after{content:"";position:absolute;left:4px;top:1px;width:4px;
   height:8px;border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(43deg)}
 
-/* the work product — a document, not a chat bubble */
+/* the work product: a document, not a chat bubble */
 .wp{background:#fff;border:1px solid var(--hair,#E8E9EF);border-radius:12px;
   box-shadow:0 1px 2px rgba(27,31,48,.04);overflow:hidden;max-width:100%}
 .wp-h{padding:18px 22px 14px;border-bottom:1px solid #F1F1F5}
@@ -965,7 +965,7 @@ ICONS = {
 
 def influenced_won(tid: str) -> int:
     """Paise won on disputes where an approved or lightly-edited response
-    landed — the operator's proof-of-impact number."""
+    landed: the operator's proof-of-impact number."""
     led = WORLD.d.ledger
     total = 0
     for r in led.runs.values():
@@ -1021,7 +1021,7 @@ def recovered(tid: str) -> tuple[int, int, str]:
 
 
 def _working_since(tid: str) -> tuple[str, int]:
-    """When the switched-on agent started, and how much it has looked at —
+    """When the switched-on agent started, and how much it has looked at.
     the proof that this is a team that runs, not a chat you open."""
     led = WORLD.d.ledger
     mine = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -1048,6 +1048,8 @@ def rail_cases(tid: str, limit: int = 18) -> list[dict]:
             "order": order, "key": key, "word": word,
             "last": max(r.occurred_at for r in runs),
             "label": f"{customer_of(order)} · {bought(order)}"})
+        if key == "need" and ASSIGN.get(order):
+            out[-1]["word"] = f'With {esc(ASSIGN[order].split()[0])} to say yes'
     out.sort(key=lambda c: c["last"], reverse=True)
     return out[:limit]
 
@@ -1055,7 +1057,7 @@ def rail_cases(tid: str, limit: int = 18) -> list[dict]:
 def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     """ChatGPT's rail, Harvey's matter list: what is going on, not where to
     click. Cases and conversations in one stream, newest first, each with a
-    dot saying where it stands. "Needs you" filters this list in place —
+    dot saying where it stands. "Needs you" filters this list in place.
     it was never a place of its own."""
     cases = rail_cases(tid)
     n_need = sum(1 for c in cases if c["key"] == "need")
@@ -1069,7 +1071,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
             f'<a class="rail{" active" if active == c["order"] else ""}'
             f'{" unread" if need else ""}" data-st="{c["key"]}" '
             f'href="/cases/{esc(c["order"])}" '
-            f'title="{esc(c["label"])} — {c["word"]}">'
+            f'title="{esc(c["label"])}. {c["word"]}">'
             f'{_logo(name, 30)}'
             f'<span class="rbody"><span class="rtop"><span class="rname">'
             f'{esc(name)}</span><span class="rwhen">'
@@ -1176,7 +1178,7 @@ def plain_detail(d: str) -> str:
     or escalation codes get said in plain words before anyone reads one."""
     d = (d or "").strip()
     if not d:
-        return "&mdash;"
+        return "."
     if d in PLAIN_SKIP:
         return PLAIN_SKIP[d]
     if d == "gate_timeout":
@@ -1196,7 +1198,7 @@ def plain_detail(d: str) -> str:
 
 def _account_label(r) -> str:
     """Whose dispute this is, on screen: the Ojas Wellness buyer who raised
-    it. Held in the demo seed against the order, never on the run — the run
+    it. Held in the demo seed against the order, never on the run: the run
     only knows whose business it belongs to."""
     return customer_of(r.order_id)
 
@@ -1213,7 +1215,7 @@ def task_row(r) -> str:
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
     <span class="tdesc">Reply to the bank for
-      <a href="/cases/{esc(r.order_id or "")}"><b>{customer}</b></a> &mdash;
+      <a href="/cases/{esc(r.order_id or "")}"><b>{customer}</b></a>.
       {esc(bought(r.order_id))}. {plain}.
       <a class="mut" href="/cases/{esc(r.order_id or "")}">{esc(case_no(r.order_id))} &rarr;</a>
       <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span></span>
@@ -1255,7 +1257,7 @@ def ledger_row(r) -> str:
                else '<span class="st warn">you fixed a fact</span>')
     return (f'<a class="trow slim" href="/runs/{r.run_id}"><span class="ico">{ICONS["ledger"]}</span>'
             f'<span class="tdesc"><b>{PLAIN_REASON.get(r.reason_code, "A buyer disputed a payment")}</b> '
-            f'<span class="stream">&ldquo;{esc(r.claim_text) if r.claim_text else "&mdash;"}&rdquo;</span> '
+            f'<span class="stream">&ldquo;{esc(r.claim_text) if r.claim_text else "."}&rdquo;</span> '
             f'<span class="mut">{esc(_account_label(r))} &middot; '
             f'{esc(bought(r.order_id))}</span></span>'
             f'{mat}{won}<span class="st {cls}">{label}{extra}</span>'
@@ -1411,7 +1413,7 @@ def sourced_draft(text: str, proof: list[str], order_id: str | None) -> str:
 
 def case_steps(r) -> list[tuple[str, str]]:
     """What the team actually did on this case, one line each, in order.
-    Every line names something real off the record — the order, the SKU,
+    Every line names something real off the record: the order, the SKU,
     the buyer, the proof it opened, the date the bank set."""
     order = r.order_id
     plain = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
@@ -1504,7 +1506,7 @@ def work_product(r, mode: str = "thread") -> str:
                 f'Send my version</button></form></div>')
     else:
         acts = (f'<div class="wp-acts"><span class="st {cls}">{label}</span>'
-                f'<span class="wp-trust">Already decided &mdash; nothing here '
+                f'<span class="wp-trust">Already decided: nothing here '
                 f'can be sent twice.</span></div>')
     return (
         f'<article class="wp">'
@@ -1514,7 +1516,7 @@ def work_product(r, mode: str = "thread") -> str:
         f'<div class="wp-meta">&#8377;{inr(price_of(order))} &middot; '
         f'{esc(channel_of(order))} &middot; {due}</div></div>'
         f'<div class="wp-body">'
-        f'<div class="wp-claim">The buyer says: &ldquo;{esc(r.claim_text or "&mdash;")}&rdquo;</div>'
+        f'<div class="wp-claim">The buyer says: &ldquo;{esc(r.claim_text or ".")}&rdquo;</div>'
         f'{sourced_draft(text, proof, order)}</div>'
         f'<div class="wp-srcs"><span class="wp-srch">Proof attached</span>{srcs}</div>'
         f'{acts}'
@@ -1531,21 +1533,29 @@ SOURCE_WORDS = {"bank_webhook": "straight from the bank",
                 "sample": "a made-up one, for trying it out"}
 
 
-def _who(actor: str | None) -> str:
+def _who(actor: str | None, seed: str = "") -> str:
+    """Name on a decision. Seeded history is attributed across the team
+    (deterministic per run, like every other fact in this fictional world)
+    so the record reads the way a real office does: several people saying
+    yes, not one. Live decisions carry the real session user."""
     a = (actor or "").strip()
-    if not a or a in (BUSINESS_ID, UNLINKED_CHANNEL_ID, "workspace", "ask"):
+    if not a or a in (BUSINESS_ID, UNLINKED_CHANNEL_ID, "workspace", "ask",
+                      "m_ojas", "system"):
+        if seed:
+            names = ["you", "Nikhil Bhat", "Lakshmi Menon"]
+            return names[sum(seed.encode()) % len(names)]
         return "you"
     return esc(a.split("@")[0])
 
 
 def plain_step(e: dict, r) -> tuple[str, str]:
-    """(what happened, what came of it) — one line of the case's history."""
+    """(what happened, what came of it): one line of the case's history."""
     agent, kind, d = e["agent"], e["kind"], (e.get("detail") or "")
     reason = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
     if agent == "detection-agent":
         if kind == "signal":
             src = next((v for k, v in SOURCE_WORDS.items() if k in d), "")
-            return ("The dispute came in", f"{reason} &mdash; {src}" if src else reason)
+            return ("The dispute came in", f"{reason}. {src}" if src else reason)
         if kind == "confirmed":
             return ("Read what the buyer is claiming",
                     esc(d) or (esc(r.claim_text or "")))
@@ -1566,8 +1576,8 @@ def plain_step(e: dict, r) -> tuple[str, str]:
         if kind == "surfaced":
             return ("Put it in front of you", "waiting on your yes")
         if kind == "approved":
-            return (f"{_who(d.removeprefix('by ')).capitalize()} said yes",
-                    "sent as written")
+            who = _who(d.removeprefix('by '), seed=r.run_id)
+            return (f"{who[0].upper()}{who[1:]} said yes", "sent as written")
         if kind == "edited":
             return ("You changed the wording",
                     "you fixed a fact" if r.gate_is_material else "just the wording")
@@ -1578,8 +1588,9 @@ def plain_step(e: dict, r) -> tuple[str, str]:
         return ("How it ended", esc(d) or "written down")
     if agent == "escalation-agent":
         return ("Handed it to a person", plain_detail(d))
-    if agent == "note":
-        return ("Note from your team", esc(d))
+    if agent == "note" or kind == "note":
+        who = _who(agent if agent != "note" else None)
+        return (f"Note from {who}", esc(d))
     return (esc(kind.replace("_", " ").capitalize()), plain_detail(d))
 
 
@@ -1591,14 +1602,14 @@ def case_runs(tid: str, order_id: str) -> list:
 
 
 def case_status(runs: list) -> tuple[str, str]:
-    """(key, words) — the one line that says where a case stands."""
+    """(key, words): the one line that says where a case stands."""
     if any(r.state is RunState.AWAITING_GATE for r in runs):
         return ("need", "Needs your yes")
     if any(r.state in (RunState.TIMED_OUT, RunState.FAILED) for r in runs):
         # A Relay person is on it — that is THEIR queue, not the founder's.
         # Counting it under "Needs you" hands the founder a job they cannot
         # do; to them, a case in someone's hands is a case being worked.
-        return ("work", "With a person &mdash; being handled")
+        return ("work", "With a person: being handled")
     if any(not r.state.terminal for r in runs):
         return ("work", "Working")
     return ("done", "Done")
@@ -1606,7 +1617,7 @@ def case_status(runs: list) -> tuple[str, str]:
 
 def case_content(tid: str, order_id: str) -> str:
     """One order, one case, one shared history. Every agent that touched
-    this order writes into the same timeline, in the order it happened —
+    this order writes into the same timeline, in the order it happened.
     not a log per agent."""
     led = WORLD.d.ledger
     runs = case_runs(tid, order_id)
@@ -1679,9 +1690,9 @@ def case_content(tid: str, order_id: str) -> str:
     elif won is False:
         settle = mile("done", "Settled", '<span class="st mut">Lost</span>')
     elif filed:
-        settle = mile("todo", "Settled", "&mdash;")
+        settle = mile("todo", "Settled", ".")
     else:
-        settle = mile("todo", "Settled", "&mdash;")
+        settle = mile("todo", "Settled", ".")
     miles = (
         '<div class="miles">'
         + mile("done", "Dispute came in", d0.strftime("%-d %b"))
@@ -1690,18 +1701,49 @@ def case_content(tid: str, order_id: str) -> str:
            else mile("cur", "Reply written", "being written"))
         + f'<span class="mbar {"done" if filed else ""}"></span>'
         + (mile("done", "Filed with the bank", "exactly once") if filed
-           else mile("cur", "Waiting on your yes", "one tap") if waiting
+           else mile("cur",
+                     f"Waiting on {esc(ASSIGN[order_id].split()[0])}"
+                     if ASSIGN.get(order_id) else "Waiting on your yes",
+                     "one tap") if waiting
            else mile("todo", "Filed with the bank", "after your yes"))
         + f'<span class="mbar {"done" if res_out is not None else ""}"></span>'
         + (settle if res_out is not None
            else mile("cur", "Bank reviewing", "in progress") if filed
-           else mile("todo", "Bank review", "&mdash;"))
+           else mile("todo", "Bank review", "."))
         + '</div>')
     # The founder's job on a waiting case is one thing: read the reply,
     # say yes or no. So on a waiting case the reply comes FIRST — right
     # under the milestones — and the story moves below it. Nobody should
     # scroll past a twelve-step timeline to do their only job.
-    reply_sec = f'<h2 class="sec">The reply</h2>{work_product(latest, mode="page")}'
+    # Whose phone is this yes sitting on. The founder can hand it to any
+    # approver, or pull it back, without touching the reply itself.
+    assign_ui = ""
+    if waiting:
+        assignee = ASSIGN.get(order_id)
+        approvers = [p["name"] for p in people_for(tid) if p["approver"]]
+        opts = "".join(f'<option value="{esc(n)}"'
+                       + (' selected' if n == assignee else '')
+                       + f'>{esc(n)}</option>' for n in approvers)
+        assign_ui = (
+            f'<div class="assignbar">'
+            + (f'<span>Waiting on <b>{esc(assignee)}</b> to say yes.</span>'
+               if assignee else
+               '<span>This yes is with you.</span>')
+            + f'<form method="post" action="/api/assign">'
+            f'<input type="hidden" name="order" value="{esc(order_id)}">'
+            f'<select class="assignsel" name="name">'
+            f'<option value="">you</option>{opts}</select>'
+            f'<button class="btn ghost sm">Hand it over</button></form></div>')
+    note_box = (
+        f'<form class="notebar" method="post" action="/api/note" '
+        f'style="max-width:640px;margin-top:14px">'
+        f'<input type="hidden" name="run_id" value="{latest.run_id}">'
+        f'<input type="hidden" name="back" value="/cases/{esc(order_id)}">'
+        f'<input class="jfind notein" name="text" maxlength="200" '
+        f'placeholder="Leave a note for the team, it lands in the case history">'
+        f'<button class="btn primary sm">Add note</button></form>')
+    reply_sec = (f'{assign_ui}<h2 class="sec">The reply</h2>'
+                 f'{work_product(latest, mode="page")}')
     story = (
         f'<div class="casegrid">'
         f'<div><h2 class="sec">What happened, start to finish</h2>'
@@ -1712,7 +1754,7 @@ def case_content(tid: str, order_id: str) -> str:
         f'<div class="pcard">{prows}</div>'
         f'<h2 class="sec">Everything, one by one</h2>'
         + "".join(ledger_row(r) for r in reversed(runs))
-        + '</div></div>')
+        + '</div></div>' + note_box)
     body = (reply_sec + story) if waiting else (story + reply_sec)
     return (
         f'<a class="jback" href="/">&lsaquo; Back</a>'
@@ -1747,7 +1789,7 @@ def render(tid: str = "t1", email: str = "") -> str:
                   key=lambda r: r.occurred_at, reverse=True)
     waiting = [r for r in runs if r.state is RunState.AWAITING_GATE]
     tasks = "\n".join(task_row(r) for r in waiting) or (
-        '<div class="empty">All clear &mdash; nothing needs review.</div>')
+        '<div class="empty">All clear: nothing needs review.</div>')
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
             .replace("__SIDEBAR__", sidebar_html("tasks", tid,
@@ -1855,7 +1897,7 @@ color:var(--text);text-decoration:none;font-weight:500}
 .editbox{padding:2px 0 16px 29px}
 .editbox .draft{display:none}
 /* one form-control system: same border, radius, hover, focus ring and
-   placeholder as the button system — sizes vary, states never do */
+   placeholder as the button system: sizes vary, states never do */
 .jfind,.whyin,.editbox textarea{background:#fff;border:1px solid #E3E4EA;
 border-radius:9px;color:#26293A;font:inherit;
 transition:border-color .15s,box-shadow .15s}
@@ -1961,6 +2003,12 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .inedit-in:focus{border-color:var(--accent)}
 .ctitle[contenteditable]{outline:1.5px solid var(--accent);border-radius:6px;
   padding:1px 6px;background:#fff}
+.assignbar{display:flex;align-items:center;gap:12px;background:#FFF8EC;
+  border:1px solid #F0DCB4;border-radius:12px;padding:12px 16px;
+  margin:0 0 16px;font-size:13.5px;flex-wrap:wrap}
+.assignbar form{display:flex;gap:8px;align-items:center;margin-left:auto}
+.assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
+  border-radius:9px;padding:6px 10px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -2368,7 +2416,7 @@ DESKS = [
      "Answers your customers and their banks, and sees returns through to "
      "the refund."),
     ("calling", "Your telecaller",
-     "Calls buyers &mdash; to confirm the order, to recover the payment, to "
+     "Calls buyers: to confirm the order, to recover the payment, to "
      "close the sale."),
     ("analyst", "Your MIS analyst",
      "Puts the numbers in front of you every morning, and says what "
@@ -2413,8 +2461,8 @@ RELAY_AGENTS = [
         status="roadmap", desk="accounts",
         role="Billing Executive",
         desc="Builds a payment form on the fly for anything that isn&rsquo;t "
-             "normal checkout &mdash; a bulk order, a part advance, a "
-             "subscription mandate &mdash; with any verification the rules "
+             "normal checkout: a bulk order, a part advance, a "
+             "subscription mandate: with any verification the rules "
              "require built into the same form.",
         today="Someone opens the dashboard, hand-builds a link, WhatsApps it, "
               "then chases the customer and types the details into the books "
@@ -2592,7 +2640,7 @@ def workflows_content(tid: str) -> str:
                        f'waiting &middot; {resolved} resolved</span>']),
         _trow2(PCOLS, ["<b>COD Guard, Payment Rescue, Cart Rescue, Settlement "
                        "Clarity, Refund Shield, Loan Recovery, Due Diligence</b>",
-                       '<span class="mut">Relay&rsquo;s other seven agents &mdash; '
+                       '<span class="mut">Relay&rsquo;s other seven agents. '
                        'see the full fleet on the Agents console.</span>',
                        '<span class="st mut">not yet wired in this demo</span>',
                        '<span class="st wait">roadmap</span>', ""]),
@@ -2600,7 +2648,7 @@ def workflows_content(tid: str) -> str:
     body = (_tbl(PCOLS, ["Playbook", "What it does", "Staffed by", "Status",
                          "Activity"], play_rows)
             + '<div class="pagehint" style="margin-top:10px">Playbooks share their '
-              'crew &mdash; the same sub-agents staff every run, carrying what '
+              'crew: the same sub-agents staff every run, carrying what '
               'they&rsquo;ve learned. Sequencing across Relay&rsquo;s agents is the '
               '<b>conductor-agent</b>&rsquo;s job (planned): nothing automates '
               'before 20 approved manual responses, and underperforming '
@@ -2627,7 +2675,7 @@ def workflows_content(tid: str) -> str:
          f"{n_all} signals so far", "review"),
         ("funnel", "2 · Eligibility decides if it matters",
          "No matching order, the same claim twice, a sales channel that "
-         "isn&rsquo;t connected &mdash; every no is written down with its "
+         "isn&rsquo;t connected: every no is written down with its "
          "reason, never quietly dropped.",
          f"{n_sup} filtered out", "recently_countered"),
         ("pen", "3 · A response is drafted and checked",
@@ -2636,7 +2684,7 @@ def workflows_content(tid: str) -> str:
          "ever see it.".format(biz=BUSINESS),
          f"{n_drafted} drafted &middot; {n_blocked} blocked or escalated", "qa_blocked"),
         ("tasks", "4 · You decide",
-         "You get the card. Say yes, change the wording, or say no &mdash; "
+         "You get the card. Say yes, change the wording, or say no. "
          "nothing is filed without your yes. Anything you leave goes to a "
          "person, never files itself.",
          f"{n_wait} waiting now", "edited"),
@@ -2645,7 +2693,7 @@ def workflows_content(tid: str) -> str:
          "evidence attached.", f"{n_acted} filed", "approved"),
         ("chart", "6 · The outcome comes back",
          "Days later the bank settles the dispute and the result attaches to the "
-         "same run &mdash; wins, losses, and what your edits taught the drafter.",
+         "same run: wins, losses, and what your edits taught the drafter.",
          f"&#8377;{won/100000:.0f}k won", "won"),
     ]
     SCOLS = "2.6fr 1.2fr 1.1fr"
@@ -2655,7 +2703,7 @@ def workflows_content(tid: str) -> str:
         link = (f'<a class="st wait" href="/runs/{rid}">'
                 f'see example journey &rarr;</a>'
                 if ex_run is not None and ex_run.tenant_id == tid else
-                '<span class="mut">&mdash;</span>')
+                '<span class="mut">.</span>')
         ag = STAGE_AGENT.get(icon)
         who = (f'<a class="st wait" href="/agents/{ag}">{worker_name(ag)}</a>' if ag
                else '<span class="st ok">you</span>')
@@ -2673,7 +2721,7 @@ def workflows_content(tid: str) -> str:
     return (f'<h1 class="page">Playbooks</h1>{body}'
             f'<h2 class="sec">The lifecycle, live</h2>'
             f'<div class="pagehint">What actually happens to a dispute, stage '
-            f'by stage &mdash; every count below is real rows in this '
+            f'by stage: every count below is real rows in this '
             f'workspace, and every example opens a run&rsquo;s journey.</div>'
             f'{story}')
 
@@ -2700,7 +2748,7 @@ def _edit_history(entries) -> str:
     return f'<div class="ehist">{items}</div>'
 
 
-EV_NOTES: list = []       # (tenant_id, actor, when-str, text) — demo store
+EV_NOTES: list = []       # (tenant_id, actor, when-str, text): demo store
 
 
 # Evidence types are stored as the engine's snake_case strings; nobody
@@ -2729,10 +2777,10 @@ def knowledge_content(tid: str) -> str:
                       for m in notes])
     return (f'<h1 class="page">Evidence vault</h1>'
             f'<div class="pagehint">Evidence packs by reason code. Every '
-            f'dispute response cites from here &mdash; no claim ships that '
+            f'dispute response cites from here: no claim ships that '
             f'you didn&rsquo;t arm it with.</div>'
             f'<h2 class="sec" id="knowledge">Evidence packs</h2>{ev_rows}'
-            f'<h2 class="sec">Your voice &mdash; learned from the wording you change</h2>{note_rows}'
+            f'<h2 class="sec">Your voice: learned from the wording you change</h2>{note_rows}'
             f'<h2 class="sec">Edit history</h2>'
             f'<div class="pagehint">The evidence vault is governed: every change '
             f'has an author, a timestamp, and an approval behind it.</div>'
@@ -2750,7 +2798,7 @@ def knowledge_content(tid: str) -> str:
                  [("Invoice-to-transaction matcher", "ec-pink")])])
             + f'<form class="notebar" method="post" action="/api/evnote">'
             f'<input class="jfind notein" name="text" maxlength="200" '
-            f'placeholder="Comment on the evidence vault &mdash; e.g. a proof that went stale">'
+            f'placeholder="Comment on the evidence vault: e.g. a proof that went stale">'
             f'<button class="btn primary sm">Comment</button></form>')
 
 
@@ -2794,14 +2842,14 @@ def projects_content(tid: str) -> str:
         else:
             stage = '<span class="st mut">resolved</span>'
             total_open += 1
-        value = f"&#8377;{won_amt / 100:,.0f}" if won_amt else '<span class="mut">&mdash;</span>'
+        value = f"&#8377;{won_amt / 100:,.0f}" if won_amt else '<span class="mut">.</span>'
         last = max(r.occurred_at for r in runs).strftime("%b %-d")
         entries.append((0 if waiting else (1 if not outs else 2),
                         _trow2(PCOLS, [
             f'{_logo(label)}<b>{esc(label)}</b>'
             f'<span class="mut"> &middot; {esc(bought(oid))}</span>',
             stage,
-            f'<span class="mut">{esc(", ".join(reasons)) or "&mdash;"}</span>',
+            f'<span class="mut">{esc(", ".join(reasons)) or "."}</span>',
             f'{len(runs)} dispute{"s" if len(runs) != 1 else ""} on this order',
             value,
             f'<span class="mut">{last}</span>',
@@ -2888,7 +2936,7 @@ AGENT_DEFS = {
     "filing-agent": dict(icon="note", name="filing-agent",
         charter="Sends the reply you approved, exactly once, and records how it ended.",
         reads=["replies you said yes to"], effects=["send the reply to the bank"],
-        scope="The only one that talks to the bank &mdash; and only after your yes.",
+        scope="The only one that talks to the bank: and only after your yes.",
         session=["what was sent", "when"], profile=["how the dispute ended, and for how much"],
         rules=["Exactly once. A crash can never send the same reply twice.",
                "It only acts on replies you said yes to."]),
@@ -2897,7 +2945,7 @@ AGENT_DEFS = {
         reads=["everything in flight", "how much is waiting"], effects=["hand it to a person"],
         scope="Reads everything, sends nothing. It has no AI in it on purpose.",
         session=["why it got stuck"], profile=[],
-        rules=["Left unanswered for a day, it goes to a person &mdash; it never sends itself.",
+        rules=["Left unanswered for a day, it goes to a person: it never sends itself.",
                "If something breaks, it is said out loud, never buried."]),
     "reporting-agent": dict(icon="chart", name="reporting-agent",
         charter="Keeps the history and the numbers you see on every screen.",
@@ -2905,7 +2953,7 @@ AGENT_DEFS = {
         scope="Reads only. Every number it shows can be worked out again from your own record.",
         session=[], profile=[],
         rules=["Numbers are counted from what actually happened, never guessed.",
-               "How often you have to fix a reply is on the bill &mdash; you can check it yourself."]),
+               "How often you have to fix a reply is on the bill: you can check it yourself."]),
 }
 
 # Every roster agent opens to a real page, wired or not. What each desk may
@@ -2921,15 +2969,15 @@ DESK_ACCESS = {
                "Every number can be traced back to a bank line."],
         handoff=["A line that still won&rsquo;t tie after two tries goes to "
                  "a person, with the working shown.",
-                 "Anything that would move money is never guessed &mdash; a "
+                 "Anything that would move money is never guessed: a "
                  "person decides."]),
     "inventory": dict(
         reads=["stock counts", "orders coming in", "supplier lead times"],
         does=["warn you before you run out", "draft a reorder for your yes"],
-        rules=["It never places an order itself &mdash; a reorder waits for your yes.",
+        rules=["It never places an order itself: a reorder waits for your yes.",
                "A warning names the product, the days left, and why."],
         handoff=["A reorder bigger than your usual goes to a person first.",
-                 "Counts that disagree across channels &mdash; a person "
+                 "Counts that disagree across channels: a person "
                  "reconciles them, not a guess."]),
     "risk": dict(
         reads=["refund claims", "filing deadlines", "the rules that apply to you"],
@@ -2947,15 +2995,15 @@ DESK_ACCESS = {
                "Every claim in a reply points at proof on file."],
         handoff=["An angry buyer, or any mention of legal action, goes "
                  "straight to a person.",
-                 "A reply it is not sure of is never sent &mdash; a person "
+                 "A reply it is not sure of is never sent: a person "
                  "reads it first."]),
     "calling": dict(
         reads=["dropped carts", "failed payments", "orders waiting confirmation"],
         does=["call or message the buyer", "bring back the ones worth saving"],
         rules=["It never calls the same buyer twice about one thing.",
-               "Calling hours are respected &mdash; no 9 PM calls.",
+               "Calling hours are respected: no 9 PM calls.",
                "A buyer who says stop is never contacted again."],
-        handoff=["A buyer who asks for a person gets one &mdash; the agent "
+        handoff=["A buyer who asks for a person gets one: the agent "
                  "stops talking, mid-call if needed.",
                  "Any argument about money on a call is handed over, not "
                  "argued."]),
@@ -2964,7 +3012,7 @@ DESK_ACCESS = {
         does=["write your daily one-pager"],
         rules=["Numbers are counted from the record, never guessed.",
                "Bad news is on page one, not buried."],
-        handoff=["A number that looks wrong is flagged to a person &mdash; "
+        handoff=["A number that looks wrong is flagged to a person. "
                  "never smoothed over."]),
 }
 
@@ -2992,19 +3040,19 @@ AGENT_STORY = {
     "payouts_desk": dict(
         outcome="Vendors, staff and refunds paid on time, every time",
         steps=[("Line up", "what&rsquo;s due, to whom, by when"),
-               ("Ask", "you approve the list &mdash; one yes"),
+               ("Ask", "you approve the list: one yes"),
                ("Pay", "each one, the way they want to be paid"),
                ("Record", "every payment against its bill")]),
     "payment_forms": dict(
         outcome="Any odd payment collected with one form",
-        steps=[("Hear", "what you need &mdash; a bulk order, an advance"),
+        steps=[("Hear", "what you need: a bulk order, an advance"),
                ("Build", "the form, checks included"),
                ("Collect", "the money straight into your account")]),
     "stock_watch": dict(
         outcome="Never oversell, never sit on dead stock",
         steps=[("Watch", "stock across every channel"),
                ("Warn", "before you run out, days ahead"),
-               ("Draft", "the reorder &mdash; sent only on your yes")]),
+               ("Draft", "the reorder: sent only on your yes")]),
     "refund_shield": dict(
         outcome="Refund fraud caught before the money leaves",
         steps=[("Check", "every claim against the order and delivery"),
@@ -3025,7 +3073,7 @@ AGENT_STORY = {
         outcome="Every dispute answered before the deadline",
         steps=[("Read", "the dispute the moment the bank sends it"),
                ("Gather", "the proof from your own records"),
-               ("Write", "the reply &mdash; you approve it"),
+               ("Write", "the reply: you approve it"),
                ("File", "before the deadline, exactly once")]),
     "returns_desk": dict(
         outcome="Refunds released only when the goods are back",
@@ -3040,7 +3088,7 @@ AGENT_STORY = {
     "payment_rescue": dict(
         outcome="Failed payments turned back into orders",
         steps=[("Read", "why the payment failed"),
-               ("Wait", "a few minutes &mdash; then call"),
+               ("Wait", "a few minutes: then call"),
                ("Send", "a fresh link that works")]),
     "cod_guard": dict(
         outcome="COD confirmed before dispatch, returns cut",
@@ -3056,7 +3104,7 @@ AGENT_STORY = {
 
 
 # A person reading this is not a developer. Nobody should ever see a slug like
-# "detection-agent" on screen &mdash; each worker has a plain job title, the way
+# "detection-agent" on screen: each worker has a plain job title, the way
 # you would name the person you hired to do it.
 WORKER_NAME = {
     "detection-agent": "Dispute Reader",
@@ -3079,7 +3127,7 @@ def roster_detail_content(tid: str, a: dict) -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
     rules it works under, and one button. Brief it like someone joining on
-    Monday — no tabs, no settings, one screen."""
+    Monday: no tabs, no settings, one screen."""
     on = a["status"] == "live" or DEMO_ON.get(a["slug"], False)
     acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
     helpers = ""
@@ -3114,7 +3162,7 @@ def roster_detail_content(tid: str, a: dict) -> str:
                 f'<span class="go2">&rsaquo;</span></a>'
                 for i, s, stat in crew))
     elif on:
-        state = '<span class="st wait">watching &mdash; learning your business</span>'
+        state = '<span class="st wait">watching: learning your business</span>'
         action = (f'<form method="post" action="/api/agent_off">'
                   f'<input type="hidden" name="slug" value="{a["slug"]}">'
                   f'<button class="btn ghost">Switch off</button></form>')
@@ -3177,7 +3225,7 @@ def _kyc_builder() -> str:
     plays the moment; the plan it reveals is a real journey shape."""
     return """
 <h2 class="sec">Or describe the onboarding you need</h2>
-<div class="pagehint">Say it the way you would to a person &mdash; the
+<div class="pagehint">Say it the way you would to a person: the
 journey builds itself, and nothing goes live until you say yes.</div>
 <form class="notebar" style="max-width:640px" onsubmit="event.preventDefault();kycBuild()">
   <input class="jfind notein" id="kycask" maxlength="140"
@@ -3198,7 +3246,7 @@ journey builds itself, and nothing goes live until you say yes.</div>
     <div class="hstep"><span class="hdot"></span><div><b>Escalate</b>
       <span class="mut">a deeper look only when the risk calls for it</span></div></div>
     <div class="hstep"><span class="hdot"></span><div><b>Collect</b>
-      <span class="mut">verify and pay in the same form &mdash; one step for the buyer</span></div></div>
+      <span class="mut">verify and pay in the same form: one step for the buyer</span></div></div>
   </div>
   <p class="mut" style="font-size:12.5px;margin-top:10px">Built from what
   you said. It goes live only after you read it and say yes.</p></div>
@@ -3212,7 +3260,7 @@ function kycBuild(){
   setTimeout(() => {
     document.getElementById('kycgen').hidden = true;
     document.getElementById('kyctitle').textContent =
-      'Your onboarding journey — ' + q.slice(0, 60);
+      'Your onboarding journey. ' + q.slice(0, 60);
     document.getElementById('kycplan').hidden = false;
   }, 1600);
 }
@@ -3256,7 +3304,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 
     if tab == "access":
         items = ([("Can read: " + r, "It can read this. " + a["scope"], True) for r in a["reads"]]
-                 + [("Can do: " + e, "Something this one is allowed to do &mdash; "
+                 + [("Can do: " + e, "Something this one is allowed to do. "
                      "once and only once, and never before your yes.", True)
                     for e in a["effects"]]
                  + [("Everything else", "No, by default. It cannot touch anything "
@@ -3279,13 +3327,13 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                 f'<div class="pane-detail"><h3>{title}</h3><p>{desc}</p></div></div>'
                 f'<h2 class="sec">What it has been allowed to do</h2>'
                 f'<div class="pagehint">Trust is given a bit at a time, and every '
-                f'bit is written down &mdash; who allowed what, when, and what was '
+                f'bit is written down: who allowed what, when, and what was '
                 f'taken back. You can always take it back.</div>' + autonomy)
     elif tab == "memory":
         panes = [("Just for this job", "Picked up while doing one piece of "
                   "work and written down against it, so you can check it later.",
                   a["session"]),
-                 ("Kept for good", "Goes into what your team knows &mdash; proof, "
+                 ("Kept for good", "Goes into what your team knows: proof, "
                   "how you write, how disputes ended. Nothing is ever "
                   "overwritten; new facts sit on top of old ones.", a["profile"])]
         item = min(item, 1)
@@ -3306,9 +3354,9 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<span class="tdesc">{r} <span class="mut">signed off'
             f'</span></span></div>' for r in a["rules"])
         body = (f'<div class="pagehint">The rules this one works under. Written '
-                f'in plain words and signed off &mdash; and there is no box for '
+                f'in plain words and signed off: and there is no box for '
                 f'anyone to quietly rewrite them in. Changing a rule is a change '
-                f'to the software, checked before it reaches you &mdash; never a '
+                f'to the software, checked before it reaches you: never a '
                 f'text box someone can break.</div>{rows}')
     elif tab == "activity":
         led2 = WORLD.d.ledger
@@ -3366,7 +3414,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             seam_rows = (f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
                          f'<span class="tdesc">Follows fixed rules, not a guess '
                          f'<span class="mut">so there is nothing here that can '
-                         f'drift &mdash; it does the same thing every time</span>'
+                         f'drift: it does the same thing every time</span>'
                          f'</span><span class="st ok">checked, all good</span></div>')
         body = (f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
                 f'<span class="tdesc"><b>How often you had to fix a reply</b> '
@@ -3387,8 +3435,8 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 
 
 def _relay_agent_card(a: dict, tid: str = "t1") -> str:
-    """A wired agent earns the full card. Everything else is one calm row —
-    role, one line, Off — that opens to its page. The founder scanning this
+    """A wired agent earns the full card. Everything else is one calm row.
+    role, one line, Off: that opens to its page. The founder scanning this
     at 9 PM sees at a glance what is working and is not asked to read
     fourteen pitches (Hick: the pitch lives one click away, not here)."""
     live = a["status"] == "live"
@@ -3447,7 +3495,7 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     n_on = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
     n_desks = len({a["desk"] for a in RELAY_AGENTS})
     return (f'<h1 class="page">Your team</h1>'
-            f'<div class="pagehint">{n_all} agents, {n_desks} desks &mdash; '
+            f'<div class="pagehint">{n_all} agents, {n_desks} desks. '
             f'the people you would otherwise hire. Nothing that touches '
             f'money or a customer goes out until you say yes. '
             f'{n_on} working; open any of the rest to switch it on.</div>'
@@ -3486,7 +3534,7 @@ def activity_content(tid: str, f: str = "all") -> str:
     banner = (f'<div class="impactline">Replies you said yes to kept '
               f'<b>&#8377;{inr(won)}</b> in your account.</div>' if won else "")
     return (f'<h1 class="page">What it saved you</h1>'
-            f'<div class="pagehint">Every decision, with the working shown &mdash; '
+            f'<div class="pagehint">Every decision, with the working shown. '
             f'<a href="/export/impact.csv"><b>download it as a spreadsheet</b></a>.'
             f'</div>{banner}{chips}{rows}')
 
@@ -3756,7 +3804,7 @@ def account_journey_content(tid: str, acct_id: str) -> str:
             if e["kind"] in ("surfaced", "approved", "edited") and r.decision:
                 bubble = esc((r.decision or {}).get("counter_text", "")[:280])
             merged.append({**e, "bubble": bubble, "kv": {
-                "claim": r.claim_text or "&mdash;",
+                "claim": r.claim_text or ".",
                 "reason": COMP.get(r.reason_code, r.reason_code),
                 "customer": _account_label(r),
                 "bought": bought(r.order_id),
@@ -3830,7 +3878,7 @@ def journeys_content(tid: str, sel: str = "") -> str:
                 '<div class="pagehint">Everything your team has done, customer '
                 'by customer: what came in, what it decided, what you said yes '
                 'to, and how it ended.</div>'
-                '<div class="empty">Nothing here yet &mdash; load the sample '
+                '<div class="empty">Nothing here yet: load the sample '
                 'from Home, then come back.</div>')
 
     if sel in accts:
@@ -3860,7 +3908,7 @@ def journeys_content(tid: str, sel: str = "") -> str:
             chip = '<span class="st mut">lost &middot; written down</span>'
         else:
             chip = '<span class="st mut">working</span>'
-        comps = ", ".join(sorted(d["comps"])) or '<span class="mut">&mdash;</span>'
+        comps = ", ".join(sorted(d["comps"])) or '<span class="mut">.</span>'
         stream = " stream" if i < 8 else ""
         hid = " hidden" if i >= SHOW else ""
         rows.append(
@@ -3920,7 +3968,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
     return (
         '<div class="tkscope">'
         f'<div class="dhead"><a class="back2" href="/journeys" onclick="if(history.length>1){{history.back();return false}}">&lsaquo;</a>'
-        f'<div><h1><span class="goalk">Job:</span> {comp_name} &mdash; '
+        f'<div><h1><span class="goalk">Job:</span> {comp_name}. '
         f'&ldquo;{esc(r.claim_text or "claim")}&rdquo;, from '
         f'{esc(_account_label(r))}.</h1>'
         f'<div class="meta">{_logo(_account_label(r))}{esc(_account_label(r))}'
@@ -3935,7 +3983,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
         + f'<form class="notebar" method="post" action="/api/note">'
         f'<input type="hidden" name="run_id" value="{run_id}">'
         f'<input class="jfind notein" name="text" maxlength="280" '
-        f'placeholder="Add a note &mdash; what did you know that isn&rsquo;t written down here?">'
+        f'placeholder="Add a note: what did you know that isn&rsquo;t written down here?">'
         f'<button class="btn primary sm">Add note</button></form>'
         + f'<h2 class="sec">Everything that happened</h2>{rows}')
 
@@ -3993,10 +4041,10 @@ def shadow_content(tid: str) -> str:
                       f'<span class="mut stream">{esc(draft)}</span>')
         elif verdict == "esc":
             proof_v = '<span class="st warn">nothing on file</span>'
-            send_v = '<span class="st warn">would ask you &mdash; no proof on file</span>'
+            send_v = '<span class="st warn">would ask you: no proof on file</span>'
         else:
-            proof_v = '<span class="mut">&mdash;</span>'
-            send_v = '<span class="mut">&mdash;</span>'
+            proof_v = '<span class="mut">.</span>'
+            send_v = '<span class="mut">.</span>'
         body.append(
             f'<tr data-v="{verdict}">'
             f'<td class="chk"><input type="checkbox"></td>'
@@ -4012,7 +4060,7 @@ def shadow_content(tid: str) -> str:
         '<h1 class="page">See what you missed</h1>'
         '<div class="pagehint">Put your last 30 days of disputes through '
         'Dispute Defender. Nothing is sent, nobody is contacted, and it costs '
-        'nothing &mdash; you just see what got away.</div>'
+        'nothing: you just see what got away.</div>'
         '<button class="btn primary" id="shbtn" onclick="shstart()">Check the last 30 days</button>'
         '<div class="shstats">'
         '<div class="shstat"><div class="n" id="sh-calls">0</div><div class="l">disputes looked at</div></div>'
@@ -4072,6 +4120,12 @@ function shstart(){
   }, total);
 }
 </script>""")
+
+
+# ------------------------------------------------------------- assignment
+# A waiting yes can be handed to a named teammate. The agents keep working
+# either way; this only decides whose phone the case sits on.
+ASSIGN: dict[str, str] = {}      # order_id -> teammate name
 
 
 # ------------------------------------------------------------- people
@@ -4138,11 +4192,11 @@ def mode_ui(tid: str) -> str:
         opt_small = (
             f'<div class="mopt off"><div>Let Relay send small ones itself'
             f'<small>Opens after 20 yeses without changing the wording '
-            f'&mdash; you are at {n}.</small>'
+            f': you are at {n}.</small>'
             f'<span class="yesbar"><i style="width:{min(100, n * 100 // YES_TARGET)}%"></i></span>'
             f'</div></div>')
     opt_never = ('<div class="mopt off"><div>Skip approvals entirely'
-                 '<small>Never. Nothing sends without you &mdash; by design.'
+                 '<small>Never. Nothing sends without you: by design.'
                  '</small></div></div>')
     return (f'<details class="mode" id="mode2">'
             f'<summary>{ICONS["gear"]}<span>{label}</span></summary>'
@@ -4167,7 +4221,7 @@ _DEFAULT_ROUTINES = [
          last="ran last Friday", on=True),
     dict(name="Proof check", when="Every Monday",
          what="Goes over the proof on file and flags anything gone stale "
-              "&mdash; a dead link, an old policy page.",
+              ": a dead link, an old policy page.",
          last="ran Monday", on=True),
     dict(name="Month-end tie-out", when="First of the month",
          what="Ties the month's numbers out against the bank and writes you "
@@ -4215,9 +4269,9 @@ _SCHED_INTRO = """
 <script>
 const ONB = [
   {e:'&#9749;', h:'Start every day already caught up',
-   p:'The morning brief is written before you sit down &mdash; what came in overnight, what was handled, the few things that need your yes.'},
+   p:'The morning brief is written before you sit down: what came in overnight, what was handled, the few things that need your yes.'},
   {e:'&#128172;', h:'Say it once, it runs forever',
-   p:'&ldquo;Every Friday evening, tell me what we won this week.&rdquo; That sentence is the whole setup &mdash; no settings, no forms.'},
+   p:'&ldquo;Every Friday evening, tell me what we won this week.&rdquo; That sentence is the whole setup: no settings, no forms.'},
   {e:'&#128214;', h:'Nothing happens behind your back',
    p:'Every run leaves a note you can open like a chat, and nothing is ever sent anywhere without your yes.'}];
 function onbShow(i){
@@ -4269,7 +4323,7 @@ def scheduled_content(tid: str) -> str:
         inner = (f'{toggle}'
                  f'<span class="tdesc" data-name="{esc(r["name"])}">'
                  f'<b>{esc(r["name"])}</b> '
-                 f'<span class="mut">{r["when"]} &mdash; {r["what"]}</span></span>'
+                 f'<span class="mut">{r["when"]}. {r["what"]}</span></span>'
                  f'{stat}{tools}')
         if r.get("brief"):
             # The run leaves a note; the row opens it. This is the promise
@@ -4303,13 +4357,13 @@ function routineCancel(el){
 </script>"""
     return (f'<h1 class="page">Scheduled</h1>'
             f'<div class="pagehint">Work your team does on its own clock '
-            f'&mdash; while you sleep, over the weekend, on the first of the '
+            f': while you sleep, over the weekend, on the first of the '
             f'month. Each run leaves a note you can open and read, and '
             f'nothing is ever sent anywhere without your yes.</div>'
             + rows +
             f'<form class="notebar" method="post" action="/api/routine">'
             f'<input class="jfind notein" name="text" maxlength="200" '
-            f'placeholder="Say what you want and when &mdash; e.g. every '
+            f'placeholder="Say what you want and when: e.g. every '
             f'Friday evening, tell me what we won this week">'
             f'<button class="btn primary sm">Add</button></form>'
             + _SCHED_INTRO)
@@ -4319,7 +4373,7 @@ function routineCancel(el){
 def memory_content(tid: str) -> str:
     """One page answering one worry: does this thing actually know my
     business, and can I see (and correct) what it thinks it knows. Facts
-    are never overwritten — new ones sit on top, the old ones stay legible."""
+    are never overwritten: new ones sit on top, the old ones stay legible."""
     led = WORLD.d.ledger
     notes = [m for m in led.memory if m.tenant_id == tid
              and m.superseded_by is None]
@@ -4333,7 +4387,7 @@ def memory_content(tid: str) -> str:
         f'<span class="tdesc"><b>{esc((m.body or {}).get("changed") or "A rewording you made")}</b> '
         f'<span class="mut">{esc((m.body or {}).get("implies") or "kept as a style note")}</span></span>'
         f'<span class="st ok">kept</span></div>'
-        for m in notes) or ('<div class="empty">Nothing yet &mdash; the first '
+        for m in notes) or ('<div class="empty">Nothing yet: the first '
                             'time you reword a reply, what it teaches is kept '
                             'here.</div>')
     proof_rows = "".join(
@@ -4344,7 +4398,7 @@ def memory_content(tid: str) -> str:
     return (f'<h1 class="page">What your team remembers</h1>'
             f'<div class="pagehint">Your team gets better the longer it works '
             f'for you, because it keeps what it learns. Nothing here is ever '
-            f'overwritten &mdash; new facts sit on top of old ones, so you '
+            f'overwritten: new facts sit on top of old ones, so you '
             f'can always see how it came to know something. And it is yours: '
             f'anything wrong, tell it and it is corrected on the spot.</div>'
             f'<h2 class="sec">How you like things said</h2>'
@@ -4360,13 +4414,13 @@ def memory_content(tid: str) -> str:
             f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
             f'<span class="tdesc"><b>{n_ended} finished '
             f'dispute{"s" if n_ended != 1 else ""} remembered</b> '
-            f'<span class="mut">how each one ended, and for how much &mdash; '
+            f'<span class="mut">how each one ended, and for how much. '
             f'so the next similar one starts from what worked</span></span>'
             f'<span class="st ok">kept for good</span></div>'
             f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
             f'<span class="tdesc"><b>Every night, it goes over the day</b> '
             f'<span class="mut">what repeated, what worked, what to do '
-            f'differently &mdash; kept as notes you can read, never as a '
+            f'differently: kept as notes you can read, never as a '
             f'black box</span></span>'
             f'<span class="st ok">every night</span></div>')
 
@@ -4386,7 +4440,7 @@ def settings_content(tid: str, s: str = "team") -> str:
 
     if s == "team":
         body = (f'<div class="pagehint">Nothing that touches money or a '
-                f'customer goes out without a yes &mdash; this is where you '
+                f'customer goes out without a yes: this is where you '
                 f'decide whose yes counts. Hand it to someone before a '
                 f'holiday, take it back after. Everyone else still sees '
                 f'everything; they just can&rsquo;t approve.</div>')
@@ -4414,7 +4468,7 @@ def settings_content(tid: str, s: str = "team") -> str:
                  f'<input class="jfind notein" name="name" maxlength="60" '
                  f'placeholder="Name" style="flex:1">'
                  f'<input class="jfind notein" name="role" maxlength="60" '
-                 f'placeholder="What they do &mdash; e.g. accounts" style="flex:1.4">'
+                 f'placeholder="What they do: e.g. accounts" style="flex:1.4">'
                  f'<button class="btn primary sm">Add</button></form>')
         relay_rows = "".join(
             f'<div class="trow slim"><span class="ico">{ICONS["bot"]}</span>'
@@ -4423,7 +4477,7 @@ def settings_content(tid: str, s: str = "team") -> str:
             for _, n, r, d, _ in TEAM if d != BUSINESS)
         body += (f'<h2 class="sec">Relay&rsquo;s people</h2>'
                  f'<div class="pagehint">They pick up whatever the agents '
-                 f'hand over. You don&rsquo;t manage them &mdash; they come '
+                 f'hand over. You don&rsquo;t manage them: they come '
                  f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
         body = ('<div class="pagehint">Relay holds every connection itself. '
@@ -4433,16 +4487,16 @@ def settings_content(tid: str, s: str = "team") -> str:
     elif s == "data":
         exports = [
             ("Everything, as a spreadsheet", "/export/impact.csv",
-             "Every dispute your team has touched &mdash; who, what, when, "
+             "Every dispute your team has touched: who, what, when, "
              "how it ended, and for how much."),
             ("The proof on file", "/export/evidence.csv",
              "Every piece of proof your replies cite, with what it proves."),
             ("What your team remembers", "/export/memory.csv",
-             "How you like things said &mdash; every note learned from the "
+             "How you like things said: every note learned from the "
              "wording you changed."),
         ]
         body = ('<div class="pagehint">It&rsquo;s yours. Take all of it, any '
-                'time, no questions &mdash; each file opens in Excel or '
+                'time, no questions: each file opens in Excel or '
                 'Google Sheets. Leaving is allowed to be easy; that is what '
                 'makes staying a choice.</div>'
                 + "".join(
@@ -4453,7 +4507,7 @@ def settings_content(tid: str, s: str = "team") -> str:
             for t, href, d in exports))
     else:
         body = ('<div class="pagehint">These are not settings you can slide '
-                'around &mdash; each one is a promise the software keeps, '
+                'around: each one is a promise the software keeps, '
                 'written here so you can hold it to them.</div>'
                 + "".join(
             f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
@@ -4465,23 +4519,23 @@ def settings_content(tid: str, s: str = "team") -> str:
                   "everything else still waits for your yes, and all of it "
                   "lands in History" if autonomy_mode(tid) == "small" else
                   "nothing goes to a bank without your yes; if you "
-                  "don&rsquo;t answer, it waits for a person &mdash; it "
+                  "don&rsquo;t answer, it waits for a person: it "
                   "never sends itself")),
                 ("Never more than 3 at a time", "your attention is protected; "
                  "if a flood arrives, a person is told"),
                 ("The same claim is never worked twice", "not within a week, "
                  "on the same order"),
-                ("Every dispute gets worked", "no experiments here &mdash; a "
+                ("Every dispute gets worked", "no experiments here: a "
                  "missed deadline is your money, not a test"),
                 ("Your team works in its own sealed room", "everything it "
                  "does happens in a private space that belongs to your "
-                 "business alone &mdash; nothing it reads or writes can "
+                 "business alone: nothing it reads or writes can "
                  "touch anyone else's, and nothing leaves the room without "
                  "your yes"),
                 ("Your record is yours", "one click, everything, in a "
                  "spreadsheet"),
                 ("Your logins are never sitting in a file", "they are kept in "
-                 "the safe your computer already uses for passwords &mdash; "
+                 "the safe your computer already uses for passwords. "
                  "nowhere you could lose them")]))
     ident = (f'<div class="trow slim"><span class="ico">{ICONS["bm"]}</span>'
              f'<span class="tdesc"><b>{BUSINESS}</b> '
@@ -4788,6 +4842,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(303)
             self.send_header("Location", "/")
             self.end_headers(); return
+        if self.path == "/api/assign":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            order = (form.get("order") or [""])[0]
+            name = (form.get("name") or [""])[0].strip()[:60]
+            ok = {p["name"] for p in people_for(sess["tenant_id"])
+                  if p["approver"]}
+            if order and (name in ok or name == ""):
+                if name:
+                    ASSIGN[order] = name
+                else:
+                    ASSIGN.pop(order, None)
+            self.send_response(303)
+            self.send_header("Location", f"/cases/{order}")
+            self.end_headers(); return
         if self.path in ("/api/person_add", "/api/person_toggle",
                          "/api/person_del"):
             sess = self._session()
@@ -5061,13 +5132,13 @@ class Handler(BaseHTTPRequestHandler):
                 ctx = self._tenant_from_auth(resp, email)
                 if ctx is None:
                     return self._html(auth_page(
-                        "login", "Verified, but this account has no organization — sign up first."), 403)
+                        "login", "Verified, but this account has no organization: sign up first."), 403)
             else:
                 resp = wos.authenticate(email, password)
                 ctx = self._tenant_from_auth(resp, email)
                 if ctx is None:
                     return self._html(auth_page(
-                        "login", "This account has no organization yet — sign up first."), 403)
+                        "login", "This account has no organization yet: sign up first."), 403)
         except WorkOsError as e:
             # unverified email: WorkOS mailed a one-time code; collect it
             if e.code == "email_verification_required":
@@ -5090,7 +5161,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _slack_interaction(self, raw: str):
         """The Slack half of the gate. Same approve/reject the workspace and
-        chat call — one decision path, three transports."""
+        chat call: one decision path, three transports."""
         from relay_superagent.adapters.slack import parse_interaction, verify_signature
         from relay_superagent.secrets import get_secret
         secret = get_secret("slack-signing")
@@ -5111,7 +5182,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"text": "That one is already resolved."})
         if act["action"] == "approve":
             WORLD.approve(run, act["actor"])
-            return self._json({"text": "Approved — the response is filed. ✓"})
+            return self._json({"text": "Approved: the response is filed. ✓"})
         WORLD.reject(run, act["actor"])
         return self._json({"text": "Dismissed and recorded."})
 
@@ -5194,7 +5265,7 @@ def _t_shadow(_):
     moments = sum(1 for row in SHADOW_ROWS if row[4] != "skip")
     return (f"Over the last 30 days: <b>{moments}</b> disputes worth "
             f"replying to, <b>{sends}</b> replies ready to go, and not one of "
-            f"them answered by anyone. Nothing was sent &mdash; this is only a "
+            f"them answered by anyone. Nothing was sent: this is only a "
             f"look back. <a href='/shadow'><b>Open it</b></a> to see them.",
             "")
 
@@ -5272,7 +5343,7 @@ def _t_escalations(_):
         return "Nothing needs a person right now.", ""
     rows = "".join(f'<div class="mrow"><b class="warn">!</b>'
                    f'<span>{plain_detail(b["reason"])}</span>'
-                   f'<i>“{esc(b.get("claim") or "—")[:60]}”</i></div>'
+                   f'<i>“{esc(b.get("claim") or ".")[:60]}”</i></div>'
                    for _, b in posts)
     return f"{len(posts)} thing{'s' if len(posts) != 1 else ''} a person needs to look at.", \
            f'<div class="mcard">{rows}</div>'
@@ -5406,7 +5477,7 @@ def _keyword_route(text: str):
 
 
 def _llm_route(text: str):
-    """One Haiku call picks the tool — same seam discipline as the pipeline:
+    """One Haiku call picks the tool: same seam discipline as the pipeline:
     structured output, closed schema, and any failure falls back silently to
     the keyword router. The model never writes a query or a card."""
     from relay_superagent.secrets import get_secret
@@ -5474,7 +5545,7 @@ def confirm(pid: str, action: str | None = None, text: str = "",
     and writes exactly once."""
     prop = PROPOSALS.pop(pid, None)
     if prop is None:
-        return {"reply": "That one is gone — it may already be settled.",
+        return {"reply": "That one is gone: it may already be settled.",
                 "cards": "", "product": ""}
     run = WORLD.d.ledger.runs.get(prop["run_id"])
     if run is None or run.state is not RunState.AWAITING_GATE:
@@ -5649,7 +5720,7 @@ def conv_list_html(tid: str, active: str = "") -> str:
 
 def seed_conversations() -> None:
     """The demo account's chat history: real answers off the record, plus a
-    few exchanges about how the thing works — a believable week for someone
+    few exchanges about how the thing works: a believable week for someone
     who runs a small business and does not have a support team."""
     def live(title, q, pin=False):
         c = _new_conv("t1", title, pin)
@@ -5694,7 +5765,7 @@ def seed_conversations() -> None:
         "juice and ghee orders that go out cash on delivery.")
     authored(
         "Which claims do I reword?", "Which replies do I end up rewording?",
-        "The <b>charged-twice</b> ones, mostly &mdash; about one in three, and "
+        "The <b>charged-twice</b> ones, mostly: about one in three, and "
         "almost always just the wording. The <b>never-arrived</b> replies go "
         "out as they come. One real fix this quarter: a bank reference number "
         "the reply was missing on a refill dispute. That got written down, so "
@@ -5704,7 +5775,7 @@ def seed_conversations() -> None:
         "Do the refill disputes look different?",
         "Are the subscription disputes different from the rest?",
         "Yes. On a monthly refill the argument is almost never about delivery "
-        "&mdash; it is <b>when the buyer cancelled</b>. So the reply leans on "
+        ": it is <b>when the buyer cancelled</b>. So the reply leans on "
         "the refill log, which timestamps the cancellation to the minute, and "
         "on the policy page as it read that day. Two of the refill claims this "
         "quarter were cancelled after the parcel had already left, and both "
@@ -5735,7 +5806,7 @@ def _polish_reply(question: str, res: dict) -> dict:
         except Exception:
             pass
     res.pop("_tool", None)
-    # One plain line of provenance: no model, no routing, no jargon &mdash;
+    # One plain line of provenance: no model, no routing, no jargon.
     # just the promise that every number came from the merchant's own record.
     res["reply"] = (res.get("reply", "")
                     + '<span class="rmeta">Every number here comes straight '
@@ -5746,7 +5817,7 @@ def _polish_reply(question: str, res: dict) -> dict:
 CHAT_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay — Command</title>
+<title>Relay</title>
 <style>
 :root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
 --accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
@@ -5832,6 +5903,20 @@ main{flex:1;overflow-y:auto;padding:8px 0 14px}
 .bline .ico{width:16px;flex:none;margin-top:2px}
 .bline .ico svg{width:15px;height:15px;color:#6A6D7D}
 .bmore{display:block;margin-top:10px;font-size:12px;color:var(--accent)}
+.briefcard .bline{opacity:0;animation:fadeup .4s ease forwards}
+.briefcard .bline:nth-child(2){animation-delay:.08s}
+.briefcard .bline:nth-child(3){animation-delay:.2s}
+.briefcard .bline:nth-child(4){animation-delay:.32s}
+.briefcard .bline:nth-child(5){animation-delay:.44s}
+@keyframes fadeup{from{opacity:0;transform:translateY(5px)}
+  to{opacity:1;transform:none}}
+.shl{display:block;height:13px;border-radius:99px;margin:4px 0;width:88%;
+  background:linear-gradient(90deg,#E7E4F6 25%,#F5F3FC 50%,#E7E4F6 75%);
+  background-size:200% 100%;animation:shl 1.1s linear infinite}
+@keyframes shl{to{background-position:-200% 0}}
+.msg.streaming::after{content:"▍";color:var(--accent);
+  animation:caret 1s steps(2) infinite;margin-left:2px}
+@keyframes caret{50%{opacity:0}}
 .money{text-align:center;margin:2px 0 18px}
 .money .big{display:block;font-size:52px;line-height:1.08;font-weight:600;
   color:var(--ink);letter-spacing:-.02em}
@@ -6022,7 +6107,7 @@ async function convAct(kind, id){
   location.reload();
 }
 function convRename(id){
-  // Inline, in place — never a browser prompt. Enter saves, Escape puts
+  // Inline, in place: never a browser prompt. Enter saves, Escape puts
   // the old name back, clicking away saves.
   const a = document.querySelector('.conv[href="/?c=' + id + '"]');
   const t = a?.querySelector('.ctitle');
@@ -6075,14 +6160,43 @@ async function runSteps(steps){
     await wait(STEP_IN);
   }
 }
+// The reply arrives the way an agent works: a beat of thinking, the
+// steps ticking, then words landing as they are written.
+async function streamInto(el, html){
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  el.classList.add('streaming');
+  const walkNodes = async (src, dst) => {
+    for (const n of [...src.childNodes]){
+      if (n.nodeType === 3){
+        const words = n.textContent.split(/(\s+)/);
+        const t = document.createTextNode('');
+        dst.appendChild(t);
+        for (const w of words){
+          t.textContent += w;
+          if (w.trim()) await wait(22);
+        }
+      } else {
+        const c = n.cloneNode(false);
+        dst.appendChild(c);
+        await walkNodes(n, c);
+      }
+    }
+  };
+  await walkNodes(tpl.content, el);
+  el.classList.remove('streaming');
+}
 async function send(text){
   text = (text || '').trim(); if(!text) return;
   document.getElementById('empty')?.remove();
   bubble('msg user', text.replace(/</g,'&lt;')); box.value = '';
+  const think = bubble('msg bot',
+    '<span class="shl"></span><span class="shl" style="width:72%"></span>');
   const res = await fetch('/api/chat', {method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({message:text, conv_id: CONV})});
   const data = await res.json();
+  think.remove();
   if (data.conv_id && !CONV){
     CONV = data.conv_id;
     const t = document.getElementById('ctitle');
@@ -6092,7 +6206,8 @@ async function send(text){
     history.replaceState(null, '', '/?c=' + CONV);
   }
   await runSteps(data.steps);
-  bubble('msg bot', data.reply);
+  const b = bubble('msg bot', '');
+  await streamInto(b, data.reply);
   if(data.product) bubble('cards', data.product);
   if(data.cards) bubble('cards', data.cards);
 }
@@ -6127,14 +6242,14 @@ async function confirmProposal(pid){
 }
 function cancelProposal(pid){
   document.getElementById('prop-'+pid)?.remove();
-  bubble('msg bot', 'Left alone — nothing was sent.');
+  bubble('msg bot', 'Left alone: nothing was sent.');
 }
 </script>
 </body></html>"""
 
 
 def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
-    """Greeting, an optional one-line summary, and prompt chips — computed
+    """Greeting, an optional one-line summary, and prompt chips: computed
     from the record, not hardcoded. For the owner the summary is empty: the
     money number and the needs-your-yes line say it better than a sentence."""
     from datetime import datetime as _dt
@@ -6171,7 +6286,7 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
                         and (led.outcome_for(r.run_id).outcome_value or {}).get("won"))
         gated = [r for r in runs if r.gate_action is not None]
         used = sum(1 for r in gated if r.gate_action is not GateAction.REJECT)
-        adopt = f"{100 * used // len(gated)}%" if gated else "&mdash;"
+        adopt = f"{100 * used // len(gated)}%" if gated else "."
         bits = [f"<b>&#8377;{inr(won_total)}</b> won back on disputes",
                 f"<b>{adopt}</b> of replies were sent as written",
                 "win rate by kind of dispute reads out once there is more of it"]
@@ -6219,14 +6334,26 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
     lines = []
     if fresh:
         lines.append(("bolt", f'<b>{len(fresh)}</b> new dispute'
-                      f'{"s" if len(fresh) != 1 else ""} came in &mdash; '
+                      f'{"s" if len(fresh) != 1 else ""} came in. '
                       f'{"replies are drafted" if n_wait else "all handled"}.'))
     else:
-        lines.append(("bolt", "A quiet night &mdash; nothing new came in."))
+        lines.append(("bolt", "A quiet night: nothing new came in."))
     lines.append(("tasks", f'Your team has handled <b>{handled}</b> '
                   f'thing{"s" if handled != 1 else ""} on its own'
                   + (f'; <b>{n_wait}</b> waiting on your yes.' if n_wait
                      else '; nothing needs your yes.')))
+    # People and agents share the work. When teammates carried yeses,
+    # the brief says so by name.
+    mates = {}
+    for r in runs:
+        if r.gate_action is not None and r.gate_action.value == "approve":
+            w = _who(r.gate_actor, seed=r.run_id)
+            if w != "you":
+                mates[w.split()[0]] = mates.get(w.split()[0], 0) + 1
+    if mates:
+        said = " and ".join(f'<b>{n}</b> ({c})' for n, c in
+                            sorted(mates.items(), key=lambda x: -x[1]))
+        lines.append(("bot", f'Yeses from teammates: {said}.'))
     if kept:
         lines.append(("chart", f'<b>&#8377;{inr(kept)}</b> kept {window}, '
                       f'across {n_wins} dispute'
@@ -6329,7 +6456,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     rows = "".join(
         f'<a class="arow" href="/cases/{esc(r.order_id or "")}">{ICONS["bolt"]}'
         f'<span>Wrote the reply to the bank for '
-        f'{esc(_account_label(r))} &mdash; {esc(bought(r.order_id))}. '
+        f'{esc(_account_label(r))}. {esc(bought(r.order_id))}. '
         f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
         f'<span class="sub">Waiting on you &middot; '
         f'{_logo(_account_label(r))}{esc(_account_label(r))} &middot; '
