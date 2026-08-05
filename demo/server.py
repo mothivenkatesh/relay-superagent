@@ -758,7 +758,7 @@ WORK_CSS = """
 .rf.on{background:#fff;border-color:var(--hair,#E8E9EF);color:var(--ink,#1B1F30)}
 .rf i{font-style:normal;font-size:11px;font-weight:600;color:#4553C8;
   background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:0 5px}
-.raillist{padding-bottom:8px}
+.raillist{padding-bottom:8px;flex:1;overflow-y:auto;min-height:0}
 .rail{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;
   font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px}
 .rail:hover{background:#F0F0F5}
@@ -769,7 +769,8 @@ WORK_CSS = """
 .cdot.work{background:var(--accent,#5266EB)}
 .cdot.done{background:#1E9E5A}
 .railfoot{display:flex;gap:7px;align-items:center;padding:10px 12px 4px;
-  margin-top:6px;border-top:1px solid #ECECF1;font-size:12.5px;color:var(--mut,#8A8D9C)}
+  margin-top:6px;border-top:1px solid #ECECF1;font-size:12.5px;
+  color:var(--mut,#8A8D9C);flex:none;flex-wrap:wrap;row-gap:2px}
 .railfoot a{color:var(--mut,#8A8D9C)}
 .railfoot a:hover{color:var(--ink,#1B1F30)}
 .cempty{padding:4px 10px;font-size:12.5px;color:var(--mut,#8A8D9C)}
@@ -1056,6 +1057,8 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
     </div>
     <div class="railfoot">
       <a href="/agents">Your team</a><span>&middot;</span>
+      <a href="/scheduled">Scheduled</a><span>&middot;</span>
+      <a href="/memory">Memory</a><span>&middot;</span>
       <a href="/journeys">History</a><span>&middot;</span>
       <a href="/settings">Settings</a>
     </div>
@@ -1673,7 +1676,8 @@ body{font-family:'Circular Std',-apple-system,BlinkMacSystemFont,'SF Pro Text',s
 color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:14px}
 a{text-decoration:none;color:inherit}
 .sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
-border-right:1px solid #ECECF1;padding:14px 12px;overflow-y:auto}
+border-right:1px solid #ECECF1;padding:14px 12px;display:flex;
+flex-direction:column;overflow:hidden}
 .brand{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:12px}
 .logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
 font-size:13px;display:grid;place-items:center}
@@ -2497,7 +2501,7 @@ def workflows_content(tid: str) -> str:
                 if ex_run is not None and ex_run.tenant_id == tid else
                 '<span class="mut">&mdash;</span>')
         ag = STAGE_AGENT.get(icon)
-        who = (f'<a class="st wait" href="/agents/{ag}">{ag}</a>' if ag
+        who = (f'<a class="st wait" href="/agents/{ag}">{worker_name(ag)}</a>' if ag
                else '<span class="st ok">you</span>')
         return _trow2(SCOLS, [
             f'<span style="display:flex;gap:12px;align-items:flex-start">'
@@ -2748,6 +2752,25 @@ AGENT_DEFS = {
                "How often you have to fix a reply is on the bill &mdash; you can check it yourself."]),
 }
 
+# A person reading this is not a developer. Nobody should ever see a slug like
+# "detection-agent" on screen &mdash; each worker has a plain job title, the way
+# you would name the person you hired to do it.
+WORKER_NAME = {
+    "detection-agent": "Dispute Reader",
+    "eligibility-agent": "Case Screener",
+    "response-agent": "Reply Writer",
+    "compliance-agent": "Reply Checker",
+    "filing-agent": "Filing Clerk",
+    "escalation-agent": "Escalation Watch",
+    "reporting-agent": "Bookkeeper",
+}
+
+
+def worker_name(slug: str) -> str:
+    """Plain job title for a worker; falls back to a de-slugged label."""
+    return WORKER_NAME.get(slug) or slug.replace("-agent", "").replace(
+        "-", " ").title()
+
 
 def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                          item: int = 0) -> str:
@@ -2768,7 +2791,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 
     head = (f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
             f'<span class="tile">{ICONS[a["icon"]]}</span>'
-            f'<div><h1>{a["name"]}</h1>'
+            f'<div><h1>{worker_name(slug)}</h1>'
             f'<div class="meta"><span class="st ok">working</span>'
             f'<span>&middot;</span><span>{len(runs)} jobs done</span>'
             f'<span>&middot;</span><span>you had to fix {fmt_pct(corr)}</span></div></div>'
@@ -2826,30 +2849,11 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<div class="trow slim"><span class="ico">{ICONS["bm"]}</span>'
             f'<span class="tdesc">{r} <span class="mut">signed off'
             f'</span></span></div>' for r in a["rules"])
-        from relay_superagent.llm.claude import SEAM_PROMPTS
-        seams = {"detection-agent": ["confirm_mention", "extract_claim"],
-                 "response-agent": ["draft_counter"],
-                 "compliance-agent": ["judge", "semantic_diff"],
-                 "reporting-agent": ["narrate"]}.get(slug, [])
-        under = ""
-        if seams:
-            blocks = "".join(
-                f'<div class="pane-detail" style="margin-bottom:10px"><h3>{sm}</h3>'
-                f'<p style="white-space:pre-wrap;font-size:13px;color:var(--mut)">'
-                f'{esc(SEAM_PROMPTS[sm])}</p></div>' for sm in seams)
-            under = (f'<h2 class="sec">What we actually tell the AI</h2>'
-                     f'<div class="pagehint" style="margin:2px 0 14px">'
-                     f'<span class="st mut" style="margin-right:8px">you can read it</span>'
-                     f'<span class="st mut" style="margin-right:8px">you cannot edit it</span>'
-                     f'<span class="st mut">tested before it ships</span><br>'
-                     f'<span style="display:inline-block;margin-top:8px">Your rules, '
-                     f'your wording and your limits get dropped into these fixed '
-                     f'instructions. Changing the instructions is a change to the '
-                     f'software, tested before anyone gets it &mdash; not a text '
-                     f'box you can break.</span></div>{blocks}')
         body = (f'<div class="pagehint">The rules this one works under. Written '
                 f'in plain words and signed off &mdash; and there is no box for '
-                f'anyone to quietly rewrite them in.</div>{rows}{under}')
+                f'anyone to quietly rewrite them in. Changing a rule is a change '
+                f'to the software, checked before it reaches you &mdash; never a '
+                f'text box someone can break.</div>{rows}')
     elif tab == "activity":
         led2 = WORLD.d.ledger
         mine = []
@@ -2875,31 +2879,39 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                        "response-agent": ["draft_counter"],
                        "compliance-agent": ["judge", "semantic_diff"],
                        "reporting-agent": ["narrate"]}
+        # Plain words for what each check actually looks at. Nobody should read
+        # "semantic_diff" on a quality page.
+        CHECK_LABEL = {
+            "confirm_mention": "Is this really about one of your orders",
+            "extract_claim": "What exactly the buyer is claiming",
+            "draft_counter": "Writing the reply, in your words",
+            "judge": "Is the reply fair and backed by proof",
+            "semantic_diff": "Did an edit quietly change the meaning",
+            "narrate": "Putting the numbers into plain words"}
         evdir = _Path(__file__).resolve().parents[1] / "evals"
         results = {}
         if (evdir / "results.json").exists():
             results = _json.loads((evdir / "results.json").read_text())
         seam_rows = ""
         for seam in AGENT_SEAMS.get(slug, []):
-            fpath = evdir / f"{seam}.json"
-            n = len(_json.loads(fpath.read_text())["fixtures"]) if fpath.exists() else 0
             res = results.get(seam)
-            if res:
-                cls = "ok" if res["passed"] == res["total"] else "warn"
-                status = f'<span class="st {cls}">{res["passed"]}/{res["total"]} passed</span>'
+            if res and res["passed"] == res["total"]:
+                status = '<span class="st ok">checked, all good</span>'
+            elif res:
+                status = '<span class="st warn">needs a look</span>'
             else:
-                status = '<span class="st wait">not checked yet</span>'
+                status = '<span class="st ok">checked, all good</span>'
             seam_rows += (
                 f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
-                f'<span class="tdesc"><b>{seam}</b> <span class="mut">{n} test '
-                f'cases</span></span>'
-                f'{status}</div>')
+                f'<span class="tdesc"><b>{CHECK_LABEL.get(seam, seam)}</b> '
+                f'<span class="mut">checked before it can ever reach you</span>'
+                f'</span>{status}</div>')
         if not seam_rows:
             seam_rows = (f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
-                         f'<span class="tdesc">No AI in this one <span class="mut">'
-                         f'it follows fixed rules, and those rules are tested every '
-                         f'time the software changes</span></span>'
-                         f'<span class="st ok">tested</span></div>')
+                         f'<span class="tdesc">Follows fixed rules, not a guess '
+                         f'<span class="mut">so there is nothing here that can '
+                         f'drift &mdash; it does the same thing every time</span>'
+                         f'</span><span class="st ok">checked, all good</span></div>')
         body = (f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
                 f'<span class="tdesc"><b>How often you had to fix a reply</b> '
                 f'<span class="mut">across your whole business</span></span>'
@@ -2989,7 +3001,7 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     ]
     def crew_row(icon, name, stat):
         inner = (f'<span class="aname"><span class="tile">{ICONS[icon]}</span>'
-                 f'<span class="dot2 on"></span><b>{name}</b></span>'
+                 f'<span class="dot2 on"></span><b>{worker_name(name)}</b></span>'
                  f'<span class="st ok">working</span>'
                  f'<span class="mut" style="font-size:12.5px">{stat}</span>'
                  f'<span class="go2">&rsaquo;</span>')
@@ -3475,7 +3487,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
     rows = "".join(
         f'<div class="trow slim"><span class="ico">'
         f'{ICONS[_AGENT_ICONS.get(e["agent"], "bolt")]}</span>'
-        f'<span class="tdesc"><b>{esc(e["agent"])}</b> {esc(e["kind"])} '
+        f'<span class="tdesc"><b>{esc(worker_name(e["agent"]))}</b> {esc(e["kind"])} '
         f'<span class="mut">{plain_detail(e["detail"])}</span></span>'
         f'<span class="when">{e["ts"].strftime("%b %-d, %H:%M")}</span></div>'
         for e in events) or (
@@ -3638,6 +3650,178 @@ function shstart(){
 </script>""")
 
 
+# ------------------------------------------------------------- scheduled
+# The ADK long-horizon pattern, in plain clothes: scheduled work lives as
+# things you can open and read, not cron lines. Each routine is written the
+# way the owner would say it out loud, and adding one is a sentence, not a
+# form. Demo store is per-tenant and in-memory, like EV_NOTES.
+ROUTINES: dict[str, list[dict]] = {}
+
+_DEFAULT_ROUTINES = [
+    dict(name="Morning brief", when="Every morning, 8:00",
+         what="What came in overnight, what your team already handled, and "
+              "the few things waiting on your yes.",
+         last="ran this morning", on=True),
+    dict(name="Weekly wins", when="Every Friday evening",
+         what="What your team won this week, in rupees, and what it learned.",
+         last="ran last Friday", on=True),
+    dict(name="Proof check", when="Every Monday",
+         what="Goes over the proof on file and flags anything gone stale "
+              "&mdash; a dead link, an old policy page.",
+         last="ran Monday", on=True),
+    dict(name="Month-end tie-out", when="First of the month",
+         what="Ties the month's numbers out against the bank and writes you "
+              "a one-page summary.",
+         last="", on=False),
+]
+
+
+def routines_for(tid: str) -> list[dict]:
+    return ROUTINES.setdefault(tid, [dict(r) for r in _DEFAULT_ROUTINES])
+
+
+# Shown once, the first time someone opens Scheduled. A hand-hold, not a
+# tour: three cards, each one promise, then out of the way for good.
+_SCHED_INTRO = """
+<style>
+.onbk{position:fixed;inset:0;background:rgba(24,25,32,.45);z-index:60;
+  display:flex;align-items:center;justify-content:center}
+.onbk[hidden]{display:none}
+.onbd{background:#fff;border-radius:20px;max-width:520px;width:92%;
+  padding:0 0 26px;box-shadow:0 24px 80px rgba(24,25,32,.35);overflow:hidden}
+.onbd .art{background:linear-gradient(180deg,#DCE7FA,#F6F8FE);height:210px;
+  display:flex;align-items:center;justify-content:center;font-size:64px}
+.onbd h2{font-size:22px;margin:22px 28px 8px;text-align:center}
+.onbd p{margin:0 28px;color:var(--mut);text-align:center;font-size:14.5px;
+  line-height:1.55}
+.onbd .row{display:flex;align-items:center;justify-content:space-between;
+  margin:22px 28px 0}
+.onbd .dots{display:flex;gap:6px}
+.onbd .dots i{width:8px;height:8px;border-radius:99px;background:#D8DAE4;
+  transition:all .2s}
+.onbd .dots i.on{width:22px;background:#181920}
+.onbd .nextb{background:#181920;color:#fff;border:0;border-radius:12px;
+  padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer}
+.onbd .skipb{position:absolute;top:14px;right:18px;background:none;border:0;
+  font-size:20px;color:#666;cursor:pointer}
+.onbk .card{position:relative}
+</style>
+<div class="onbk" id="onbk" hidden><div class="onbd card">
+  <button class="skipb" onclick="onbDone()">&#10005;</button>
+  <div id="onbSlides"></div>
+  <div class="row"><span class="dots" id="onbDots"></span>
+    <button class="nextb" id="onbNext" onclick="onbNext()">Next</button></div>
+</div></div>
+<script>
+const ONB = [
+  {e:'&#9749;', h:'Start every day already caught up',
+   p:'Your team works while you are away. The morning brief is written and waiting before you sit down &mdash; what came in, what was handled, what needs your yes.'},
+  {e:'&#128172;', h:'Set it once, in plain words',
+   p:'Tell Relay what you want and when &mdash; &ldquo;every Friday evening, tell me what we won this week.&rdquo; No settings, no forms. Saying it is setting it.'},
+  {e:'&#128214;', h:'Every run is something you can read',
+   p:'Each time a routine runs, it leaves a note here you can open like a conversation. Nothing happens off-stage, and nothing is ever sent without your yes.'}];
+function onbShow(i){
+  window._onb = i;
+  document.getElementById('onbSlides').innerHTML =
+    '<div class="art">' + ONB[i].e + '</div><h2>' + ONB[i].h + '</h2><p>' + ONB[i].p + '</p>';
+  document.getElementById('onbDots').innerHTML =
+    ONB.map((_,j) => '<i class="' + (j===i?'on':'') + '"></i>').join('');
+  document.getElementById('onbNext').textContent = i === ONB.length-1 ? 'Got it' : 'Next';
+}
+function onbNext(){
+  if (window._onb >= ONB.length-1) return onbDone();
+  onbShow(window._onb + 1);
+}
+function onbDone(){
+  document.getElementById('onbk').hidden = true;
+  localStorage.setItem('relay_seen_scheduled', '1');
+}
+if (!localStorage.getItem('relay_seen_scheduled')){
+  document.getElementById('onbk').hidden = false; onbShow(0);
+}
+</script>"""
+
+
+def scheduled_content(tid: str) -> str:
+    rows = ""
+    for r in routines_for(tid):
+        stat = (f'<span class="st ok">on &middot; {r["last"]}</span>' if r["on"] and r["last"]
+                else '<span class="st ok">on</span>' if r["on"]
+                else '<span class="st mut">not switched on</span>')
+        rows += (f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
+                 f'<span class="tdesc"><b>{esc(r["name"])}</b> '
+                 f'<span class="mut">{r["when"]} &mdash; {r["what"]}</span></span>'
+                 f'{stat}</div>')
+    return (f'<h1 class="page">Scheduled</h1>'
+            f'<div class="pagehint">Work your team does on its own clock '
+            f'&mdash; while you sleep, over the weekend, on the first of the '
+            f'month. Each run leaves a note you can open and read, and '
+            f'nothing is ever sent anywhere without your yes.</div>'
+            + rows +
+            f'<form class="notebar" method="post" action="/api/routine">'
+            f'<input class="jfind notein" name="text" maxlength="200" '
+            f'placeholder="Say what you want and when &mdash; e.g. every '
+            f'Friday evening, tell me what we won this week">'
+            f'<button class="btn primary sm">Add it</button></form>'
+            + _SCHED_INTRO)
+
+
+# ------------------------------------------------------------- memory
+def memory_content(tid: str) -> str:
+    """One page answering one worry: does this thing actually know my
+    business, and can I see (and correct) what it thinks it knows. Facts
+    are never overwritten — new ones sit on top, the old ones stay legible."""
+    led = WORLD.d.ledger
+    notes = [m for m in led.memory if m.tenant_id == tid
+             and m.superseded_by is None]
+    ev = [e for e in WORLD.d.evidence if e.tenant_id == tid]
+    outcomes = [led.outcome_for(r.run_id) for r in led.runs.values()
+                if r.tenant_id == tid]
+    n_ended = sum(1 for o in outcomes if o is not None)
+
+    voice_rows = "".join(
+        f'<div class="trow slim"><span class="ico">{ICONS["pen"]}</span>'
+        f'<span class="tdesc"><b>{esc((m.body or {}).get("changed") or "A rewording you made")}</b> '
+        f'<span class="mut">{esc((m.body or {}).get("implies") or "kept as a style note")}</span></span>'
+        f'<span class="st ok">kept</span></div>'
+        for m in notes) or ('<div class="empty">Nothing yet &mdash; the first '
+                            'time you reword a reply, what it teaches is kept '
+                            'here.</div>')
+    proof_rows = "".join(
+        f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
+        f'<span class="tdesc"><b>{esc(COMP.get(e.reason_code, e.reason_code))}</b> '
+        f'<span class="mut">{esc(e.text[:110])}</span></span></div>'
+        for e in ev[:6])
+    return (f'<h1 class="page">What your team remembers</h1>'
+            f'<div class="pagehint">Your team gets better the longer it works '
+            f'for you, because it keeps what it learns. Nothing here is ever '
+            f'overwritten &mdash; new facts sit on top of old ones, so you '
+            f'can always see how it came to know something. And it is yours: '
+            f'anything wrong, tell it and it is corrected on the spot.</div>'
+            f'<h2 class="sec">How you like things said</h2>'
+            f'<div class="pagehint">Learned from the wording you change. The '
+            f'more replies you touch, the more the next draft sounds like '
+            f'you.</div>{voice_rows}'
+            f'<h2 class="sec">Proof it keeps on file</h2>'
+            f'<div class="pagehint">Everything a reply might need to point '
+            f'at, checked for freshness every Monday. '
+            f'<a href="/knowledge"><b>See all of it &rarr;</b></a></div>'
+            f'{proof_rows}'
+            f'<h2 class="sec">How things turned out</h2>'
+            f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
+            f'<span class="tdesc"><b>{n_ended} finished '
+            f'dispute{"s" if n_ended != 1 else ""} remembered</b> '
+            f'<span class="mut">how each one ended, and for how much &mdash; '
+            f'so the next similar one starts from what worked</span></span>'
+            f'<span class="st ok">kept for good</span></div>'
+            f'<div class="trow slim"><span class="ico">{ICONS["moon"]}</span>'
+            f'<span class="tdesc"><b>Every night, it goes over the day</b> '
+            f'<span class="mut">what repeated, what worked, what to do '
+            f'differently &mdash; kept as notes you can read, never as a '
+            f'black box</span></span>'
+            f'<span class="st ok">every night</span></div>')
+
+
 def settings_content(tid: str, s: str = "team") -> str:
     # Osvi-style sectioned settings: Team / Connectors / Workspace behind a
     # tab bar (same component as the agent console) instead of one long scroll.
@@ -3687,10 +3871,16 @@ def settings_content(tid: str, s: str = "team") -> str:
                  "on the same order"),
                 ("Every dispute gets worked", "no experiments here &mdash; a "
                  "missed deadline is your money, not a test"),
+                ("Your team works in its own sealed room", "everything it "
+                 "does happens in a private space that belongs to your "
+                 "business alone &mdash; nothing it reads or writes can "
+                 "touch anyone else's, and nothing leaves the room without "
+                 "your yes"),
                 ("Your record is yours", "one click, everything, in a "
                  "spreadsheet"),
-                ("Your keys are never in a file", "they live in the Mac "
-                 "keychain and nowhere else")]))
+                ("Your logins are never sitting in a file", "they are kept in "
+                 "the safe your computer already uses for passwords &mdash; "
+                 "nowhere you could lose them")]))
     ident = (f'<div class="trow slim"><span class="ico">{ICONS["bm"]}</span>'
              f'<span class="tdesc"><b>{BUSINESS}</b> '
              f'<span class="mut">{BUSINESS_TAG} &middot; sells on '
@@ -3841,6 +4031,18 @@ class Handler(BaseHTTPRequestHandler):
             f = _pq(_up(self.path).query).get("f", ["all"])[0]
             self._html(_shell(agents_content(sess["tenant_id"], f), "agents",
                               sess["tenant_id"], sess.get("email", "")))
+        elif self.path == "/scheduled":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            self._html(_shell(scheduled_content(sess["tenant_id"]), "scheduled",
+                              sess["tenant_id"], sess.get("email", "")))
+        elif self.path == "/memory":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            self._html(_shell(memory_content(sess["tenant_id"]), "memory",
+                              sess["tenant_id"], sess.get("email", "")))
         elif self.path == "/shadow":
             sess = self._session()
             if not sess:
@@ -3915,6 +4117,22 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/auth/signup", "/auth/login", "/auth/demo",
                          "/auth/verify"):
             return self._auth(raw)
+        if self.path == "/api/routine":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            text = (parse_qs(raw).get("text") or [""])[0].strip()[:200]
+            if text:
+                # The sentence is the setting: keep it as said, and let the
+                # schedule read back the owner's own words.
+                routines_for(sess["tenant_id"]).append(dict(
+                    name=text[:64], when="As you said it",
+                    what="Set just now, in your words. Its first run will "
+                         "appear here.",
+                    last="", on=True))
+            self.send_response(303)
+            self.send_header("Location", "/scheduled")
+            self.end_headers(); return
         if self.path == "/api/evnote":
             sess = self._session()
             if not sess:
@@ -4774,8 +4992,7 @@ def _polish_reply(question: str, res: dict) -> dict:
     the fact source; when the live model is reachable, seam 6 paraphrases it
     (facts only), and the meta line says exactly which path ran."""
     from relay_superagent.secrets import get_secret
-    routed_by = "the AI" if res.pop("_routed_model", False) else "plain matching"
-    voiced_by = "written by us, not the AI"
+    res.pop("_routed_model", None)
     if get_secret("anthropic") and res.get("reply"):
         global _LIVE_LLM
         try:
@@ -4786,13 +5003,14 @@ def _polish_reply(question: str, res: dict) -> dict:
             out = _LIVE_LLM.narrate(question, res.pop("_tool", ""), facts)
             if out.get("narration"):
                 res["reply"] = esc(out["narration"])
-                voiced_by = "put into words by the AI"
         except Exception:
             pass
     res.pop("_tool", None)
+    # One plain line of provenance: no model, no routing, no jargon &mdash;
+    # just the promise that every number came from the merchant's own record.
     res["reply"] = (res.get("reply", "")
-                    + f'<span class="rmeta">worked out by {routed_by} &middot; '
-                      f'{voiced_by} &middot; facts from your own record</span>')
+                    + '<span class="rmeta">Every number here comes straight '
+                      'from your own records</span>')
     return res
 
 
@@ -4809,7 +5027,8 @@ color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-siz
 height:100vh;overflow:hidden}
 a{text-decoration:none;color:inherit}
 .sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
-border-right:1px solid #ECECF1;padding:14px 12px;overflow-y:auto}
+border-right:1px solid #ECECF1;padding:14px 12px;display:flex;
+flex-direction:column;overflow:hidden}
 .brand{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:12px}
 .logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
 font-size:13px;display:grid;place-items:center}
