@@ -709,7 +709,7 @@ input:focus{{outline:none;border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,
     <button class="btn primary wide">{'Sign up' if signup else 'Log in'}</button>
   </form>
   <div class="swap">{swap}</div>
-  <form class="demo" method="post" action="/auth/demo"><button class="btn ghost wide">Continue with the demo workspace</button></form>
+  <form class="demo" method="post" action="/auth/demo"><button class="btn ghost wide">Try the demo</button></form>
 </div>
 </body></html>"""
 
@@ -787,11 +787,11 @@ WORK_CSS = """
   font-size:12px;color:var(--mut,#8A8D9C)}
 .rail.unread .rname{font-weight:700}
 .rail.unread .rprev{color:var(--text,#3A3D4D)}
-.rail.unread .cdot.need{width:9px;height:9px}
+
 .rlabel{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .railsys{flex:none;padding-top:8px;margin-top:6px;border-top:1px solid #ECECF1}
 .railsys .nav{margin-bottom:1px}
-.cdot{width:7px;height:7px;border-radius:50%;flex:none}
+.cdot{width:8px;height:8px;border-radius:50%;flex:none}
 .cdot.need{background:#E8A33D}
 .cdot.work{background:var(--accent,#5266EB)}
 .cdot.done{background:#1E9E5A}
@@ -877,7 +877,7 @@ WORK_CSS = """
   position:relative;font-size:13.5px;opacity:0;animation:wfadein .45s ease forwards}
 .cstep:not(:last-child)::before{content:"";position:absolute;left:3px;top:16px;
   bottom:-9px;width:1px;background:#E7E8EE}
-.cdot2{position:absolute;left:0;top:12px;width:7px;height:7px;border-radius:50%;
+.cdot2{position:absolute;left:0;top:12px;width:8px;height:8px;border-radius:50%;
   background:#C6C9D4}
 .clab{flex:1;color:var(--ink,#1B1F30);min-width:0}
 .csub{display:block;font-size:12.5px;color:var(--mut,#8A8D9C);margin-top:1px;
@@ -1720,7 +1720,7 @@ HOME_CONTENT = """
     <div class="pagehint">Your team wrote these. Nothing goes to the bank
       until you say yes.
       <form method="post" action="/api/sample" style="display:inline;margin-left:8px">
-      <button class="btn ghost sm">Try it with a made-up dispute</button></form></div>
+      <button class="btn ghost sm">Try a sample</button></form></div>
     <div id="bulkbar" class="bulkbar" hidden>
       <b id="bcount"></b>
       <input id="bwhy" class="whyin" style="width:190px" maxlength="200"
@@ -1893,7 +1893,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .hzn.on{color:#177245;font-weight:500}
 .slimcard{display:flex !important;align-items:center;gap:10px;
   padding:12px 16px !important;font-size:14px;color:var(--ink)}
-.slimcard .dot2{position:static;border:0;width:7px;height:7px;flex:none}
+.slimcard .dot2{position:static;border:0;width:8px;height:8px;flex:none}
 .slimcard .ident{flex:none}
 .slimcard b{flex:none;font-weight:600}
 .slimcard .slimdesc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;
@@ -1903,7 +1903,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
   margin:20px 0 10px;max-width:640px}
 .hsteps{margin:4px 0 6px;max-width:560px}
 .hstep{display:flex;gap:14px;padding:9px 2px;align-items:flex-start}
-.hstep .hdot{width:9px;height:9px;border-radius:50%;background:var(--ink);
+.hstep .hdot{width:8px;height:8px;border-radius:50%;background:var(--ink);
   flex:none;margin-top:5px;box-shadow:0 0 0 3px #ECECF1}
 .hstep b{display:block;font-size:14px;color:var(--ink)}
 .hstep .mut{font-size:13px}
@@ -1931,6 +1931,8 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
 .mbar{flex:1;height:3px;border-radius:99px;background:#ECECF1;
   margin-top:12px;min-width:24px}
 .mbar.done{background:var(--accent)}
+.ctahint{display:block;font-size:11.5px;color:var(--mut);margin-top:6px;
+  text-align:right}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -3066,13 +3068,13 @@ def roster_detail_content(tid: str, a: dict) -> str:
         state = '<span class="st wait">watching &mdash; learning your business</span>'
         action = (f'<form method="post" action="/api/agent_off">'
                   f'<input type="hidden" name="slug" value="{a["slug"]}">'
-                  f'<button class="btn ghost">Switch it off</button></form>')
+                  f'<button class="btn ghost">Switch off</button></form>')
     else:
         state = '<span class="st mut">not switched on</span>'
         action = (f'<form method="post" action="/api/agent_on">'
                   f'<input type="hidden" name="slug" value="{a["slug"]}">'
-                  f'<button class="btn primary">Switch on &mdash; it only '
-                  f'watches for the first week</button></form>')
+                  f'<button class="btn primary">Switch on</button>'
+                  f'<span class="ctahint">It only watches for the first week.</span></form>')
     story = AGENT_STORY.get(a["slug"], {})
     steps = "".join(
         f'<div class="hstep"><span class="hdot"></span>'
@@ -3081,8 +3083,8 @@ def roster_detail_content(tid: str, a: dict) -> str:
     caps = "".join(
         f'<span class="capchip">{ICONS["book"]} Reads {r}</span>'
         for r in acc["reads"]) + "".join(
-        f'<span class="capchip act">{ICONS["bolt"]} Can {d} &middot; '
-        f'after your yes</span>'
+        f'<span class="capchip act">{ICONS["bolt"]} Can {d}'
+        + ('' if 'yes' in d else ' &middot; after your yes') + '</span>'
         for d in acc["does"])
     rules = "".join(f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
                     f'<span class="tdesc">{r}</span></div>'
@@ -3117,7 +3119,7 @@ journey builds itself, and nothing goes live until you say yes.</div>
 <form class="notebar" style="max-width:640px" onsubmit="event.preventDefault();kycBuild()">
   <input class="jfind notein" id="kycask" maxlength="140"
     placeholder="e.g. checks for buyers above &#8377;2 lakh, PAN before payment">
-  <button class="btn primary sm">Build it</button></form>
+  <button class="btn primary sm">Build</button></form>
 <div id="kycgen" hidden style="max-width:640px;margin-top:14px">
   <div class="mut" style="font-size:13px;margin-bottom:10px">&#10022; Putting it together&hellip;</div>
   <div class="shimmer"></div><div class="shimmer" style="width:82%"></div>
@@ -3187,7 +3189,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<span>&middot;</span><span>{len(runs)} jobs done</span>'
             f'<span>&middot;</span><span>you had to fix {fmt_pct(corr)}</span></div></div>'
             f'<form method="post" action="/api/sample" style="margin-left:auto">'
-            f'<button class="btn ghost">Try it with a made-up dispute</button></form></div>')
+            f'<button class="btn ghost">Try a sample</button></form></div>')
 
     if tab == "access":
         items = ([("Can read: " + r, "It can read this. " + a["scope"], True) for r in a["reads"]]
@@ -4192,7 +4194,7 @@ def scheduled_content(tid: str) -> str:
             f'<input class="jfind notein" name="text" maxlength="200" '
             f'placeholder="Say what you want and when &mdash; e.g. every '
             f'Friday evening, tell me what we won this week">'
-            f'<button class="btn primary sm">Add it</button></form>'
+            f'<button class="btn primary sm">Add</button></form>'
             + _SCHED_INTRO)
 
 
@@ -6011,7 +6013,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     has_runs = any(r.tenant_id == tid for r in WORLD.d.ledger.runs.values())
     sample_html = "" if has_runs else (
         '<form method="post" action="/api/sample" class="samplecta">'
-        '<button class="btn primary">Watch it defend one dispute</button>'
+        '<button class="btn primary">Try it now</button>'
         '<span class="mut">A made-up dispute, the real agent. Nothing is '
         'filed anywhere.</span></form>')
 
