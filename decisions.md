@@ -312,3 +312,41 @@ pipeline. Engine untouched — 108 tests still green.
 **Open:** self-serve onboarding (required by the no-setup-project promise)
 is not built; no real webhook is attached; which agent gets wired second is
 undecided.
+
+## D24 — The office is job titles, and every agent must replace one (2026-08-05)
+
+Captain-directed, layered across one session. Two rules and a roster.
+
+**Rule 1 — the bar for existing.** An agent earns a place only if it
+replaces a real job and beats that job on cost. Not "assists with", not
+"speeds up". Every agent therefore carries a `replaces` field naming the
+job and an indicative monthly cost, rendered on its card. If an agent
+cannot name the job it displaces, it does not ship. This is the labor
+arbitrage thesis made checkable per agent rather than asserted per deck.
+
+Caveat on the record: the salary bands are indicative Indian small-business
+ranges used to frame the arbitrage. They are not sourced figures and must
+be replaced with real data before any external use.
+
+**Rule 2 — organise by hire, not by function.** Desks are job titles a
+founder would recognise from a payroll, in common Indian commerce terms:
+accounts manager, inventory manager, risk & compliance manager, support
+manager, telecaller, MIS analyst. Explicitly not CFO/VP-Ops corporate
+American titles, and explicitly not functional taxonomies (Finance/Risk/
+Revenue, which this replaced) — a founder thinks "I need an accounts
+person", never "I need a finance desk".
+
+**Roster grew 7 → 14** as the captain named the jobs: added Cashflow
+Forecast, Payouts Desk, Stock Watch, GST & Compliance, KYC Desk, Returns
+Desk and Daily MIS. KYC Desk covers PAN/Aadhaar/GST/RC/DL verification —
+the jewellery counter needing a PAN before a Rs 2L sale is the anchor
+example. AgentType in models.py carries all 14, grouped by desk.
+
+**Surface voice unchanged from D23's Khatabook-plain rule**, and the
+"Your team" header now computes its counts from RELAY_AGENTS so it cannot
+go stale as the roster grows.
+
+**UI fix in the same pass:** the `.needs` card on Home had no svg sizing
+rule, so the tick icon expanded to fill the flex container. Added
+`.needs svg{width:18px;height:18px;flex:none}`. A programmatic sweep for
+horizontal overflow and oversized SVGs across the app now reports clean.

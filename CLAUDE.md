@@ -20,12 +20,36 @@ are value-added services on top, never the core.
   Price against the labor budget, per unit of work — never per seat.
 - Problem sentence: every unit of growth buys a proportional unit of ops
   labor, so growth never compounds margin.
-- Surface: six agents = the money motion of ONE order, in lifecycle order
-  (Cart Rescue → Payment Rescue → COD Guard → Refund Shield → Dispute
-  Defender → Reconciliation). Loan Recovery and Due Diligence were dropped
-  from the earlier 8-agent deck lineup: they are NBFC/LSP lending, not
-  commerce. Settlement Clarity renamed Reconciliation (that name was
-  already retired per the Arivu wiki).
+- Surface (captain-directed 2026-08-05): **a virtual back office / agent
+  swarm**, organised as the people a founder would otherwise put on
+  payroll. 14 agents, 6 hires:
+  **Your accounts manager** (3-Way Reconciliation, Settlement Insights,
+  Cashflow Forecast, Payouts Desk) · **Your inventory manager** (Stock
+  Watch) · **Your risk & compliance manager** (Refund Shield, GST &
+  Compliance, KYC Desk) · **Your support manager** (Dispute Defender —
+  the only wired one — and Returns Desk) · **Your telecaller** (Cart
+  Rescue, Payment Rescue, COD Guard) · **Your MIS analyst** (Daily MIS).
+  Desks are JOB TITLES, never functional taxonomies — a founder thinks
+  "I need an accounts person", never "I need a finance desk". Use common
+  Indian commerce job titles (telecaller, MIS executive, accounts
+  executive), not American corporate ones (CFO, VP Ops).
+- **The rule every agent must pass (captain, 2026-08-05):** an agent
+  earns a place ONLY if it replaces a real job and beats that job on
+  cost. Not "assists", not "speeds up" — replaces. Every agent therefore
+  carries a `replaces` field naming the job and an indicative monthly
+  salary band, rendered on the card. **The salary bands are indicative
+  Indian SMB ranges, NOT sourced data** — flag this before any external
+  use. If an agent cannot name the job it displaces, it should not ship.
+- Voice: **Khatabook-plain**. Big numbers, few words, zero jargon. No
+  B2B role-speak — a five-person business has no risk lead and no ops
+  lead, so no personas anywhere in product copy. Banned in user-visible
+  copy: run/pipeline/gate/ledger/escalation/evidence pack/reason code/
+  merchant/tenant/workspace/adoption. Say: job, needs your yes, history,
+  needs a person, proof, reply to the bank, the business's name or "you".
+  Internal identifiers, DB columns and test names keep the old words.
+- Long horizon is a product claim, so it must be visible: the switched-on
+  agent shows "Working since <date> · N disputes checked · never sleeps";
+  everything else says "Not switched on", never "roadmap".
 - Moat: **one order graph.** All six key off the same order, so each agent
   added makes the others better. This is the concrete version of "memory is
   the moat" — a shared join key, not abstract memory.
@@ -76,7 +100,7 @@ captain thinking about the next decision, not waiting.
 - **Integrations**: merchant can't bring their own keys (no-BYOK
   constraint, Lassie precedent) — the platform holds every credential.
   Which rails and who provisions upstream keys is open.
-- **Agent #2**: which of the seven roadmap agents gets wired next.
+- **Agent #2**: which of the six not-switched-on agents gets wired next.
 
 ## Conventions inherited from CoMarketer (still apply — violate = bug)
 - Ports and fakes: every external rail behind `ports/base.py`; tests run on
@@ -90,13 +114,24 @@ captain thinking about the next decision, not waiting.
 
 ## How to run
 - `uv run pytest` — 108 tests, ~1s (Postgres contract tests use :5435).
-- `uv run python demo/server.py` — Relay demo workspace on :8790
-  (dispute content, 8-agent console; Dispute Defender wired, 7 roadmap).
+- `uv run python demo/server.py` — Relay demo on :8790. Nav is Home /
+  Needs you / History / Your team / Settings (routes unchanged:
+  / /approvals /journeys /agents /settings). Home is the AI-CFO screen:
+  one big rupee number off the record, "N things need your yes", "What
+  your team did today", prompt box.
 - `make pg` — repo-local Postgres 17 on :5435 (no sudo, Postgres.app
   binaries). Ports are 5435/8790 because comarketer still owns 5434/8787
   on this machine.
 
-## Current state (2026-08-04, evening)
+## Current state (2026-08-05)
+Virtual-back-office pass landed: `AgentType` is 7 values (THREE_WAY_RECON,
+SETTLEMENT_INSIGHTS, DISPUTE_DEFENDER, REFUND_SHIELD, CART_RESCUE,
+PAYMENT_RESCUE, COD_GUARD); `RELAY_AGENTS` carries `desk`, no `persona`,
+and `today` renders as "Without Relay:". Plain-language sweep done across
+Home, Needs you, History, Your team, Settings, agent detail, chat replies
+and seeded conversations. 108 tests green; all routes 200.
+
+## Previous state (2026-08-04, evening)
 Dispute Defender domain-complete on the inherited engine; demo workspace
 fully re-seeded (fictional Indian SMB merchants: Loomcraft Textiles, Verve
 Wellness, Bumblebee Mobility, Kavali Kitchens, Northgate Fresh; dispute

@@ -83,22 +83,37 @@ class Arm(StrEnum):
 class AgentType(StrEnum):
     """Which of Relay's agents produced this run.
 
-    The lineup is the money motion of a single commerce order, in
-    lifecycle order: a cart drops, a payment fails, a COD order needs
-    confirming, a refund is claimed, a dispute is filed, and the money
-    finally settles (or doesn't). Six views of one order — which is why
-    they belong to one super agent and not six point tools.
+    Relay is the back office a small business never hired: seven agents
+    sitting at three desks. Finance ties the money out and says what
+    landed. Risk defends the money already taken. Revenue goes after the
+    money that nearly got away. Every one of them keys off the same
+    order, which is why they belong to one back office and not seven
+    tools.
 
     Dispute Defender is the only one wired end-to-end in this codebase
     today; the rest exist so the ledger, metrics and demo console can
-    already speak in terms of the full fleet."""
+    already speak in terms of the full back office."""
 
+    # Your accounts manager
+    THREE_WAY_RECON = "three_way_recon"
+    SETTLEMENT_INSIGHTS = "settlement_insights"
+    CASHFLOW_FORECAST = "cashflow_forecast"
+    PAYOUTS_DESK = "payouts_desk"
+    # Your inventory manager
+    STOCK_WATCH = "stock_watch"
+    # Your risk & compliance manager
+    REFUND_SHIELD = "refund_shield"
+    GST_COMPLIANCE = "gst_compliance"
+    KYC_DESK = "kyc_desk"
+    # Your support manager
+    DISPUTE_DEFENDER = "dispute_defender"
+    RETURNS_DESK = "returns_desk"
+    # Your telecaller
     CART_RESCUE = "cart_rescue"
     PAYMENT_RESCUE = "payment_rescue"
     COD_GUARD = "cod_guard"
-    REFUND_SHIELD = "refund_shield"
-    DISPUTE_DEFENDER = "dispute_defender"
-    RECONCILIATION = "reconciliation"
+    # Your MIS analyst
+    DAILY_MIS = "daily_mis"
 
 
 def sha(*parts: str) -> str:

@@ -539,29 +539,49 @@ COMP = {"RG": "Goods not received", "RN": "Not as described",
         "RD": "Duplicate charge", "RF": "Unauthorized/fraud",
         "RC": "Subscription cancelled"}
 
+# The same five, said the way a shop owner would say them out loud. Used
+# anywhere the owner is reading a sentence rather than scanning a table.
+# Why something was set aside, said plainly. The engine writes short codes;
+# the owner should never have to read one.
+PLAIN_SKIP = {
+    "no_order": "no order matches this",
+    "merchant_not_enrolled": "this business isn&rsquo;t switched on",
+    "merchant_daily_cap": "already handled enough for them today",
+    "not_actionable": "not really a dispute",
+    "recent_duplicate": "same claim, already handled",
+}
+
+PLAIN_REASON = {
+    "RG": "Buyer says it never arrived",
+    "RN": "Buyer says it wasn&rsquo;t what they ordered",
+    "RD": "Buyer says they were charged twice",
+    "RF": "Buyer says they never made this payment",
+    "RC": "Buyer says they had already cancelled",
+}
+
 # The six merchants (defined near the top, alongside MERCHANT_IDS) live on
 # this Relay workspace, plus the small Relay-side ops team who own
 # escalations. Merchants are the "enrolled reviewers" here — each merchant's
 # own ops contact is who approves (or edits, or dismisses) the response
 # Dispute Defender drafts on their orders.
 TEAM = (
-    [(mid, name, f"Merchant · {category}", "Merchants", True)
+    [(mid, name, category, "Businesses you look after", True)
      for mid, name, category in MERCHANTS]
     # Relay Ops (3) — own escalations, never see a queue of their own
-    + [("ops_deepa",  "Deepa Krishnan", "Dispute Ops Lead", "Relay Ops", False),
-       ("ops_farhan", "Farhan Sheikh",  "Merchant Success", "Relay Ops", False),
-       ("ops_riya",   "Riya Kapoor",    "Support",          "Relay Ops", False)]
+    + [("ops_deepa",  "Deepa Krishnan", "handles disputes", "Relay’s people", False),
+       ("ops_farhan", "Farhan Sheikh",  "looks after you",   "Relay’s people", False),
+       ("ops_riya",   "Riya Kapoor",    "support",           "Relay’s people", False)]
 )
 REP = {tid: name for tid, name, _, _, _ in TEAM}
 STATE_META = {
-    RunState.AWAITING_GATE: ("Awaiting review", "wait"),
-    RunState.ACTED: ("Filed with the bank", "ok"),
-    RunState.RESOLVED: ("Resolved", "ok"),
-    RunState.EDITED: ("Edited & filed", "ok"),
-    RunState.REJECTED: ("Dismissed", "mut"),
-    RunState.TIMED_OUT: ("Escalated to ops", "warn"),
-    RunState.SUPPRESSED: ("Suppressed", "mut"),
-    RunState.FAILED: ("Escalated to ops", "warn"),
+    RunState.AWAITING_GATE: ("Needs your yes", "wait"),
+    RunState.ACTED: ("Sent to the bank", "ok"),
+    RunState.RESOLVED: ("Done", "ok"),
+    RunState.EDITED: ("Your wording, sent", "ok"),
+    RunState.REJECTED: ("You said no", "mut"),
+    RunState.TIMED_OUT: ("Needs a person", "warn"),
+    RunState.SUPPRESSED: ("Set aside", "mut"),
+    RunState.FAILED: ("Needs a person", "warn"),
 }
 STEPS = ["safety", "retrieve", "draft", "check", "gate"]
 
@@ -736,6 +756,59 @@ def influenced_won(tid: str) -> int:
     return total
 
 
+def inr(paise: int | float) -> str:
+    """Whole rupees, Indian grouping: 12400000 paise &rarr; '1,24,000'."""
+    n = int(round((paise or 0) / 100))
+    s = str(abs(n))
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        parts = []
+        while len(head) > 2:
+            parts.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            parts.insert(0, head)
+        s = ",".join(parts) + "," + tail
+    return ("-" if n < 0 else "") + s
+
+
+def recovered(tid: str) -> tuple[int, int, str]:
+    """The AI-CFO headline: money Relay kept for this business, in paise,
+    with how many wins it came from and the honest window it covers.
+
+    This month when there is something this month; otherwise the whole
+    record, and it says so rather than quietly padding a month."""
+    led = WORLD.d.ledger
+    now = WORLD.d.clock.now()
+    wins = []
+    for r in led.runs.values():
+        if r.tenant_id != tid:
+            continue
+        out = led.outcome_for(r.run_id)
+        if out and (out.outcome_value or {}).get("won"):
+            wins.append((out.observed_at,
+                         (out.outcome_value or {}).get("amount_paise") or 0))
+    this_month = [w for w in wins
+                  if w[0].year == now.year and w[0].month == now.month]
+    if this_month:
+        return (sum(a for _, a in this_month), len(this_month), "this month")
+    if not wins:
+        return (0, 0, "so far")
+    first = min(t for t, _ in wins)
+    return (sum(a for _, a in wins), len(wins),
+            f"since {first.strftime('%-d %B')}")
+
+
+def _working_since(tid: str) -> tuple[str, int]:
+    """When the switched-on agent started, and how much it has looked at —
+    the proof that this is a team that runs, not a chat you open."""
+    led = WORLD.d.ledger
+    mine = [r for r in led.runs.values() if r.tenant_id == tid]
+    if not mine:
+        return ("", 0)
+    return (min(r.occurred_at for r in mine).strftime("%-d %B"), len(mine))
+
+
 def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
     led = WORLD.d.ledger
     n_wait = sum(1 for r in led.runs.values()
@@ -747,10 +820,10 @@ def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
   <aside class="sidebar">
     <div class="brand"><span class="logo">C</span><b>Relay</b></div>
     {nav("/", "home", "Home", key="cmd")}
-    {nav("/approvals", "tasks", "Approvals", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
-    {nav("/journeys", "bolt", "Journeys", key="journeys")}
+    {nav("/approvals", "tasks", "Needs you", f'<span class="count">{n_wait}</span>' if n_wait else "", "tasks")}
+    {nav("/journeys", "bolt", "History", key="journeys")}
     <hr class="side">
-    {nav("/agents", "bot", "Agents", key="agents")}
+    {nav("/agents", "bot", "Your team", key="agents")}
     <hr class="side">
     {nav("/settings", "gear", "Settings", key="settings")}
     <hr class="side">
@@ -792,7 +865,7 @@ def _account_label(r) -> str:
 
 
 def task_row(r) -> str:
-    reason = esc(COMP.get(r.reason_code, r.reason_code))
+    plain = PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")
     merchant = esc(REP.get(r.merchant_id, r.merchant_id))
     when = r.occurred_at.strftime("%b %-d")
     rid = r.run_id
@@ -802,16 +875,15 @@ def task_row(r) -> str:
   <div class="trow">
     <input type="checkbox" class="selrun" value="{rid}" onclick="bulksync()">
     <span class="ico">{ICONS["bolt"]}</span>
-    <span class="tdesc">Approve response to a <b>{reason}</b> dispute
-      <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span> <span class="mut">merchant <b>{merchant}</b> &middot;
-      {_logo(_account_label(r))}{esc(_account_label(r))}</span></span>
+    <span class="tdesc">Reply to the bank for <b>{merchant}</b>. {plain}.
+      <span class="stream">&ldquo;{esc(r.claim_text)}&rdquo;</span></span>
     <span class="tacts">
       <form method="post" action="/act"><input type="hidden" name="run" value="{rid}">
-        <button class="btn primary" name="action" value="approve">Approve</button>
-        <input class="whyin" name="why" maxlength="200" placeholder="why? (optional)">
-        <button class="btn ghost" name="action" value="reject">Dismiss</button>
+        <button class="btn primary" name="action" value="approve">Send it</button>
+        <input class="whyin" name="why" maxlength="200" placeholder="why not? (optional)">
+        <button class="btn ghost" name="action" value="reject">Don&rsquo;t send</button>
       </form>
-      <button class="btn ghost" onclick="toggleEdit('e-{rid}')">Edit</button>
+      <button class="btn ghost" onclick="toggleEdit('e-{rid}')">Change the wording</button>
     </span>
     <span class="when">{when}</span>
   </div>
@@ -820,7 +892,7 @@ def task_row(r) -> str:
     <form method="post" action="/act">
       <input type="hidden" name="run" value="{rid}">
       <textarea name="text" rows="3">{counter}</textarea>
-      <button class="btn primary" name="action" value="edit">Send edited</button>
+      <button class="btn primary" name="action" value="edit">Send my version</button>
     </form>
   </div>
 </div>"""
@@ -828,20 +900,21 @@ def task_row(r) -> str:
 
 def ledger_row(r) -> str:
     label, cls = STATE_META.get(r.state, (r.state.value, "mut"))
-    extra = f' &middot; {esc(r.suppressed_reason)}' if r.state is RunState.SUPPRESSED else ""
+    extra = ((f' &middot; {PLAIN_SKIP.get(r.suppressed_reason, esc(r.suppressed_reason))}')
+             if r.state is RunState.SUPPRESSED else "")
     out = WORLD.d.ledger.outcome_for(r.run_id)
     won = ""
     if out:
         v = out.outcome_value
         amt = v.get("amount_paise")
-        won = (f'<span class="st ok">won{f" &#8377;{amt/100000:.0f}k" if amt else ""}</span>'
+        won = (f'<span class="st ok">kept{f" &#8377;{inr(amt)}" if amt else ""}</span>'
                if v.get("won") else '<span class="st warn">lost</span>')
     mat = ""
     if r.gate_action is GateAction.EDIT:
-        mat = ('<span class="st mut">edit &middot; style</span>' if r.gate_is_material is False
-               else '<span class="st warn">edit &middot; material</span>')
+        mat = ('<span class="st mut">you reworded it</span>' if r.gate_is_material is False
+               else '<span class="st warn">you fixed a fact</span>')
     return (f'<a class="trow slim" href="/runs/{r.run_id}"><span class="ico">{ICONS["ledger"]}</span>'
-            f'<span class="tdesc"><b>{esc(COMP.get(r.reason_code, "&ndash;"))}</b> '
+            f'<span class="tdesc"><b>{PLAIN_REASON.get(r.reason_code, "A buyer disputed a payment")}</b> '
             f'<span class="stream">&ldquo;{esc(r.claim_text) if r.claim_text else "&mdash;"}&rdquo;</span> '
             f'<span class="mut">{esc(REP.get(r.merchant_id, r.merchant_id or "&ndash;"))}</span></span>'
             f'{mat}{won}<span class="st {cls}">{label}{extra}</span>'
@@ -850,17 +923,18 @@ def ledger_row(r) -> str:
 
 
 HOME_CONTENT = """
-    <h1 class="page" id="tasks">Approvals</h1>
-    <div class="pagehint">Nothing gets filed with the bank without your yes.
+    <h1 class="page" id="tasks">Needs you</h1>
+    <div class="pagehint">Your team wrote these. Nothing goes to the bank
+      until you say yes.
       <form method="post" action="/api/sample" style="display:inline;margin-left:8px">
-      <button class="btn ghost sm">Simulate a dispute webhook</button></form></div>
+      <button class="btn ghost sm">Try it with a made-up dispute</button></form></div>
     <div id="bulkbar" class="bulkbar" hidden>
       <b id="bcount"></b>
       <input id="bwhy" class="whyin" style="width:190px" maxlength="200"
              placeholder="why? (applies to dismissals)">
-      <button class="btn primary sm" onclick="bulk('approve', this)">Approve selected</button>
-      <button class="btn ghost sm" onclick="bulk('reject', this)">Dismiss selected</button>
-      <span class="mut" style="font-size:12px">j/k move &middot; x select &middot; a approve &middot; d dismiss &middot; e edit</span>
+      <button class="btn primary sm" onclick="bulk('approve', this)">Say yes to these</button>
+      <button class="btn ghost sm" onclick="bulk('reject', this)">Don&rsquo;t send these</button>
+      <span class="mut" style="font-size:12px">j/k move &middot; x pick &middot; a yes &middot; d no &middot; e change</span>
     </div>
     __TASKS__"""
 
@@ -1013,6 +1087,9 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:38px 0 2px}
   border-radius:50%;border:1.5px solid #fff}
 .dot2.on{background:#1E9E5A}.dot2.off{background:#C2C5D2}
 .atable .go2{color:var(--mut);text-align:right}
+.hzn{font-size:12.5px;color:var(--mut);border-top:1px solid #F1F1F5;
+  padding-top:9px;margin-top:2px}
+.hzn.on{color:#177245;font-weight:500}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:18px 0 22px}
 .tabbar a{padding:9px 14px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -1389,67 +1466,150 @@ def _card(title: str, sub: str, right: str = "") -> str:
             f'{right}</div>')
 
 
-# Relay's six agents — the money motion of a single commerce order, in
-# lifecycle order: cart drops, payment fails, COD needs confirming, refund
-# is claimed, dispute is filed, money settles. Six views of one order.
+# Relay's back office, organised as the three people a founder would
+# otherwise have to hire: a CFO who knows where the money is, an ops manager
+# who keeps orders moving, and a support manager who deals with customers
+# and their banks. Every agent keys off the same order, which is why this is
+# one back office and not seven tools.
 #
-# `today` is the labor-arbitrage line: who does this work now, and what it
+# `today` renders as "Without Relay:" — who does this work now, and what it
 # costs or why it goes undone. That gap is the product. Dispute Defender is
-# the only one wired to a live pipeline here; the rest are badged roadmap.
+# the only one switched on here; the rest are off.
+#
+# No personas on these cards, deliberately. A five-person business has no
+# risk lead and no ops lead. One person wears every hat, and that person is
+# the only reader this copy is written for.
+# The office is organised by the three people a founder would otherwise
+# have to hire — not by an internal functional taxonomy. A founder thinks
+# "I need a CFO", never "I need a finance desk".
+DESKS = [
+    ("accounts", "Your accounts manager",
+     "Ties out every rupee against the bank, tells you what you were "
+     "actually paid, and warns you before cash gets tight."),
+    ("inventory", "Your inventory manager",
+     "Knows what you have, what is moving, and what you are about to run "
+     "out of."),
+    ("risk", "Your risk &amp; compliance manager",
+     "Checks what looks wrong before the money leaves, and keeps you filing-ready."),
+    ("support", "Your support manager",
+     "Answers your customers and their banks, and sees returns through to "
+     "the refund."),
+    ("calling", "Your telecaller",
+     "Calls buyers &mdash; to confirm the order, to recover the payment, to "
+     "close the sale."),
+    ("analyst", "Your MIS analyst",
+     "Puts the numbers in front of you every morning, and says what "
+     "changed."),
+]
+
 RELAY_AGENTS = [
-    dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
-        status="roadmap", moment="Cart dropped",
-        persona="For the growth lead at an ad-spending D2C brand.",
-        desc="On a cart drop, calls the buyer in their language within "
-             "minutes, presents the offer, and sends a payment link.",
-        today="A WhatsApp blast recovers a fraction. Voice converts better, "
-              "but nobody can call 400 dropped carts a day.",
-        tagline="Charged only on recovered orders. TRAI-compliant."),
-    dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
-        status="roadmap", moment="Payment failed",
-        persona="For the growth lead at a UPI-heavy online store.",
-        desc="Reads the decline reason. Waits 3 minutes for the customer to "
-             "self-retry. If still open, places a voice call explaining what "
-             "failed and sends a link to retry.",
-        today="A failed UPI payment is simply a lost order. Nobody reads a "
-              "decline code, and nobody follows up.",
-        tagline="Recovered while the intent is still warm. One call per "
-                "customer per hour."),
-    dict(slug="cod_guard", name="COD Guard", icon="note",
-        status="roadmap", moment="Before dispatch",
-        persona="For the ops lead at a COD-heavy D2C brand.",
-        desc="Confirms each COD order before dispatch via WhatsApp or voice, "
-             "offers a prepaid option to flagged orders, and blocks repeat "
-             "bad addresses.",
-        today="Someone works the COD list every morning. COD runs 50&ndash;65% "
-              "of orders and 15&ndash;25% of those come back.",
-        tagline="Fewer returns-to-origin, at &#8377;150&ndash;300 a return."),
+    # --- Your accounts manager -------------------------------------------
+    dict(slug="three_way_recon", name="3-Way Reconciliation", icon="ledger",
+        status="roadmap", desk="accounts",
+        desc="Matches every order to the payout to the bank credit. Tells "
+             "you what didn&rsquo;t tie.",
+        today="Someone ties out lines by hand every day. Tools get to about "
+              "80%, and a failed payout can surface weeks later.",
+        replaces="an accounts executive tying out the bank, &#8377;20&ndash;30k a month"),
+    dict(slug="settlement_insights", name="Settlement Insights", icon="chart",
+        status="roadmap", desk="accounts",
+        desc="Tells you what&rsquo;s landing, when, what was deducted, and "
+             "what&rsquo;s stuck.",
+        today="You find out what you were actually paid by opening a "
+              "statement and doing the maths.",
+        replaces="the part of the accounts job spent reading statements"),
+    dict(slug="cashflow_forecast", name="Cashflow Forecast", icon="flow",
+        status="roadmap", desk="accounts",
+        desc="Tells you what cash lands this week, what is already spoken "
+             "for, and when it gets tight.",
+        today="You find out you are short in the week you are short. The "
+              "forecast lives in someone&rsquo;s head or a stale sheet.",
+        replaces="the finance person who keeps the cash sheet, &#8377;25&ndash;40k a month"),
+    dict(slug="payouts_desk", name="Payouts Desk", icon="send",
+        status="roadmap", desk="accounts",
+        desc="Pays vendors, staff and refunds on time, each in the way they "
+             "want to be paid.",
+        today="Payment day is one person with a bank tab open, copying "
+              "account numbers. Something always goes out late.",
+        replaces="the accounts payable clerk, &#8377;20&ndash;28k a month"),
+    # --- Your inventory manager ------------------------------------------
+    dict(slug="stock_watch", name="Stock Watch", icon="folder",
+        status="roadmap", desk="inventory",
+        desc="Watches stock across every channel, warns you before you run "
+             "out, and stops you selling what you don&rsquo;t have.",
+        today="You oversell on one channel and sit on dead stock in "
+              "another. Someone checks sheets by hand, usually after a "
+              "customer has already complained.",
+        replaces="an inventory executive, &#8377;18&ndash;25k a month"),
+    # --- Your risk manager -----------------------------------------------
     dict(slug="refund_shield", name="Refund Shield", icon="moon",
-        status="roadmap", moment="Refund claimed",
-        persona="For the risk lead at a high-refund D2C brand.",
-        desc="Scores each claim against fraud signals, holds the risky ones "
-             "before you pay.",
-        today="Claims get paid before anyone reviews them, because reviewing "
-              "every claim costs more than the fraud does.",
-        tagline="Cross-merchant signals. Checked before paying, not after."),
+        status="roadmap", desk="risk",
+        desc="Checks every refund claim for fraud before you pay it.",
+        today="Claims get paid before anyone looks, because looking at every "
+              "claim costs more than the fraud does.",
+        replaces="a fraud reviewer you almost certainly never hired"),
+    dict(slug="gst_compliance", name="GST &amp; Compliance", icon="funnel",
+        status="roadmap", desk="risk",
+        desc="Keeps GST, TDS and e-invoices tied to real orders, and flags "
+             "what won&rsquo;t match before you file.",
+        today="Your CA asks for the file on the 18th. Someone spends two "
+              "days rebuilding it out of three different systems.",
+        replaces="the monthly compliance scramble your CA bills you for"),
+    dict(slug="kyc_desk", name="KYC Desk", icon="lock",
+        status="roadmap", desk="risk",
+        desc="Verifies PAN, Aadhaar, GST, RC or driving licence in seconds, "
+             "and keeps the proof for audit.",
+        today="The jewellery counter needs a PAN before a &#8377;2L sale. "
+              "Someone types the number into a portal and files a printout "
+              "while the customer waits at the counter.",
+        replaces="a KYC executive checking documents by hand, "
+                 "&#8377;18&ndash;25k a month"),
+    # --- Your support manager --------------------------------------------
     dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
-        status="live", moment="Dispute filed",
-        persona="For the support lead at an online merchant.",
-        desc="Gathers the evidence, builds the case, and files before the "
+        status="live", desk="support",
+        desc="Gathers the proof, writes the reply, and files it before the "
              "deadline.",
-        today="Evidence sits across the store, the courier and the inbox. By "
-              "the time it is gathered, the window has closed.",
-        tagline="Never miss a deadline &middot; evidence auto-gathered."),
-    dict(slug="reconciliation", name="Reconciliation", icon="ledger",
-        status="roadmap", moment="Money settles",
-        persona="For the finance lead at a multi-channel merchant.",
-        desc="Matches each payout to its order against the bank, flags the "
-             "gaps, and posts to your books.",
-        today="A finance exec ties out lines by hand every day. Tools reach "
-              "about 80%, and a pending payout can fail weeks later with no "
-              "alert.",
-        tagline="Bank-verified match, not a status webhook. Silent failures "
-                "caught."),
+        today="Proof sits across your store, the courier and your inbox. By "
+              "the time it&rsquo;s gathered, the window has shut.",
+        replaces="the support executive who chases proof, &#8377;18&ndash;25k a month"),
+    dict(slug="returns_desk", name="Returns Desk", icon="baton",
+        status="roadmap", desk="support",
+        desc="Follows every return from pickup to restock, and releases the "
+             "refund once the goods are actually back.",
+        today="Refunds go out before the item returns, or the customer "
+              "chases you for weeks. Nobody joins the courier&rsquo;s "
+              "tracking to your refund.",
+        replaces="the returns coordinator between courier, warehouse and refund"),
+    # --- Your telecaller --------------------------------------------------
+    dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
+        status="roadmap", desk="calling",
+        desc="Calls buyers who left without paying and sends them a payment "
+             "link.",
+        today="A WhatsApp blast gets a fraction back. Nobody can call 400 "
+              "dropped carts a day.",
+        replaces="a telecaller, &#8377;15&ndash;22k a month"),
+    dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
+        status="roadmap", desk="calling",
+        desc="Reads why a payment failed, waits a few minutes, then calls "
+             "and sends a fresh link.",
+        today="A failed UPI payment is just a lost order. Nobody reads a "
+              "decline code.",
+        replaces="a telecaller, &#8377;15&ndash;22k a month"),
+    dict(slug="cod_guard", name="COD Guard", icon="note",
+        status="roadmap", desk="calling",
+        desc="Confirms COD orders before dispatch and blocks addresses that "
+             "keep failing.",
+        today="Someone works the COD list every morning. COD is half your "
+              "orders and a fifth of them come back.",
+        replaces="the morning COD calling shift, &#8377;15&ndash;22k a month"),
+    # --- Your MIS analyst -------------------------------------------------
+    dict(slug="daily_mis", name="Daily MIS", icon="book",
+        status="roadmap", desk="analyst",
+        desc="Sends you the numbers that matter each morning, and flags what "
+             "changed and why.",
+        today="Someone rebuilds the MIS sheet every morning. It tells you "
+              "what happened, never why.",
+        replaces="an MIS executive, &#8377;25&ndash;35k a month"),
 ]
 
 # Dispute Defender's own crew — the seven sub-agents inside the pipeline
@@ -1484,14 +1644,14 @@ def _agent_chips(slugs: list[str]) -> str:
 
 # Journey scenarios: reference-style goal names per merchant saga.
 GOAL_META = {
-    "m_loomcraft": ("Repeat RG defense",
-                    "Hold Loomcraft Textiles&rsquo; goods-not-received win rate through the bank&rsquo;s escalation."),
-    "m_kavali":    ("Duplicate-charge cleanup",
-                    "Clear Kavali Kitchens&rsquo; duplicate-charge disputes before the next settlement cycle."),
-    "m_verve":     ("Not-as-described review",
-                    "Get Verve Wellness&rsquo; not-as-described disputes resolved without a chargeback fee."),
-    "m_bumblebee": ("Delivery proof coverage",
-                    "Make sure Bumblebee Mobility&rsquo;s delivery proof reaches every goods-not-received claim."),
+    "m_loomcraft": ("Never-arrived claims",
+                    "Keep winning Loomcraft Textiles&rsquo; never-arrived claims, even when the bank asks twice."),
+    "m_kavali":    ("Charged-twice claims",
+                    "Clear Kavali Kitchens&rsquo; charged-twice claims before the next payout."),
+    "m_verve":     ("Wrong-item claims",
+                    "Get Verve Wellness&rsquo; wrong-item claims settled without paying the bank&rsquo;s fee."),
+    "m_bumblebee": ("Delivery proof",
+                    "Make sure Bumblebee Mobility has delivery proof on every never-arrived claim."),
 }
 
 
@@ -1753,27 +1913,27 @@ PCOLS = "1.6fr 1.2fr 1.1fr 1.1fr .8fr .7fr .8fr"
 
 def vault_content(tid: str) -> str:
     from relay_superagent.secrets import get_secret
-    rails = [("Anthropic (drafting models)", "anthropic"),
-             ("Slack (gate cards)", "slack-bot"),
-             ("Slack signing (button security)", "slack-signing"),
-             ("Fathom (reference trigger, from the fork)", "fathom-webhook"),
-             ("Gmail (email trigger)", "gmail-token"),
-             ("HubSpot (order notes &mdash; reference)", "hubspot-token"),
-             ("WorkOS (sign-in)", "workos-api-key")]
+    rails = [("The AI that writes the replies", "anthropic"),
+             ("Slack, so you can say yes from there", "slack-bot"),
+             ("Slack button security", "slack-signing"),
+             ("Meeting notes (not used here)", "fathom-webhook"),
+             ("Your email inbox", "gmail-token"),
+             ("Order notes (not used here)", "hubspot-token"),
+             ("Signing in", "workos-api-key")]
     def rail_status(acct):
         if get_secret(acct):
             return '<span class="st ok">connected</span>'
         # every adapter is built; what remains is the key — say exactly that
-        return ('<span class="st wait">ready &mdash; add key</span>')
+        return ('<span class="st wait">built, not switched on</span>')
     rows = "".join(
         f'<div class="trow slim"><span class="ico">{ICONS["lock"]}</span>'
-        f'<span class="tdesc"><b>{esc(name)}</b> <span class="mut">keychain: relay_superagent / {acct}</span></span>'
+        f'<span class="tdesc"><b>{esc(name)}</b> <span class="mut">held by Relay</span></span>'
         + rail_status(acct) + '</div>'
         for name, acct in rails)
-    hint = ('<div class="empty">Keys live in the macOS keychain, never in files. '
-            'Connect one: <code>security add-generic-password -U -s relay_superagent '
-            '-a &lt;name&gt; -w \'&hellip;\'</code></div>')
-    return f'<h2 class="sec" id="vault">Connectors</h2>{rows}{hint}'
+    hint = ('<div class="empty">Nothing here is yours to set up. Relay holds '
+            'every one of these itself, in the Mac keychain, never in a '
+            'file.</div>')
+    return f'<h2 class="sec" id="vault">What it&rsquo;s plugged into</h2>{rows}{hint}'
 
 
 # Per-agent console data (CM-21 demo world). Access grants and memory
@@ -1781,57 +1941,59 @@ def vault_content(tid: str) -> str:
 # field-notes rules. Slug = URL identity.
 AGENT_DEFS = {
     "detection-agent": dict(icon="ear", name="detection-agent",
-        charter="Reads every inbound dispute webhook, classifies it by reason code.",
-        reads=["bank/processor webhooks", "inbound chargeback email"],
-        effects=[], scope="Writes signals; reads nothing personal beyond the dispute narrative.",
-        session=["claim_text", "reason_code", "confidence"],
-        profile=["merchant &rarr; prior dispute history"],
-        rules=["A dispute is actionable only when its reason code has evidence coverage.",
-               "A duplicate webhook redelivery never re-triggers."]),
+        charter="Reads every dispute the moment the bank sends it, and works out what the buyer is claiming.",
+        reads=["disputes from the bank", "chargeback emails"],
+        effects=[], scope="Only reads what the bank sent. Nothing else about the buyer.",
+        session=["what the buyer claimed", "what kind of claim it is", "how sure it is"],
+        profile=["what this business has been disputed for before"],
+        rules=["It only takes on a claim it has proof for.",
+               "If the bank sends the same dispute twice, it is not worked twice."]),
     "eligibility-agent": dict(icon="funnel", name="eligibility-agent",
-        charter="Decides what deserves attention. Every no is logged with a reason.",
-        reads=["open orders (CRM)", "prior runs (ledger)", "merchant enrollment"],
-        effects=[], scope="Reads the ledger; writes suppression reasons only.",
-        session=["suppressed_reason"], profile=[],
-        rules=["No matching order &rarr; suppress.", "Same claim recently handled &rarr; suppress.",
-               "Merchant over daily cap &rarr; suppress. Caps are hard, not advisory."]),
+        charter="Decides what is worth your time. Every no is written down with a reason.",
+        reads=["your orders", "what has already been done", "who is signed up"],
+        effects=[], scope="Reads the history. The only thing it writes is why it said no.",
+        session=["why it was set aside"], profile=[],
+        rules=["No matching order &rarr; set aside.",
+               "Same claim handled recently &rarr; set aside.",
+               "Too many in one day for one business &rarr; set aside. That limit is hard, not a suggestion."]),
     "response-agent": dict(icon="pen", name="response-agent",
-        charter="Drafts the dispute response with cited evidence, in the merchant&rsquo;s learned voice.",
-        reads=["evidence library", "learned voice notes", "order context"],
-        effects=[], scope="Reads the evidence library + voice notes; never sends anything.",
-        session=["counter_text", "cited_evidence"], profile=["merchant voice notes (from edits)"],
-        rules=["Every factual claim cites an evidence-library entry.",
-               "No superlatives (best / leading / number one).",
-               "Uncertain &rarr; escalate to ops, never guess."]),
+        charter="Writes the reply to the bank, quoting the proof, in the way this business writes.",
+        reads=["the proof on file", "how you have reworded replies before", "the order"],
+        effects=[], scope="Reads the proof and your past wording. It never sends anything.",
+        session=["the reply", "the proof it quoted"],
+        profile=["how you write (learned from your changes)"],
+        rules=["Every claim in the reply points at a piece of proof on file.",
+               "No boasting words (best / leading / number one).",
+               "If it is not sure, it asks a person. It never guesses."]),
     "compliance-agent": dict(icon="shield", name="compliance-agent",
-        charter="Checks links, claims and quality before a human ever sees a draft.",
-        reads=["drafts", "evidence sources"], effects=["escalate to ops"],
-        scope="Reads drafts; its only power is to block them.",
-        session=["check_failures", "judge_scores"], profile=[],
-        rules=["A dead source link blocks the draft.",
-               "Contact info in a response blocks the draft.",
-               "Judge below threshold &rarr; ops, not the merchant."]),
+        charter="Checks the links, the facts and the wording before you ever see a reply.",
+        reads=["replies", "where the proof came from"], effects=["ask a person"],
+        scope="Reads replies. The only power it has is to stop one.",
+        session=["what failed the check", "how the wording scored"], profile=[],
+        rules=["A dead link stops the reply.",
+               "A phone number or email in the reply stops it.",
+               "If the wording scores low, a person sees it, not you."]),
     "filing-agent": dict(icon="note", name="filing-agent",
-        charter="Files the approved response exactly once, attaches the outcome.",
-        reads=["approved runs"], effects=["file response (bank/processor)"],
-        scope="The only agent that files with the bank &mdash; and only after your yes.",
-        session=["note_ref", "acted_at"], profile=["dispute outcome (won/lost, amount)"],
-        rules=["Exactly-once: a crash can never double-file.",
-               "Acts only on approved or edited runs."]),
+        charter="Sends the reply you approved, exactly once, and records how it ended.",
+        reads=["replies you said yes to"], effects=["send the reply to the bank"],
+        scope="The only one that talks to the bank &mdash; and only after your yes.",
+        session=["what was sent", "when"], profile=["how the dispute ended, and for how much"],
+        rules=["Exactly once. A crash can never send the same reply twice.",
+               "It only acts on replies you said yes to."]),
     "escalation-agent": dict(icon="moon", name="escalation-agent",
-        charter="Escalates stuck work and floods. Never sends anything itself.",
-        reads=["all run states", "queue depths"], effects=["escalate to ops"],
-        scope="Reads everything, sends nothing. Deliberately has no AI in it.",
-        session=["timeout / stall reasons"], profile=[],
-        rules=["A card unanswered for 24h escalates &mdash; never auto-files.",
-               "A crash-parked run is failed loudly, never silently."]),
+        charter="Notices what is stuck or piling up and hands it to a person. It never sends anything.",
+        reads=["everything in flight", "how much is waiting"], effects=["hand it to a person"],
+        scope="Reads everything, sends nothing. It has no AI in it on purpose.",
+        session=["why it got stuck"], profile=[],
+        rules=["Left unanswered for a day, it goes to a person &mdash; it never sends itself.",
+               "If something breaks, it is said out loud, never buried."]),
     "reporting-agent": dict(icon="chart", name="reporting-agent",
-        charter="Keeps the decision ledger and the Signals in the sidebar.",
-        reads=["the ledger"], effects=[],
-        scope="Read-only. Every number it shows is recomputable from your own audit log.",
+        charter="Keeps the history and the numbers you see on every screen.",
+        reads=["the history"], effects=[],
+        scope="Reads only. Every number it shows can be worked out again from your own record.",
         session=[], profile=[],
-        rules=["Metrics are computed from rows, never estimated.",
-               "The correction rate is the bill &mdash; merchant-auditable."]),
+        rules=["Numbers are counted from what actually happened, never guessed.",
+               "How often you have to fix a reply is on the bill &mdash; you can check it yourself."]),
 }
 
 
@@ -1839,14 +2001,14 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                          item: int = 0) -> str:
     a = AGENT_DEFS.get(slug)
     if not a:
-        return '<h1 class="page">Unknown agent</h1>'
+        return '<h1 class="page">We don&rsquo;t have anyone by that name</h1>'
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
     corr = correction_rate(led, tid)
 
-    TABS = [("overview", "Overview"), ("activity", "Activity"),
-            ("access", "Access"), ("memory", "Memory"),
-            ("playbook", "Playbook"), ("quality", "Quality")]
+    TABS = [("overview", "What it does"), ("activity", "What it did"),
+            ("access", "What it can touch"), ("memory", "What it remembers"),
+            ("playbook", "Rules it follows"), ("quality", "How good it is")]
     tabbar = '<div class="tabbar">' + "".join(
         f'<a class="{"on" if key == tab else ""}" '
         f'href="/agents/{slug}?tab={key}">{label}</a>'
@@ -1855,19 +2017,19 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     head = (f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
             f'<span class="tile">{ICONS[a["icon"]]}</span>'
             f'<div><h1>{a["name"]}</h1>'
-            f'<div class="meta"><span class="st ok">active &middot; trial</span>'
-            f'<span>&middot;</span><span>{len(runs)} runs</span>'
-            f'<span>&middot;</span><span>needed edits {fmt_pct(corr)}</span></div></div>'
+            f'<div class="meta"><span class="st ok">working</span>'
+            f'<span>&middot;</span><span>{len(runs)} jobs done</span>'
+            f'<span>&middot;</span><span>you had to fix {fmt_pct(corr)}</span></div></div>'
             f'<form method="post" action="/api/sample" style="margin-left:auto">'
-            f'<button class="btn ghost">Simulate a dispute webhook</button></form></div>')
+            f'<button class="btn ghost">Try it with a made-up dispute</button></form></div>')
 
     if tab == "access":
-        items = ([("Reads: " + r, "Read access. " + a["scope"], True) for r in a["reads"]]
-                 + [("May do: " + e, "A side effect this agent may fire — always "
-                     "through the exactly-once effect table, always after your yes.", True)
+        items = ([("Can read: " + r, "It can read this. " + a["scope"], True) for r in a["reads"]]
+                 + [("Can do: " + e, "Something this one is allowed to do &mdash; "
+                     "once and only once, and never before your yes.", True)
                     for e in a["effects"]]
-                 + [("Everything else", "Deny by default. This agent cannot touch "
-                     "anything not listed here.", False)])
+                 + [("Everything else", "No, by default. It cannot touch anything "
+                     "that isn&rsquo;t on this list.", False)])
         item = min(item, len(items) - 1)
         left = "".join(
             f'<a class="pitem {"on" if i == item else ""}" '
@@ -1876,40 +2038,41 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             for i, (t, _, on) in enumerate(items))
         title, desc, _ = items[item]
         autonomy = _edit_history([
-            ("Mothi Venkatesh", "Jul 30, 11:40 AM", "Granted",
-             [("draft for approval", "ec-green")]),
-            ("Mothi Venkatesh", "Jul 18, 9:15 AM", "Revoked",
-             [("weekend triage", "ec-amber")]),
-            ("Orchestrator", "Jul 12, 10:02 AM", "Hired on probation",
-             [("shadow mode", "ec-purple"), ("exams required", "ec-blue")])])
+            ("Mothi Venkatesh", "Jul 30, 11:40 AM", "Allowed",
+             [("write replies for me to check", "ec-green")]),
+            ("Mothi Venkatesh", "Jul 18, 9:15 AM", "Taken back",
+             [("weekend work", "ec-amber")]),
+            ("Relay", "Jul 12, 10:02 AM", "Started on trial",
+             [("watching only", "ec-purple"), ("has to pass tests", "ec-blue")])])
         body = (f'<div class="twopane"><div class="pane-list">{left}</div>'
                 f'<div class="pane-detail"><h3>{title}</h3><p>{desc}</p></div></div>'
-                f'<h2 class="sec">Autonomy history</h2>'
-                f'<div class="pagehint">Trust is earned in steps and every step '
-                f'is written down &mdash; who granted what, when, and what was '
-                f'taken back. Reversible by design.</div>' + autonomy)
+                f'<h2 class="sec">What it has been allowed to do</h2>'
+                f'<div class="pagehint">Trust is given a bit at a time, and every '
+                f'bit is written down &mdash; who allowed what, when, and what was '
+                f'taken back. You can always take it back.</div>' + autonomy)
     elif tab == "memory":
-        panes = [("Per run", "Extracted on every run and stored on the run row — "
-                  "the customer-auditable record.", a["session"]),
-                 ("Persists", "Merges into durable memory (evidence packs, "
-                  "voice notes, outcomes) with provenance — never overwritten, "
-                  "only superseded.", a["profile"])]
+        panes = [("Just for this job", "Picked up while doing one piece of "
+                  "work and written down against it, so you can check it later.",
+                  a["session"]),
+                 ("Kept for good", "Goes into what your team knows &mdash; proof, "
+                  "how you write, how disputes ended. Nothing is ever "
+                  "overwritten; new facts sit on top of old ones.", a["profile"])]
         item = min(item, 1)
         left = "".join(
             f'<a class="pitem {"on" if i == item else ""}" '
             f'href="/agents/{slug}?tab=memory&item={i}"><span>{t}'
-            f'<span class="sub2">{len(fields) or "no"} fields</span></span></a>'
+            f'<span class="sub2">{len(fields) or "no"} things</span></span></a>'
             for i, (t, _, fields) in enumerate(panes))
         t, d, fields = panes[item]
         rows = "".join(f'<div class="trow slim"><span class="ico">{ICONS["note"]}</span>'
                        f'<span class="tdesc"><b>{f}</b></span></div>'
-                       for f in fields) or '<div class="empty">Nothing tracked.</div>'
+                       for f in fields) or '<div class="empty">Nothing kept.</div>'
         body = (f'<div class="twopane"><div class="pane-list">{left}</div>'
                 f'<div class="pane-detail"><h3>{t}</h3><p>{d}</p>{rows}</div></div>')
     elif tab == "playbook":
         rows = "".join(
             f'<div class="trow slim"><span class="ico">{ICONS["bm"]}</span>'
-            f'<span class="tdesc">{r} <span class="mut">signed &middot; playbook v1'
+            f'<span class="tdesc">{r} <span class="mut">signed off'
             f'</span></span></div>' for r in a["rules"])
         from relay_superagent.llm.claude import SEAM_PROMPTS
         seams = {"detection-agent": ["confirm_mention", "extract_claim"],
@@ -1922,18 +2085,19 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                 f'<div class="pane-detail" style="margin-bottom:10px"><h3>{sm}</h3>'
                 f'<p style="white-space:pre-wrap;font-size:13px;color:var(--mut)">'
                 f'{esc(SEAM_PROMPTS[sm])}</p></div>' for sm in seams)
-            under = (f'<h2 class="sec">Under the hood &mdash; model instructions</h2>'
+            under = (f'<h2 class="sec">What we actually tell the AI</h2>'
                      f'<div class="pagehint" style="margin:2px 0 14px">'
-                     f'<span class="st mut" style="margin-right:8px">read-only</span>'
-                     f'<span class="st mut" style="margin-right:8px">versioned in git</span>'
-                     f'<span class="st mut">tested by evals</span><br>'
-                     f'<span style="display:inline-block;margin-top:8px">Your playbook '
-                     f'rules, voice notes and policy are injected into these fixed '
-                     f'templates as data. Editing them is an engineering change, '
-                     f'validated before it ships &mdash; not a textarea.</span></div>{blocks}')
-        body = (f'<div class="pagehint">The rules this agent works under. Written '
-                f'in plain language, signed, and versioned &mdash; there is no '
-                f'editable prompt box, by design.</div>{rows}{under}')
+                     f'<span class="st mut" style="margin-right:8px">you can read it</span>'
+                     f'<span class="st mut" style="margin-right:8px">you cannot edit it</span>'
+                     f'<span class="st mut">tested before it ships</span><br>'
+                     f'<span style="display:inline-block;margin-top:8px">Your rules, '
+                     f'your wording and your limits get dropped into these fixed '
+                     f'instructions. Changing the instructions is a change to the '
+                     f'software, tested before anyone gets it &mdash; not a text '
+                     f'box you can break.</span></div>{blocks}')
+        body = (f'<div class="pagehint">The rules this one works under. Written '
+                f'in plain words and signed off &mdash; and there is no box for '
+                f'anyone to quietly rewrite them in.</div>{rows}{under}')
     elif tab == "activity":
         led2 = WORLD.d.ledger
         mine = []
@@ -1947,12 +2111,11 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<b>{esc(e["kind"])}</b>',
             f'<span class="mut">{esc(e["detail"] or "&mdash;")}</span>',
             f'{_logo(_account_label(r))}{esc(_account_label(r))}',
-            f'<a class="st wait" href="/runs/{r.run_id}">journey &rarr;</a>'],
+            f'<a class="st wait" href="/runs/{r.run_id}">see it &rarr;</a>'],
         ) for e, r in mine[:25]]
-        body = (f'<div class="pagehint">What this agent did, most recent '
-                f'first &mdash; every row opens the full run journey it '
-                f'belongs to.</div>'
-                + _tbl(ACOLS, ["Action", "Detail", "Account", "Run"], rows2))
+        body = (f'<div class="pagehint">What this one did, newest first. '
+                f'Open any row to see the whole story it belongs to.</div>'
+                + _tbl(ACOLS, ["What it did", "Detail", "Business", ""], rows2))
     elif tab == "quality":
         import json as _json
         from pathlib import Path as _Path
@@ -1973,52 +2136,63 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
                 cls = "ok" if res["passed"] == res["total"] else "warn"
                 status = f'<span class="st {cls}">{res["passed"]}/{res["total"]} passed</span>'
             else:
-                status = '<span class="st wait">not run yet &mdash; needs API credits</span>'
+                status = '<span class="st wait">not checked yet</span>'
             seam_rows += (
                 f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
-                f'<span class="tdesc"><b>{seam}</b> <span class="mut">{n} scenarios '
-                f'&middot; uv run python scripts/run_evals.py {seam}</span></span>'
+                f'<span class="tdesc"><b>{seam}</b> <span class="mut">{n} test '
+                f'cases</span></span>'
                 f'{status}</div>')
         if not seam_rows:
             seam_rows = (f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
-                         f'<span class="tdesc">Deterministic agent <span class="mut">'
-                         f'no model inside &mdash; covered by the harness test suite '
-                         f'on every commit</span></span><span class="st ok">tested</span></div>')
+                         f'<span class="tdesc">No AI in this one <span class="mut">'
+                         f'it follows fixed rules, and those rules are tested every '
+                         f'time the software changes</span></span>'
+                         f'<span class="st ok">tested</span></div>')
         body = (f'<div class="trow slim"><span class="ico">{ICONS["chart"]}</span>'
-                f'<span class="tdesc"><b>Needed edits</b> <span class="mut">workspace-wide'
-                f'</span></span><span class="st mut">{fmt_pct(corr)}</span></div>'
+                f'<span class="tdesc"><b>How often you had to fix a reply</b> '
+                f'<span class="mut">across your whole business</span></span>'
+                f'<span class="st mut">{fmt_pct(corr)}</span></div>'
                 + seam_rows)
     else:
         plays = AGENT_PLAYS.get(slug, [])
         play_html = "".join(
-            f'<span class="st ok" style="margin-right:6px">{pl} &middot; live</span>'
-            for pl in plays) or '<span class="st mut">supporting role</span>'
-        body = (f'<div class="pane-detail" style="max-width:640px"><h3>Charter</h3>'
+            f'<span class="st ok" style="margin-right:6px">{pl} &middot; on</span>'
+            for pl in plays) or '<span class="st mut">helps out</span>'
+        body = (f'<div class="pane-detail" style="max-width:640px"><h3>Its job</h3>'
                 f'<p>{a["charter"]}</p><p style="margin-top:10px" class="mut">'
                 f'{a["scope"]}</p>'
-                f'<h3 style="margin-top:16px">Works on</h3><p>{play_html}</p></div>')
+                f'<h3 style="margin-top:16px">Works for</h3><p>{play_html}</p></div>')
 
     return head + tabbar + body
 
 
-def _relay_agent_card(a: dict) -> str:
+def _relay_agent_card(a: dict, tid: str = "t1") -> str:
+    """Name, what it does, what it costs you without Relay, and the proof it
+    has been running for months. No persona line: the reader is the owner,
+    and the owner is every role."""
     live = a["status"] == "live"
-    badge = ('<span class="st ok">live in this demo</span>' if live
-             else '<span class="st wait">Coming next &middot; roadmap</span>')
-    inner = (f'<div class="aname" style="margin-bottom:6px;flex-wrap:wrap;'
+    if live:
+        since, n = _working_since(tid)
+        horizon = (f'Working since {since} &middot; {n} disputes checked '
+                   f'&middot; never sleeps' if since
+                   else "Switched on &middot; never sleeps")
+        horizon_html = f'<div class="hzn on">{horizon}</div>'
+        switch = '<span class="st ok">On</span>'
+    else:
+        horizon_html = '<div class="hzn">Not switched on</div>'
+        switch = '<span class="st mut">Off</span>'
+    inner = (f'<div class="aname" style="margin-bottom:8px;flex-wrap:wrap;'
              f'row-gap:6px">'
              f'<span class="tile">{ICONS[a["icon"]]}</span>'
              f'<span class="dot2 {"on" if live else "off"}"></span>'
-             f'<b style="font-size:15px;white-space:nowrap">{a["name"]}</b>'
-             f'<span class="st mut" style="margin-left:8px;flex:none">'
-             f'{a["moment"]}</span></div>'
-             f'<div class="mut" style="margin:0 0 6px;font-size:12px">{a["persona"]}</div>'
-             f'<div style="margin:2px 0 10px">&ldquo;{a["desc"]}&rdquo;</div>'
-             f'<div class="mut" style="margin:0 0 8px;font-size:12px;'
+             f'<b style="font-size:15px">{a["name"]}</b>'
+             f'<span style="margin-left:auto;flex:none">{switch}</span></div>'
+             f'<div style="margin:2px 0 10px">{a["desc"]}</div>'
+             f'<div class="mut" style="margin:0 0 10px;font-size:12.5px;'
              f'border-left:2px solid var(--hair);padding-left:10px">'
-             f'<b>Today:</b> {a["today"]}</div>'
-             f'<div class="mut"><b>{a["tagline"]}</b></div>'
-             f'<div style="margin-top:10px">{badge}</div>')
+             f'<b>Without Relay:</b> {a["today"]}</div>'
+             f'<div class="repl">Replaces {a["replaces"]}.</div>'
+             f'{horizon_html}')
     if live:
         return f'<a class="arow2" style="display:block;padding:16px" href="/agents/detection-agent">{inner}</a>'
     return f'<div class="arow2" style="display:block;padding:16px;opacity:.75">{inner}</div>'
@@ -2038,22 +2212,32 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         agents = [a for a in agents if a["status"] == want]
     if q:
         agents = [a for a in agents if q.lower() in a["name"].lower()]
-    cards = ("".join(_relay_agent_card(a) for a in agents)
-             or '<div class="empty">No agents match.</div>')
+
+    desks = ""
+    for key, title, line in DESKS:
+        mine = [a for a in agents if a["desk"] == key]
+        if not mine:
+            continue
+        desks += (f'<h2 class="sec">{title}</h2>'
+                  f'<div class="pagehint">{line}</div>'
+                  f'<div class="atable" style="grid-template-columns:1fr">'
+                  + "".join(_relay_agent_card(a, tid) for a in mine) + '</div>')
+    if not desks:
+        desks = '<div class="empty">Nothing matches.</div>'
 
     crew_rows = [
-        ("ear", "detection-agent", f"{len(runs)} triggers"),
-        ("funnel", "eligibility-agent", f"{n_sup} filtered"),
-        ("pen", "response-agent", f"{n_drafted} drafts"),
-        ("shield", "compliance-agent", "every draft"),
+        ("ear", "detection-agent", f"{len(runs)} disputes read"),
+        ("funnel", "eligibility-agent", f"{n_sup} set aside"),
+        ("pen", "response-agent", f"{n_drafted} replies written"),
+        ("shield", "compliance-agent", "every reply"),
         ("note", "filing-agent", f"{n_acted} filed"),
-        ("moon", "escalation-agent", f"{n_esc} escalations"),
+        ("moon", "escalation-agent", f"{n_esc} handed to a person"),
         ("chart", "reporting-agent", f"{len(runs)} rows"),
     ]
     def crew_row(icon, name, stat):
         inner = (f'<span class="aname"><span class="tile">{ICONS[icon]}</span>'
                  f'<span class="dot2 on"></span><b>{name}</b></span>'
-                 f'<span class="st ok">active</span>'
+                 f'<span class="st ok">working</span>'
                  f'<span class="mut" style="font-size:12.5px">{stat}</span>'
                  f'<span class="go2">&rsaquo;</span>')
         return f'<a class="arow2" href="/agents/{name}">{inner}</a>'
@@ -2061,25 +2245,28 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
 
     seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
                               f'href="/agents?f={key}">{label}</a>')
-    return (f'<h1 class="page">Agents</h1>'
-            f'<div class="pagehint">Six agents, one order. Relay follows a '
-            f'single order from dropped cart to settled rupee &mdash; the same '
-            f'graph every agent reads and writes, which is why each one makes '
-            f'the others better. Your ops cost scales with orders. Relay&rsquo;s '
-            f'does not. Dispute Defender is wired end-to-end below; the other '
-            f'five are next. You approve before anything sends.</div>'
+    n_all = len(RELAY_AGENTS)
+    n_on = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
+    n_desks = len({a["desk"] for a in RELAY_AGENTS})
+    return (f'<h1 class="page">Your team</h1>'
+            f'<div class="pagehint">{n_all} agents doing the work of '
+            f'{n_desks} people you would otherwise have to hire. Every one '
+            f'of them replaces a real job and costs less than that job does '
+            f'&mdash; that is the whole point. Delegate the work and they '
+            f'handle the rest, and they keep working while you don&rsquo;t. '
+            f'In this demo {n_on} is switched on; the other {n_all - n_on} '
+            f'are off. You approve before anything sends.</div>'
             f'<div class="atoolbar">'
-            f'<span class="search-in">{ICONS["search"]}'
-            f'<input placeholder="Search agents&hellip;" '
-            f'oninput="[...document.querySelectorAll(\'.arow2\')].forEach(r=>'
-            f'r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?\'\':\'none\')"></span>'
-            f'<span class="seg">{seg("all", "All")}{seg("active", "Live")}{seg("planned", "Roadmap")}</span></div>'
-            f'<div class="atable" style="grid-template-columns:1fr">{cards}</div>'
-            f'<h2 class="sec">Dispute Defender&rsquo;s crew</h2>'
-            f'<div class="pagehint">The seven sub-agents inside the pipeline &mdash; '
-            f'each with its own access, memory, playbook and quality tabs.</div>'
-            f'<div class="atable"><div class="thead"><span>Agent name</span>'
-            f'<span>Status</span><span>Activity</span><span></span></div>'
+            f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
+            f'{seg("planned", "Not on yet")}</span></div>'
+            f'{desks}'
+            f'<h2 class="sec">Inside Dispute Defender</h2>'
+            f'<div class="pagehint">The seven helpers that do the actual work '
+            f'&mdash; one reads the dispute, one writes the reply, one checks '
+            f'it, one files it. Open any of them to see what it may touch and '
+            f'the rules it works under.</div>'
+            f'<div class="atable"><div class="thead"><span>Name</span>'
+            f'<span>Status</span><span>What it did</span><span></span></div>'
             f'{crew_table}</div>')
 
 
@@ -2101,19 +2288,19 @@ def activity_content(tid: str, f: str = "all") -> str:
         count = f" &middot; {n}" if n is not None else ""
         return f'<a class="{cls}" href="/impact?f={key}">{label}{count}</a>'
     chips = ('<div class="pills">'
-             + chip("all", "All", len(runs))
-             + chip("escalated", "Escalated", len(esc_rows))
-             + chip("resolved", "Won",
+             + chip("all", "Everything", len(runs))
+             + chip("escalated", "Needed a person", len(esc_rows))
+             + chip("resolved", "Kept the money",
                     sum(1 for r in runs if r.state is RunState.RESOLVED))
              + "</div>")
     rows = "\n".join(ledger_row(r) for r in shown) or (
         '<div class="empty">Nothing here yet.</div>')
     won = influenced_won(tid)
-    banner = (f'<div class="impactline">Counters you approved influenced '
-              f'<b class="countup" data-n="{won/1000:.0f}" data-pre="$" data-suf="k">$0k</b> in closed-won deals.</div>' if won else "")
-    return (f'<h1 class="page">Impact</h1>'
-            f'<div class="pagehint">Every decision, recomputable from your own '
-            f'record &mdash; <a href="/export/impact.csv"><b>export CSV</b></a>.'
+    banner = (f'<div class="impactline">Replies you said yes to kept '
+              f'<b>&#8377;{inr(won)}</b> in your account.</div>' if won else "")
+    return (f'<h1 class="page">What it saved you</h1>'
+            f'<div class="pagehint">Every decision, with the working shown &mdash; '
+            f'<a href="/export/impact.csv"><b>download it as a spreadsheet</b></a>.'
             f'</div>{banner}{chips}{rows}')
 
 
@@ -2372,8 +2559,6 @@ def account_journey_content(tid: str, acct_id: str) -> str:
     if not runs:
         return '<h1 class="page">Account not found</h1>'
     label = _account_label(runs[0])
-    comps = sorted({COMP.get(r.reason_code, r.reason_code)
-                    for r in runs if r.reason_code})
     merged = []
     for r in runs:
         for e in led.trace_for(r.run_id):
@@ -2393,15 +2578,14 @@ def account_journey_content(tid: str, acct_id: str) -> str:
             won += (out.outcome_value or {}).get("amount_paise") or 0
     waiting = sum(1 for r in runs if r.state is RunState.AWAITING_GATE)
     goal_line = (GOAL_META[acct_id][1] if acct_id in GOAL_META
-                 else f'Keep {esc(label)}&rsquo;s dispute win rate healthy on '
-                      f'{esc(" & ".join(comps) or "open reason codes")}.')
-    stats = (f'{len(runs)} moments &middot; {waiting} waiting'
-             + (f' &middot; &#8377;{won/100000:.0f}k won' if won else ""))
+                 else f'Keep {esc(label)}&rsquo;s money where it belongs.')
+    stats = (f'{len(runs)} things done &middot; {waiting} need your yes'
+             + (f' &middot; &#8377;{inr(won)} kept' if won else ""))
     rows = "\n".join(ledger_row(r) for r in reversed(runs))
     return (
         '<div class="tkscope">'
         f'<div class="dhead"><a class="back2" href="/journeys">&lsaquo;</a>'
-        f'<div><h1><span class="goalk">Goal:</span> {goal_line}</h1>'
+        f'<div><h1><span class="goalk">Job:</span> {goal_line}</h1>'
         f'<div class="meta">{_logo(label)}{esc(label)}'
         f'<span>&middot;</span><span>{stats}</span></div></div>'
         f'<span class="jnav"><button class="btn ghost sm jcirc" onclick="jstep(-1)">&larr;</button>'
@@ -2413,9 +2597,9 @@ def account_journey_content(tid: str, acct_id: str) -> str:
         f'<input type="hidden" name="run_id" value="{runs[-1].run_id}">'
         f'<input type="hidden" name="back" value="/journeys?a={acct_id}">'
         f'<input class="jfind notein" name="text" maxlength="280" '
-        f'placeholder="Add account context &mdash; what does the team know about {esc(label)} that the record doesn&rsquo;t?">'
+        f'placeholder="Tell your team something about {esc(label)} that isn&rsquo;t written down yet">'
         f'<button class="btn primary sm">Add note</button></form>'
-        + f'<h2 class="sec">Every moment</h2>{rows}')
+        + f'<h2 class="sec">Everything, one by one</h2>{rows}')
 
 
 def journeys_content(tid: str, sel: str = "") -> str:
@@ -2435,7 +2619,7 @@ def journeys_content(tid: str, sel: str = "") -> str:
         a["n"] += 1
         a["last"] = max(a["last"], r.occurred_at)
         if r.reason_code:
-            a["comps"].add(COMP.get(r.reason_code, r.reason_code))
+            a["comps"].add(PLAIN_REASON.get(r.reason_code, r.reason_code))
         if r.state is RunState.AWAITING_GATE:
             a["waiting"] += 1
         out = led.outcome_for(r.run_id)
@@ -2445,15 +2629,15 @@ def journeys_content(tid: str, sel: str = "") -> str:
             else:
                 a["lost"] = True
     if not accts:
-        return ('<h1 class="page">Journeys</h1>'
-                '<div class="pagehint">Every goal the team works becomes a '
-                'replayable timeline: what was heard, what was decided, what '
-                'you approved, what came back.</div>'
-                '<div class="empty">No journeys yet &mdash; load sample data '
+        return ('<h1 class="page">History</h1>'
+                '<div class="pagehint">Everything your team has done, business '
+                'by business: what came in, what it decided, what you said yes '
+                'to, and how it ended.</div>'
+                '<div class="empty">Nothing here yet &mdash; load the sample '
                 'from Home, then come back.</div>')
 
     if sel in accts:
-        return ('<a class="jback" href="/journeys">&lsaquo; All journeys</a>'
+        return ('<a class="jback" href="/journeys">&lsaquo; All of it</a>'
                 + account_journey_content(tid, sel))
 
     def _goal(a, d):
@@ -2461,8 +2645,7 @@ def journeys_content(tid: str, sel: str = "") -> str:
         # titles are escaped at build below.
         if a in GOAL_META:
             return GOAL_META[a][1]
-        comps = ", ".join(sorted(d["comps"])) or "open reason codes"
-        return esc(f"Defend {d['name']}'s disputes: {comps}.")
+        return esc(f"Keep {d['name']}'s money where it belongs.")
 
     order = sorted(accts, key=lambda a: accts[a]["last"], reverse=True)
     SHOW = 60  # chunked render: everything is in the DOM for search/sort,
@@ -2470,14 +2653,14 @@ def journeys_content(tid: str, sel: str = "") -> str:
     for i, a in enumerate(order):
         d = accts[a]
         if d["waiting"]:
-            chip = f'<span class="st amber">{d["waiting"]} waiting</span>'
+            chip = f'<span class="st amber">{d["waiting"]} need your yes</span>'
         elif d["won"]:
-            chip = f'<span class="st ok">won &#8377;{d["won"]/100:,.0f}</span>'
+            chip = f'<span class="st ok">kept &#8377;{inr(d["won"])}</span>'
         elif d["lost"]:
-            chip = '<span class="st mut">lost &middot; recorded</span>'
+            chip = '<span class="st mut">lost &middot; written down</span>'
         else:
-            chip = '<span class="st mut">active</span>'
-        comps = esc(", ".join(sorted(d["comps"]))) or '<span class="mut">&mdash;</span>'
+            chip = '<span class="st mut">working</span>'
+        comps = ", ".join(sorted(d["comps"])) or '<span class="mut">&mdash;</span>'
         stream = " stream" if i < 8 else ""
         hid = " hidden" if i >= SHOW else ""
         rows.append(
@@ -2491,24 +2674,24 @@ def journeys_content(tid: str, sel: str = "") -> str:
             f'<td class="num" data-s="{int(d["last"].timestamp())}">'
             f'{d["last"].strftime("%b %-d")}</td></tr>')
     more_btn = (f'<button class="btn ghost sm gmore" id="jmore" '
-                f'onclick="jshowall(this)">Show all {len(order)} merchants</button>'
+                f'onclick="jshowall(this)">Show all {len(order)}</button>'
                 if len(order) > SHOW else "")
     shown = min(SHOW, len(order))
     return (
-        '<h1 class="page">Journeys</h1>'
-        '<div class="pagehint">Every merchant on this workspace becomes a '
-        'replayable timeline. Search, sort, open, scrub.</div>'
-        '<input class="jfind" placeholder="Search merchants, goals or dispute reasons&hellip;" '
+        '<h1 class="page">History</h1>'
+        '<div class="pagehint">Every business your team has worked for, and '
+        'everything it did for them. Open one to play it back.</div>'
+        '<input class="jfind" placeholder="Search by name or by what happened&hellip;" '
         'oninput="jfilter(this.value)">'
-        f'<div class="gridcount" id="jcount">Showing {shown} of {len(order)} merchants</div>'
+        f'<div class="gridcount" id="jcount">Showing {shown} of {len(order)}</div>'
         '<div class="dgridwrap"><table class="dgrid" id="jgrid">'
         '<thead><tr>'
-        '<th onclick="dsort(this)">Merchant</th>'
-        '<th onclick="dsort(this)">Goal</th>'
-        '<th onclick="dsort(this)">Dispute reasons</th>'
-        '<th onclick="dsort(this)" class="num">Moments</th>'
-        '<th onclick="dsort(this)">Status</th>'
-        '<th onclick="dsort(this)" class="num">Last activity</th>'
+        '<th onclick="dsort(this)">Business</th>'
+        '<th onclick="dsort(this)">What we are doing for them</th>'
+        '<th onclick="dsort(this)">What the buyers claimed</th>'
+        '<th onclick="dsort(this)" class="num">Things done</th>'
+        '<th onclick="dsort(this)">Where it stands</th>'
+        '<th onclick="dsort(this)" class="num">Last touched</th>'
         '</tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div>'
         + more_btn)
@@ -2518,7 +2701,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
     led = WORLD.d.ledger
     r = led.runs.get(run_id)
     if r is None or r.tenant_id != tid:
-        return '<h1 class="page">Run not found</h1>'
+        return '<h1 class="page">Not found</h1>'
     label, cls = STATE_META.get(r.state, (r.state.value, "mut"))
     events = [dict(e) for e in led.trace_for(run_id)]
     for e in events:
@@ -2531,13 +2714,13 @@ def run_trace_content(tid: str, run_id: str) -> str:
         f'<span class="mut">{esc(e["detail"])}</span></span>'
         f'<span class="when">{e["ts"].strftime("%b %-d, %H:%M")}</span></div>'
         for e in events) or (
-        '<div class="empty">No trace events — this run predates tracing.</div>')
-    comp_name = esc(COMP.get(r.reason_code, r.reason_code))
+        '<div class="empty">Nothing was written down for this one.</div>')
+    comp_name = PLAIN_REASON.get(r.reason_code, "A buyer disputed a payment")
     return (
         '<div class="tkscope">'
         f'<div class="dhead"><a class="back2" href="/journeys" onclick="if(history.length>1){{history.back();return false}}">&lsaquo;</a>'
-        f'<div><h1><span class="goalk">Goal:</span> Defend the {comp_name} '
-        f'dispute &mdash; &ldquo;{esc(r.claim_text or "claim")}&rdquo; at {esc(_account_label(r))}.</h1>'
+        f'<div><h1><span class="goalk">Job:</span> {comp_name} &mdash; '
+        f'&ldquo;{esc(r.claim_text or "claim")}&rdquo; at {esc(_account_label(r))}.</h1>'
         f'<div class="meta">{_logo(_account_label(r))}{esc(_account_label(r))}'
         f'<span>&middot;</span><span class="st {cls}">{label}</span></div></div>'
         f'<span class="jnav"><button class="btn ghost sm jcirc" onclick="jstep(-1)">&larr;</button>'
@@ -2548,39 +2731,39 @@ def run_trace_content(tid: str, run_id: str) -> str:
         + f'<form class="notebar" method="post" action="/api/note">'
         f'<input type="hidden" name="run_id" value="{run_id}">'
         f'<input class="jfind notein" name="text" maxlength="280" '
-        f'placeholder="Add a note to this journey &mdash; what did you know that the record doesn&rsquo;t?">'
+        f'placeholder="Add a note &mdash; what did you know that isn&rsquo;t written down here?">'
         f'<button class="btn primary sm">Add note</button></form>'
-        + f'<h2 class="sec">Full log</h2>{rows}')
+        + f'<h2 class="sec">Everything that happened</h2>{rows}')
 
 
 # (days ago, merchant, reason label, buyer claim, verdict, evidence, draft)
 SHADOW_ROWS = [
-    (27, "Loomcraft Textiles",   "Goods not received", "Kurta set never arrived",             "send", "2 proofs",
-     "Courier proof-of-delivery is signed and GPS-stamped at the doorstep; the WhatsApp thread confirms receipt the same evening."),
-    (25, "Kavali Kitchens",      "Duplicate charge",   "Two debits for one thali order",      "send", "2 proofs",
-     "One gateway transaction id, one settled debit; the second line is an authorization hold that reverses on its own."),
-    (24, "Verve Wellness",       "",                   "Refund status query, not a dispute",  "skip", "",
+    (27, "Loomcraft Textiles",   "Says it never arrived",   "Kurta set never arrived",             "send", "2 proofs",
+     "The courier's delivery proof is signed and stamped at the door; the WhatsApp thread confirms it arrived the same evening."),
+    (25, "Kavali Kitchens",      "Says charged twice",      "Two debits for one thali order",      "send", "2 proofs",
+     "One payment, one debit. The second line is a hold the bank releases on its own."),
+    (24, "Verve Wellness",       "",                        "Asking where a refund is, not a dispute", "skip", "",
      ""),
-    (21, "Bumblebee Mobility",   "Goods not received", "Scooter charger missing",             "send", "2 proofs",
-     "POD shows delivery two days before the dispute was filed; the buyer's own delivery-day message is attached."),
-    (19, "Sundar Studio Prints", "Not as described",   "Print colours don't match listing",   "send", "1 proof",
-     "The listing snapshot from the order date matches the shipped SKU's batch code exactly."),
-    (17, "Northgate Fresh Mart", "Duplicate charge",   "Grocery order billed twice",          "send", "2 proofs",
-     "Invoice and bank settlement excerpt agree on a single debit for this order id."),
-    (16, "Verve Wellness",       "",                   "Buyer praised the delivery speed",    "skip", "",
+    (21, "Bumblebee Mobility",   "Says it never arrived",   "Scooter charger missing",             "send", "2 proofs",
+     "It was delivered two days before the buyer complained, and the buyer's own message from that day is attached."),
+    (19, "Sundar Studio Prints", "Says it was wrong",       "Print colours don't match listing",   "send", "1 proof",
+     "The listing from the day they ordered matches the batch that shipped, exactly."),
+    (17, "Northgate Fresh Mart", "Says charged twice",      "Grocery order billed twice",          "send", "2 proofs",
+     "The bill and the bank statement agree: one charge for this order."),
+    (16, "Verve Wellness",       "",                        "Buyer praised the delivery speed",    "skip", "",
      ""),
-    (14, "Kavali Kitchens",      "Fraud claim",        "Card owner says order wasn't theirs", "esc",  "none",
+    (14, "Kavali Kitchens",      "Says it wasn't them",     "Card owner says order wasn't theirs", "esc",  "none",
      ""),
-    (12, "Loomcraft Textiles",   "Duplicate charge",   "Statement lists the saree twice",     "send", "2 proofs",
-     "The gateway and the invoice tie this order to one transaction; the duplicate line never captured."),
-    (9,  "Bumblebee Mobility",   "Goods not received", "Helmet order marked undelivered",     "send", "1 proof",
-     "The courier scan places the parcel at the registered address, signed for on the handheld device."),
-    (7,  "Northgate Fresh Mart", "",                   "Delivery-slot reschedule request",    "skip", "",
+    (12, "Loomcraft Textiles",   "Says charged twice",      "Statement lists the saree twice",     "send", "2 proofs",
+     "The payment and the bill tie this order to one charge; the second line never went through."),
+    (9,  "Bumblebee Mobility",   "Says it never arrived",   "Helmet order marked undelivered",     "send", "1 proof",
+     "The courier's scan puts the parcel at the address they gave, signed for on the spot."),
+    (7,  "Northgate Fresh Mart", "",                        "Asking to change the delivery slot",  "skip", "",
      ""),
-    (5,  "Sundar Studio Prints", "Goods not received", "Wedding-card box never showed",       "send", "2 proofs",
-     "POD plus the buyer's WhatsApp confirmation from delivery day; both attach to the filing."),
-    (2,  "Verve Wellness",       "Not as described",   "Serum shade differs from photos",     "send", "2 proofs",
-     "Listing snapshot and the buyer's own return photos show the same packaging and batch code."),
+    (5,  "Sundar Studio Prints", "Says it never arrived",   "Wedding-card box never showed",       "send", "2 proofs",
+     "Delivery proof plus the buyer's own WhatsApp message from the day it arrived. Both go with the reply."),
+    (2,  "Verve Wellness",       "Says it was wrong",       "Serum shade differs from photos",     "send", "2 proofs",
+     "The listing and the buyer's own return photos show the same box and the same batch."),
 ]
 
 
@@ -2603,8 +2786,8 @@ def shadow_content(tid: str) -> str:
             send_v = (f'<span class="st ok">ready</span> '
                       f'<span class="mut stream">{esc(draft)}</span>')
         elif verdict == "esc":
-            proof_v = '<span class="st warn">none &mdash; gap</span>'
-            send_v = '<span class="st warn">escalate &mdash; no proof on file</span>'
+            proof_v = '<span class="st warn">nothing on file</span>'
+            send_v = '<span class="st warn">would ask you &mdash; no proof on file</span>'
         else:
             proof_v = '<span class="mut">&mdash;</span>'
             send_v = '<span class="mut">&mdash;</span>'
@@ -2613,37 +2796,37 @@ def shadow_content(tid: str) -> str:
             f'<td class="chk"><input type="checkbox"></td>'
             f'<td class="acct">{_logo(acct)}<b>{esc(acct)}</b> '
             f'<span class="mut">{when}</span></td>'
-            + cell("listening&hellip;", comp_v)
-            + cell("extracting claim&hellip;", claim_v)
-            + cell("checking the evidence vault&hellip;", proof_v)
-            + cell("drafting the response&hellip;", send_v, "wide")
+            + cell("reading&hellip;", comp_v)
+            + cell("working out the claim&hellip;", claim_v)
+            + cell("looking for proof&hellip;", proof_v)
+            + cell("writing the reply&hellip;", send_v, "wide")
             + '<td class="ghost"></td></tr>')
 
     return (
-        '<h1 class="page">Shadow trial</h1>'
-        '<div class="pagehint">Run the last 30 days of disputes through '
-        'Dispute Defender. Nothing files, nobody is contacted, and the scan '
-        'is free &mdash; you just see what you missed.</div>'
-        '<button class="btn primary" id="shbtn" onclick="shstart()">Scan the last 30 days</button>'
+        '<h1 class="page">See what you missed</h1>'
+        '<div class="pagehint">Put your last 30 days of disputes through '
+        'Dispute Defender. Nothing is sent, nobody is contacted, and it costs '
+        'nothing &mdash; you just see what got away.</div>'
+        '<button class="btn primary" id="shbtn" onclick="shstart()">Check the last 30 days</button>'
         '<div class="shstats">'
-        '<div class="shstat"><div class="n" id="sh-calls">0</div><div class="l">webhooks scanned</div></div>'
-        '<div class="shstat"><div class="n" id="sh-moments">0</div><div class="l">actionable disputes</div></div>'
-        '<div class="shstat"><div class="n" id="sh-sends">0</div><div class="l">responses it would have filed</div></div>'
-        '<div class="shstat"><div class="n" id="sh-missed">0</div><div class="l">answered by anyone today</div></div>'
+        '<div class="shstat"><div class="n" id="sh-calls">0</div><div class="l">disputes looked at</div></div>'
+        '<div class="shstat"><div class="n" id="sh-moments">0</div><div class="l">worth replying to</div></div>'
+        '<div class="shstat"><div class="n" id="sh-sends">0</div><div class="l">replies it had ready</div></div>'
+        '<div class="shstat"><div class="n" id="sh-missed">0</div><div class="l">answered by anyone</div></div>'
         '</div>'
         '<div class="dgridwrap"><table class="dgrid">'
         '<thead><tr><th class="chk"></th>'
         '<th onclick="dsort(this)">Dispute</th>'
-        '<th onclick="dsort(this)">Reason code covered?</th>'
-        '<th onclick="dsort(this)">The claim</th>'
-        '<th onclick="dsort(this)">Evidence on file?</th>'
-        '<th class="wide" onclick="dsort(this)">Would it have filed?</th>'
+        '<th onclick="dsort(this)">Something we handle?</th>'
+        '<th onclick="dsort(this)">What the buyer said</th>'
+        '<th onclick="dsort(this)">Proof on file?</th>'
+        '<th class="wide" onclick="dsort(this)">Would it have replied?</th>'
         '<th class="ghost">+ New question</th></tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table></div>'
-        '<div class="shband" id="shband"><span><b>Shadow mode:</b> nothing was '
-        'filed, nobody was contacted, and this scan cost nothing. This is what '
-        'last month looked like without Dispute Defender.</span>'
-        '<a class="btn primary sm" href="/settings?s=connectors">Go live &rarr;</a></div>'
+        '<div class="shband" id="shband"><span><b>Nothing was sent.</b> Nobody '
+        'was contacted and this cost you nothing. That is what last month '
+        'looked like without Dispute Defender.</span>'
+        '<a class="btn primary sm" href="/settings?s=connectors">Switch it on &rarr;</a></div>'
         + """<script>
 function shstart(){
   const btn = document.getElementById('shbtn');
@@ -2688,8 +2871,8 @@ function shstart(){
 def settings_content(tid: str, s: str = "team") -> str:
     # Osvi-style sectioned settings: Team / Connectors / Workspace behind a
     # tab bar (same component as the agent console) instead of one long scroll.
-    SECTIONS = [("team", "Team"), ("connectors", "Connectors"),
-                ("workspace", "Workspace")]
+    SECTIONS = [("team", "People"), ("connectors", "What it&rsquo;s plugged into"),
+                ("workspace", "Rules")]
     if s not in {k for k, _ in SECTIONS}:
         s = "team"
     tabs = '<div class="tabbar">' + "".join(
@@ -2700,42 +2883,43 @@ def settings_content(tid: str, s: str = "team") -> str:
         by_dept: dict[str, list] = {}
         for tid_, name, role, dept, enrolled in TEAM:
             by_dept.setdefault(dept, []).append((name, role, enrolled))
-        body = ('<div class="pagehint">Who the agents work with. '
-                '&ldquo;Reviews responses&rdquo; means their approvals feed '
-                'the Track Record.</div>')
+        body = ('<div class="pagehint">The people your team works with. '
+                '&ldquo;Says yes or no&rdquo; means this person can approve a '
+                'reply before it goes out.</div>')
         for dept, members in by_dept.items():
             rows = "".join(
                 f'<div class="trow slim"><span class="ico">{ICONS["bot" if enrolled else "bm"]}</span>'
                 f'<span class="tdesc"><b>{esc(name)}</b> <span class="mut">{esc(role)}</span></span>'
-                + ('<span class="st ok">reviews responses</span>' if enrolled else '')
+                + ('<span class="st ok">says yes or no</span>' if enrolled else '')
                 + '</div>'
                 for name, role, enrolled in members)
             body += (f'<h2 class="sec">{dept} ({len(members)})</h2>{rows}')
     elif s == "connectors":
-        body = ('<div class="pagehint">Every rail is built; a connector goes '
-                'live the moment its key lands in the keychain.</div>'
+        body = ('<div class="pagehint">Relay holds every connection itself. '
+                'There is nothing for you to set up and no keys for you to '
+                'find.</div>'
                 + vault_content(tid))
     else:
-        body = ('<div class="pagehint">How this workspace runs. These are '
-                'policy, not preferences &mdash; each maps to an enforced '
-                'guarantee.</div>'
+        body = ('<div class="pagehint">How your team works. These are not '
+                'settings you can slide around &mdash; each one is a promise '
+                'the software keeps.</div>'
                 + "".join(
             f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
             f'<span class="tdesc"><b>{esc(k)}</b> <span class="mut">{v}</span></span></div>'
             for k, v in [
-                ("Human gate", "nothing files without an explicit yes; "
-                 "timeouts escalate, never auto-file"),
-                ("Queue cap", "at most 3 cards per merchant &mdash; attention "
-                 "is protected, floods escalate"),
-                ("Repeat suppression", "the same claim on the same order is "
-                 "not re-worked within 7 days"),
-                ("No holdouts", "every covered dispute is worked &mdash; a "
-                 "missed chargeback deadline is real money, never an A/B arm"),
-                ("Your Track Record", "export is a right &mdash; one click, "
-                 "everything, recomputable (arriving with the first live "
-                 "workspace)"),
-                ("Secrets", "macOS keychain only; keys never touch files or "
-                 "this database")]))
+                ("You approve before anything sends", "nothing goes to a bank "
+                 "without your yes; if you don&rsquo;t answer, it waits for a "
+                 "person &mdash; it never sends itself"),
+                ("Never more than 3 at a time", "your attention is protected; "
+                 "if a flood arrives, a person is told"),
+                ("The same claim is never worked twice", "not within a week, "
+                 "on the same order"),
+                ("Every dispute gets worked", "no experiments here &mdash; a "
+                 "missed deadline is your money, not a test"),
+                ("Your record is yours", "one click, everything, in a "
+                 "spreadsheet (arriving with the first real business)"),
+                ("Your keys are never in a file", "they live in the Mac "
+                 "keychain and nowhere else")]))
     return '<h1 class="page">Settings</h1>' + tabs + body
 
 
@@ -3244,7 +3428,7 @@ def _mini_run(r) -> str:
     label, cls = STATE_META.get(r.state, (r.state.value, "mut"))
     counter = esc((r.decision or {}).get("counter_text", ""))
     return (f'<div class="mrun"><div class="mhead">'
-            f'<span class="comp">{esc(COMP.get(r.reason_code, "–"))}</span>'
+            f'<span class="comp">{PLAIN_REASON.get(r.reason_code, "Dispute")}</span>'
             f'<span class="meta">{esc(REP.get(r.merchant_id, r.merchant_id or "–"))}'
             f' · {_logo(_account_label(r))}{esc(_account_label(r) or "–")}</span>'
             f'<span class="st {cls}">{label}</span></div>'
@@ -3255,33 +3439,38 @@ def _mini_run(r) -> str:
 def _t_shadow(_):
     sends = sum(1 for row in SHADOW_ROWS if row[4] == "send")
     moments = sum(1 for row in SHADOW_ROWS if row[4] != "skip")
-    return (f"Shadow scan over the last 30 days: <b>{moments}</b> actionable "
-            f"disputes, <b>{sends}</b> responses ready to file, none answered "
-            f"by anyone. Nothing was filed &mdash; shadow mode never contacts "
-            f"a bank. <a href='/shadow'><b>Open the scan</b></a> to replay it.",
+    return (f"Over the last 30 days: <b>{moments}</b> disputes worth "
+            f"replying to, <b>{sends}</b> replies ready to go, and not one of "
+            f"them answered by anyone. Nothing was sent &mdash; this is only a "
+            f"look back. <a href='/shadow'><b>Open it</b></a> to see them.",
             "")
 
 
 def _t_queue(_):
     runs = [r for r in WORLD.d.ledger.runs.values() if r.state is RunState.AWAITING_GATE]
     if not runs:
-        return "The queue is clear — nothing is waiting on you.", ""
-    return (f"{len(runs)} dispute response{'s' if len(runs) != 1 else ''} awaiting review. "
-            f"Say “approve the &lt;dispute reason&gt; one” to act on one.",
+        return "Nothing needs your yes right now.", ""
+    return (f"{len(runs)} repl{'ies' if len(runs) != 1 else 'y'} to the bank "
+            f"waiting on your yes. Say “send the charged-twice one” and I will "
+            f"show it to you first.",
             "".join(_mini_run(r) for r in runs))
 
 
 def _t_metrics(_):
     led = WORLD.d.ledger
     rows = [
-        ("Correction rate", fmt_pct(correction_rate(led, "t1")), "target <5%"),
-        ("Response usage", fmt_pct(counter_usage_rate(led, "t1")), "approved or lightly edited"),
-        ("Trigger precision", fmt_pct(trigger_precision(led, "t1")), "disputes worth surfacing"),
-        ("Gate p95", _fmt_latency(gate_latency_p95_ms(led, "t1")), "time to a decision"),
+        ("How often you had to fix a reply", fmt_pct(correction_rate(led, "t1")),
+         "we want this under 5%"),
+        ("Replies you sent as written", fmt_pct(counter_usage_rate(led, "t1")),
+         "said yes, or barely reworded"),
+        ("Disputes worth showing you", fmt_pct(trigger_precision(led, "t1")),
+         "the rest were set aside"),
+        ("How long you take to decide", _fmt_latency(gate_latency_p95_ms(led, "t1")),
+         "your slowest one in twenty"),
     ]
     html = "".join(f'<div class="mrow"><b>{v}</b><span>{k}</span><i>{h}</i></div>'
                    for k, v, h in rows)
-    return "Here is how the loop is running.", f'<div class="mcard">{html}</div>'
+    return "Here is how your team is doing.", f'<div class="mcard">{html}</div>'
 
 
 def _t_runs(args):
@@ -3290,9 +3479,9 @@ def _t_runs(args):
     if comp:
         runs = [r for r in runs if r.reason_code == comp]
     if not runs:
-        return f"No runs found{' for ' + COMP.get(comp, comp) if comp else ''}.", ""
-    label = f" on {COMP.get(comp, comp)} disputes" if comp else ""
-    return f"{len(runs)} run{'s' if len(runs) != 1 else ''}{label}, newest first.", \
+        return (f"Nothing found{' where ' + PLAIN_REASON.get(comp, comp).lower() if comp else ''}.", "")
+    label = (f" where the {PLAIN_REASON.get(comp, comp).lower()}" if comp else "")
+    return f"{len(runs)} thing{'s' if len(runs) != 1 else ''}{label}, newest first.", \
            "".join(_mini_run(r) for r in runs[:6])
 
 
@@ -3309,28 +3498,29 @@ def _t_evidence(_):
                 if out.outcome_value.get("won"):
                     st["won"] += 1
     if not stats:
-        return "No evidence has been cited yet.", ""
+        return "No proof has been used yet.", ""
     ev_by_id = {e.evidence_id: e for e in WORLD.d.evidence}
     rows = ""
     for eid, st in sorted(stats.items(), key=lambda kv: -kv[1]["cited"]):
         e = ev_by_id.get(eid)
-        rate = (f'{st["won"]}/{st["resolved"]} won' if st["resolved"]
-                else "no outcomes yet")
+        rate = (f'{st["won"]} of {st["resolved"]} kept' if st["resolved"]
+                else "nothing settled yet")
         rows += (f'<div class="mrow"><b>{st["cited"]}×</b>'
                  f'<span>{esc(e.text[:70]) if e else eid}</span><i>{rate}</i></div>')
-    return ("Evidence by citations. Win rates stay hidden until n ≥ 5 — "
-            "these are shown raw because this is seed data.",
+    return ("Your proof, most used first. Normally we hide the win rate "
+            "until a piece of proof has been used five times; this is sample "
+            "data, so you are seeing it all.",
             f'<div class="mcard">{rows}</div>')
 
 
 def _t_escalations(_):
     posts = WORLD.d.slack.channel_posts
     if not posts:
-        return "Nothing needs ops right now.", ""
+        return "Nothing needs a person right now.", ""
     rows = "".join(f'<div class="mrow"><b class="warn">!</b>'
                    f'<span>{esc(b["reason"])}</span><i>“{esc(b.get("claim") or "—")[:60]}”</i></div>'
                    for _, b in posts)
-    return f"{len(posts)} escalation{'s' if len(posts) != 1 else ''} in the review channel.", \
+    return f"{len(posts)} thing{'s' if len(posts) != 1 else ''} a person needs to look at.", \
            f'<div class="mcard">{rows}</div>'
 
 
@@ -3344,48 +3534,66 @@ def _find_awaiting(comp):
 def _t_action(args, action):
     run = _find_awaiting((args or {}).get("competitor"))
     if run is None:
-        return "There is no matching counter awaiting review.", "", None
+        return "Nothing like that is waiting on your yes.", "", None
     pid = str(_uuid.uuid4())
     PROPOSALS[pid] = {"run_id": run.run_id, "action": action}
-    verb = "Approve & file with the bank" if action == "approve" else "Dismiss"
+    verb = "Yes, send it to the bank" if action == "approve" else "No, don't send it"
     card = (f'{_mini_run(run)}'
             f'<div class="proposal" id="prop-{pid}">'
             f'<button class="btn primary" onclick="confirmProposal(\'{pid}\')">{verb}</button>'
             f'<button class="btn ghost" onclick="cancelProposal(\'{pid}\')">Cancel</button></div>')
-    return (f"Here is the {COMP.get(run.reason_code)} response. Confirm to "
-            f"{'approve it' if action == 'approve' else 'dismiss it'} — nothing "
-            f"happens until you do.", card, pid)
+    return (f"Here is the reply. {PLAIN_REASON.get(run.reason_code, 'A buyer '
+            'is disputing a payment')}. Nothing happens until you say so.",
+            card, pid)
 
 
-HELP = ("I answer from the ledger, never from memory. Try: "
-        "<b>what's awaiting review?</b> · <b>how are the metrics?</b> · "
-        "<b>show goods-not-received runs</b> · <b>which evidence is winning?</b> · "
-        "<b>anything escalated?</b> · <b>approve the duplicate-charge one</b>")
+HELP = ("Everything I say comes from your own record, never from memory. "
+        "Try: <b>what needs my yes?</b> · <b>how is the team doing?</b> · "
+        "<b>show me the never-arrived ones</b> · <b>which proof wins?</b> · "
+        "<b>anything need a person?</b> · <b>send the charged-twice one</b>")
 
 
 def _keyword_route(text: str):
     t = text.lower().replace("-", " ")
     if "shadow" in t or "would have filed" in t or "would have sent" in t or "would have gone" in t:
         return "shadow", {"competitor": None}
-    comp = next((dr.code for dr in WORLD.d.policy.dispute_reasons
-                 if dr.label.lower() in t
-                 or dr.id.replace("_", " ") in t
-                 or COMP.get(dr.code, "").lower() in t), None)
+    # what the owner would actually say, mapped to the bank's code
+    SPOKEN = {"RG": ("never arrived", "not arrived", "not received", "missing"),
+              "RD": ("charged twice", "double charge", "duplicate", "twice"),
+              "RN": ("wasn't what", "wasnt what", "not as described",
+                     "wrong item", "doesn't match", "doesnt match"),
+              "RF": ("never made", "didn't make", "didnt make", "fraud",
+                     "unauthorised", "unauthorized"),
+              "RC": ("already cancelled", "cancelled", "canceled")}
+    comp = next((code for code, phrases in SPOKEN.items()
+                 if any(ph in t for ph in phrases)), None)
+    if comp is None:
+        comp = next((dr.code for dr in WORLD.d.policy.dispute_reasons
+                     if dr.label.lower() in t
+                     or dr.id.replace("_", " ") in t
+                     or COMP.get(dr.code, "").lower() in t), None)
     args = {"competitor": comp}
-    if any(w in t for w in ("approve", "send it", "ship it", "file it")):
+    if any(w in t for w in ("need a person", "needs a person", "escalat",
+                            "timeout", "stuck", "for ops")):
+        return "escalations", args
+    if any(w in t for w in ("say yes to", "approve", "send it", "send the",
+                            "ship it", "file it")):
         return "approve", args
-    if any(w in t for w in ("dismiss", "reject")):
+    if any(w in t for w in ("dismiss", "reject", "don't send", "do not send")):
         return "dismiss", args
-    if any(w in t for w in ("queue", "awaiting", "review", "pending", "waiting")):
+    if any(w in t for w in ("needs my yes", "need my yes", "needs your yes",
+                            "queue", "awaiting", "review", "pending", "waiting")):
         return "queue", args
     if any(w in t for w in ("metric", "correction", "usage", "precision",
-                            "latency", "how are we", "how is", "kpi")):
+                            "latency", "how are we", "how is", "how is the team",
+                            "doing", "kpi")):
         return "metrics", args
-    if any(w in t for w in ("evidence", "winning", "win rate", "argument", "proof")):
+    if any(w in t for w in ("evidence", "winning", "win rate", "which proof",
+                            "argument", "proof")):
         return "evidence", args
-    if any(w in t for w in ("escalat", "timeout", "stuck", "for ops")):
-        return "escalations", args
-    if comp or any(w in t for w in ("run", "ledger", "history", "dispute", "order")):
+    if comp or any(w in t for w in ("show", "run", "ledger", "history",
+                                    "dispute", "order", "won", "win",
+                                    "closed", "list")):
         return "runs", args
     return "help", args
 
@@ -3446,16 +3654,16 @@ def ask(message: str) -> dict:
 def confirm(pid: str) -> dict:
     prop = PROPOSALS.pop(pid, None)
     if prop is None:
-        return {"reply": "That proposal is gone — it may already be resolved.", "cards": ""}
+        return {"reply": "That one is gone — it may already be settled.", "cards": ""}
     run = WORLD.d.ledger.runs.get(prop["run_id"])
     if run is None or run.state is not RunState.AWAITING_GATE:
-        return {"reply": "That run is no longer awaiting review.", "cards": ""}
+        return {"reply": "That one is no longer waiting on you.", "cards": ""}
     if prop["action"] == "approve":
         WORLD.approve(run, "ask")
-        return {"reply": "Approved — the response is filed with the bank and "
-                         "the ledger has the row.", "cards": _mini_run(run)}
+        return {"reply": "Sent. The bank has the reply and it is written down "
+                         "in your history.", "cards": _mini_run(run)}
     WORLD.reject(run, "ask")
-    return {"reply": "Dismissed and recorded.", "cards": _mini_run(run)}
+    return {"reply": "Not sent, and written down.", "cards": _mini_run(run)}
 
 
 # ------------------------------------------------------------- sample data
@@ -3595,9 +3803,9 @@ def conv_list_html(tid: str, active: str = "") -> str:
 
 
 def seed_conversations() -> None:
-    """The demo account's chat history: live ledger answers plus exchanges
-    grounded in Dispute Defender's operating rules (deadlines, evidence
-    coverage, edit-learning) — a believable merchant week."""
+    """The demo account's chat history: real answers off the record, plus a
+    few exchanges about how the thing works — a believable week for someone
+    who runs a small business and does not have a support team."""
     def live(title, q, pin=False):
         c = _new_conv("t1", title, pin)
         r = ask(q)
@@ -3611,45 +3819,42 @@ def seed_conversations() -> None:
         c["msgs"] += [{"who": "msg user", "html": esc(q)},
                       {"who": "msg bot", "html": reply}]
 
-    live("My review queue", "What's awaiting review?", pin=True)
+    live("What needs my yes", "What needs my yes?", pin=True)
     authored(
-        "Why do deadlines matter so much?", "What happens if we miss a dispute deadline?",
-        "A missed deadline is an automatic loss &mdash; the bank rules for the "
-        "buyer and the money is gone, no matter how strong your evidence was. "
-        "That is why <b>disputes are never held out</b>, why an unanswered "
-        "card escalates to ops at 24h instead of expiring silently, and why "
-        "the filing step is exactly-once with the deadline stamped on the "
-        "run.", pin=True)
-    live("Evidence that wins disputes", "Which evidence is winning?", pin=True)
+        "What if we miss the date?", "What happens if we miss a dispute deadline?",
+        "You lose, automatically. The bank sides with the buyer and the money "
+        "is gone, however good your proof was. That is why <b>every dispute "
+        "gets worked</b>, why anything you haven&rsquo;t answered in a day goes "
+        "to a person instead of quietly expiring, and why the reply can only "
+        "ever be sent once, with the date it was due sitting right on it.",
+        pin=True)
+    live("What proof actually wins", "Which proof wins?", pin=True)
 
     approved = sum(1 for r in WORLD.d.ledger.runs.values()
                    if r.gate_action is not None
                    and r.gate_action.value in ("approve", "edit"))
     authored(
-        "Automate dispute filing?", "Can we automate the dispute responses yet?",
-        f"Not yet. The rule is <b>20&ndash;30 approved manual responses before "
-        f"anything automates</b> &mdash; it exists so the drafter earns trust "
-        f"on your own dispute history, not a demo. You are at "
-        f"<b>{approved} of 20</b> approved runs; the Conductor unlocks "
-        f"auto-drafting when the count clears and your edit rate stays flat. "
-        f"Filing itself always keeps the approval gate.")
+        "Can it just send them itself?", "Can it send the replies without me?",
+        f"Not yet. It has to say yes to you <b>20 times</b> first, and you "
+        f"have to stop changing the wording. That way it earns your trust on "
+        f"your own disputes, not on a demo. You are at <b>{approved} of "
+        f"20</b>. Even after that, sending to the bank still waits for you.")
     authored(
-        "Goods-not-received pattern", "What wins goods-not-received disputes?",
-        "The pair that survives every round: the <b>courier proof-of-delivery "
-        "(signed + GPS-stamped)</b> and the <b>buyer's own WhatsApp "
-        "confirmation</b> from delivery day. Merchants filed that pack "
-        "unedited in all but two cases, both style edits. A POD alone wins "
-        "less often than POD plus the comms log.")
+        "What wins never-arrived claims?", "What wins never-arrived claims?",
+        "Two things together: the <b>courier&rsquo;s delivery proof</b>, signed "
+        "and stamped with where it was dropped, and the <b>buyer&rsquo;s own "
+        "WhatsApp message</b> from the day it arrived. That pair went out "
+        "unchanged every time but two, and both of those were just reworded. "
+        "The delivery proof on its own wins less often.")
     authored(
-        "Who edits the drafts?", "Which merchants edit the drafts most?",
-        "<b>Kavali Kitchens</b> edits most &mdash; about 1 in 3 drafts, mostly "
-        "style. <b>Loomcraft Textiles</b> files as-is. One <b>material</b> "
-        "edit this quarter: a bank reference number the draft lacked, and "
-        "that correction was written back to the evidence vault so no later "
-        "draft repeated it. Material edits are the learning signal; style "
-        "edits are free.")
-    live("Goods-not-received runs", "Show goods-not-received runs")
-    live("Escalations this week", "escalations")
+        "Who rewords the replies?", "Which businesses reword the replies most?",
+        "<b>Kavali Kitchens</b> most &mdash; about one reply in three, and "
+        "almost always just the wording. <b>Loomcraft Textiles</b> sends them "
+        "as they come. One real fix this quarter: a bank reference number the "
+        "reply was missing. That got written down, so no later reply left it "
+        "out again. Real fixes are how it learns; rewording costs you nothing.")
+    live("The never-arrived ones", "Show me the never-arrived ones")
+    live("What needs a person", "what needs a person")
 
 
 _LIVE_LLM = None
@@ -3660,8 +3865,8 @@ def _polish_reply(question: str, res: dict) -> dict:
     the fact source; when the live model is reachable, seam 6 paraphrases it
     (facts only), and the meta line says exactly which path ran."""
     from relay_superagent.secrets import get_secret
-    routed_by = "Haiku" if res.pop("_routed_model", False) else "keywords"
-    voiced_by = "deterministic reply"
+    routed_by = "the AI" if res.pop("_routed_model", False) else "plain matching"
+    voiced_by = "written by us, not the AI"
     if get_secret("anthropic") and res.get("reply"):
         global _LIVE_LLM
         try:
@@ -3672,13 +3877,13 @@ def _polish_reply(question: str, res: dict) -> dict:
             out = _LIVE_LLM.narrate(question, res.pop("_tool", ""), facts)
             if out.get("narration"):
                 res["reply"] = esc(out["narration"])
-                voiced_by = "narrated by Haiku"
+                voiced_by = "put into words by the AI"
         except Exception:
             pass
     res.pop("_tool", None)
     res["reply"] = (res.get("reply", "")
-                    + f'<span class="rmeta">routed by {routed_by} &middot; '
-                      f'{voiced_by} &middot; facts from the ledger</span>')
+                    + f'<span class="rmeta">worked out by {routed_by} &middot; '
+                      f'{voiced_by} &middot; facts from your own record</span>')
     return res
 
 
@@ -3750,11 +3955,24 @@ color:#fff;display:inline-flex;align-items:center;justify-content:center;
 font-size:12px;font-weight:650;text-transform:uppercase}
 main{flex:1;overflow-y:auto;padding:8px 0 14px}
 .thread{max-width:740px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:16px}
-.hero{margin-top:9vh}
+.hero{margin-top:7vh}
 .hero h1{font-size:33px;font-weight:450;color:var(--ink);letter-spacing:-.01em;
   margin-bottom:10px;text-align:center}
 .brief{text-align:center;color:var(--mut);font-size:13.5px;margin-bottom:24px}
 .brief b{color:var(--ink);font-weight:600}
+.money{text-align:center;margin:2px 0 18px}
+.money .big{display:block;font-size:52px;line-height:1.08;font-weight:600;
+  color:var(--ink);letter-spacing:-.02em}
+.money .cap{display:block;font-size:14px;color:var(--mut);margin-top:6px}
+.needs{display:flex;align-items:center;gap:12px;background:#fff;
+  border:1px solid #C7CDF3;border-radius:14px;padding:15px 18px;margin:0 0 20px;
+  font-size:15px;color:var(--ink);font-weight:500}
+.needs:hover{background:#F7F8FE}
+.needs svg{width:18px;height:18px;flex:none;color:var(--accent)}
+.repl{font-size:12px;color:var(--mut);margin:0 0 10px}
+.needs .go{margin-left:auto;color:var(--accent);font-size:18px}
+.needs.calm{border-color:var(--hair);color:var(--mut);font-weight:400}
+.needs.calm svg{color:var(--mut)}
 .samplecta{display:flex;flex-direction:column;align-items:center;gap:10px;
   margin:26px 0 4px;text-align:center}
 .samplecta .mut{font-size:12.5px;color:var(--mut)}
@@ -3876,18 +4094,20 @@ __SIDEBAR__
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
       __ROLEPILLS__<h1>__GREET__</h1>
+      __MONEY__
       <div class="brief">__BRIEF__</div>
+      __NEEDS__
       <form class="hcomposer" onsubmit="event.preventDefault();send(hbox.value)">
-        <input id="hbox" placeholder="How can I help you today?" autofocus autocomplete="off">
+        <input id="hbox" placeholder="Ask anything, or tell Relay what to do" autofocus autocomplete="off">
         <div class="hrow">
           <details class="mode" id="mode">
-            <summary>""" + ICONS["gear"] + """<span>Approval mode: Manual</span></summary>
+            <summary>""" + ICONS["gear"] + """<span>You approve everything</span></summary>
             <div class="menu">
               <div class="mopt" onclick="document.getElementById('mode').open=false">
-                Manually approve<span class="tick">&#10003;</span></div>
-              <div class="mopt off"><div>Automatically approve
-                <small>Unlocks after 20 approved runs per play &mdash; the Conductor&rsquo;s rule.</small></div></div>
-              <div class="mopt off"><div>Skip all approvals
+                You say yes to everything<span class="tick">&#10003;</span></div>
+              <div class="mopt off"><div>Let Relay send small ones itself
+                <small>Opens up after you have said yes 20 times without changing the wording.</small></div></div>
+              <div class="mopt off"><div>Skip approvals entirely
                 <small>Never. Nothing sends without you &mdash; by design.</small></div></div>
             </div>
           </details>
@@ -3898,7 +4118,6 @@ __SIDEBAR__
         </div>
       </form>
       __SAMPLE__
-      __RESUME__
       __ACTIVE__
       <div class="tryline">Try one of these:</div>
       <div class="hints">__CHIPS__</div>
@@ -3906,16 +4125,16 @@ __SIDEBAR__
   </div></main>
   <div class="composer" id="composer">
   <form class="hcomposer" onsubmit="event.preventDefault();send(box.value)">
-    <input id="box" placeholder="How can I help you today?" autocomplete="off">
+    <input id="box" placeholder="Ask anything, or tell Relay what to do" autocomplete="off">
     <div class="hrow">
       <details class="mode" id="mode2">
-        <summary>""" + ICONS["gear"] + """<span>Approval mode: Manual</span></summary>
+        <summary>""" + ICONS["gear"] + """<span>You approve everything</span></summary>
         <div class="menu">
           <div class="mopt" onclick="document.getElementById('mode2').open=false">
-            Manually approve<span class="tick">&#10003;</span></div>
-          <div class="mopt off"><div>Automatically approve
-            <small>Unlocks after 20 approved runs per play &mdash; the Conductor&rsquo;s rule.</small></div></div>
-          <div class="mopt off"><div>Skip all approvals
+            You say yes to everything<span class="tick">&#10003;</span></div>
+          <div class="mopt off"><div>Let Relay send small ones itself
+            <small>Opens up after you have said yes 20 times without changing the wording.</small></div></div>
+          <div class="mopt off"><div>Skip approvals entirely
             <small>Never. Nothing sends without you &mdash; by design.</small></div></div>
         </div>
       </details>
@@ -3997,15 +4216,16 @@ async function confirmProposal(pid){
 }
 function cancelProposal(pid){
   document.getElementById('prop-'+pid)?.remove();
-  bubble('msg bot', 'Cancelled — nothing was sent.');
+  bubble('msg bot', 'Left alone — nothing was sent.');
 }
 </script>
 </body></html>"""
 
 
 def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
-    """Greeting, one-line state summary, and prompt chips — computed from the
-    ledger, not hardcoded. The home is a briefing officer, not a chatbox."""
+    """Greeting, an optional one-line summary, and prompt chips — computed
+    from the record, not hardcoded. For the owner the summary is empty: the
+    money number and the needs-your-yes line say it better than a sentence."""
     from datetime import datetime as _dt
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -4024,12 +4244,14 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
                  and m.superseded_by is None]
         edits = [r for r in runs if r.gate_action is GateAction.EDIT]
         material = sum(1 for r in edits if r.gate_is_material)
-        bits = [f"<b>{esc_n}</b> escalation{'s' if esc_n != 1 else ''} need you"
-                if esc_n else "no escalations",
-                f"evidence vault: <b>{ev_n}</b> proofs, <b>{len(notes)}</b> voice notes",
-                f"<b>{material}</b> material edit{'s' if material != 1 else ''} to learn from"]
-        chips = ["Show escalations", "Which evidence is winning?",
-                 "What did merchants change in our drafts?"]
+        bits = [f"<b>{esc_n}</b> item{'s' if esc_n != 1 else ''} need a person"
+                if esc_n else "nothing needs a person",
+                f"proof on file: <b>{ev_n}</b> pieces, <b>{len(notes)}</b> notes "
+                f"on how you write",
+                f"<b>{material}</b> real correction{'s' if material != 1 else ''} "
+                f"to learn from"]
+        chips = ["What needs a person?", "Which proof wins?",
+                 "What did people change in our replies?"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
     if persona == "finance":
         won_total = sum((led.outcome_for(r.run_id).outcome_value or {}).get("amount_paise") or 0
@@ -4039,49 +4261,34 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
         gated = [r for r in runs if r.gate_action is not None]
         used = sum(1 for r in gated if r.gate_action is not GateAction.REJECT)
         adopt = f"{100 * used // len(gated)}%" if gated else "&mdash;"
-        bits = [f"<b>&#8377;{won_total / 100:,.0f}</b> disputes won this quarter",
-                f"<b>{adopt}</b> of responses used by merchants",
-                "win-rate by reason code reads out once volume builds"]
-        chips = ["What closed recently?", "How is adoption trending?",
-                 "Show the pipeline"]
+        bits = [f"<b>&#8377;{inr(won_total)}</b> won back on disputes",
+                f"<b>{adopt}</b> of replies were sent as written",
+                "win rate by kind of dispute reads out once there is more of it"]
+        chips = ["What closed recently?", "How often are replies sent as written?",
+                 "What is the team working on?"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
     if persona == "builder":
         would = sum(1 for row in SHADOW_ROWS if row[4] == "send")
-        bits = [f"<b>{len(runs)}</b> runs through the pipeline, "
-                f"<b>{esc_n}</b> escalated",
-                "connectors: <b>4/4</b> healthy (bank webhook, Slack, CRM, email)",
-                f'shadow scan: <b>{would}</b> responses it would have filed']
-        chips = ["What would have filed last night?", "How are the metrics?",
-                 "Show the run ledger"]
+        bits = [f"<b>{len(runs)}</b> jobs done, <b>{esc_n}</b> handed to a person",
+                "connections: <b>4/4</b> healthy (bank, Slack, orders, email)",
+                f'test scan: <b>{would}</b> replies it would have filed']
+        chips = ["What would it have filed last night?", "How is it doing?",
+                 "Show the history"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
-    bits, chips = [], []
+    # Owner: no summary sentence. The money number and the "needs your yes"
+    # line above it already say the whole state of the business.
+    chips = []
     if waiting:
-        age = WORLD.d.clock.now() - waiting[0].occurred_at
-        h = int(age.total_seconds() // 3600)
-        oldest = (f"oldest {h // 24}d" if h >= 48
-                  else f"oldest {h}h" if h
-                  else f"oldest {int(age.total_seconds() // 60)}m")
-        bits.append(f'<a href="/approvals"><b>{len(waiting)}</b> '
-                    f"dispute response{'s' if len(waiting) > 1 else ''} "
-                    f"awaiting your approval ({oldest})</a>")
-        chips.append("What&rsquo;s awaiting review?")
-        comp = COMP.get(waiting[0].reason_code, waiting[0].reason_code)
-        chips.append(f"Approve {esc(comp)} at {esc(_account_label(waiting[0]))}")
+        chips.append("What needs my yes?")
+        chips.append(f"Say yes to {esc(_account_label(waiting[0]))}")
     if esc_n:
-        bits.append(f"<b>{esc_n}</b> escalation{'s' if esc_n > 1 else ''} for ops")
-        chips.append("Show escalations")
-    for r, out in wins[:1]:
-        v = (out.outcome_value or {}) if out else {}
-        if v.get("won"):
-            bits.append(f"<b>{esc(_account_label(r))}</b> won a "
-                        f"&#8377;{v.get('amount_paise', 0) / 100000:.0f}k dispute")
-            chips.append("What closed recently?")
-    if not bits:
-        bits.append("your workspace is quiet &mdash; load sample data below, "
-                    "or connect your rails in Settings")
-        chips = ["What can you do?", "Show the ledger"]
-    chips.append("Which evidence is winning?")
-    return (f"Good {tod}", ", ".join(bits[:3]) + ".", chips[:4])
+        chips.append("What needs a person?")
+    if wins:
+        chips.append("What did we win?")
+    if not chips:
+        chips = ["What can you do?", "Show me the history"]
+    chips.append("Which proof wins?")
+    return (f"Good {tod}", "", chips[:4])
 
 
 def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner") -> str:
@@ -4098,47 +4305,54 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     chips_html = "".join(
         f'<span class="hint" onclick="send(this.textContent)">{c}</span>' for c in chips)
 
-    # resume: newest conversation with an undecided proposal, else newest
-    mine_convs = sorted((c for c in CONVS.values() if c["tenant"] == tid),
-                        key=lambda c: -c["seq"])
-    resume = next((c for c in mine_convs if c.get("pending")),
-                  mine_convs[0] if mine_convs else None)
-    resume_html = ""
-    if resume and not cid:
-        last = next((m["html"] for m in reversed(resume["msgs"])
-                     if m["who"] == "msg bot"), "")
-        snippet = esc(" ".join(_re.sub("<[^>]+>", " ", last).split())[:90])
-        if len(snippet) < 45 or snippet.lower().startswith("nothing"):
-            snippet = ""
-        tag = ('<span class="st pendtag">decision pending</span>'
-               if resume.get("pending") else "")
-        resume_html = (
-            f'<a class="resume" href="/?c={resume["id"]}">'
-            f'<div><div class="rt">Continue where you left off {tag}</div>'
-            f'<b>{esc(resume["title"])}</b>'
-            + (f'<span class="sub">{snippet}&hellip;</span>' if snippet else '')
-            + '</div>'
-            f'<span class="go">&rarr;</span></a>')
+    # "Continue where you left off" is gone from Home on purpose: at this
+    # simplicity level the owner needs one number, one ask, and one list.
+    # Past conversations live in the sidebar, which is where you look for them.
 
     has_runs = any(r.tenant_id == tid for r in WORLD.d.ledger.runs.values())
     sample_html = "" if has_runs else (
         '<form method="post" action="/api/sample" class="samplecta">'
         '<button class="btn primary">See it working &mdash; load sample data</button>'
-        '<span class="mut">Simulates a dispute webhook through the real '
-        'pipeline. Nothing files anywhere.</span></form>')
+        '<span class="mut">Puts one made-up dispute through the real '
+        'agent. Nothing is filed anywhere.</span></form>')
+
+    # The AI-CFO headline: one number, big, in rupees, from the record.
+    kept, n_wins, window = recovered(tid)
+    if kept:
+        money = (f'<div class="money"><b class="big">&#8377;{inr(kept)}</b>'
+                 f'<span class="cap">kept {window}, across {n_wins} '
+                 f'dispute{"s" if n_wins != 1 else ""} your team won</span></div>')
+    else:
+        money = ('<div class="money"><b class="big">&#8377;0</b>'
+                 '<span class="cap">nothing won back yet &mdash; your team is '
+                 'still working</span></div>')
+
+    n_wait = sum(1 for r in WORLD.d.ledger.runs.values()
+                 if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
+    if n_wait:
+        needs = (f'<a class="needs" href="/approvals">{ICONS["tasks"]}'
+                 f'<span><b>{n_wait}</b> thing{"s" if n_wait != 1 else ""} '
+                 f'need{"" if n_wait != 1 else "s"} your yes</span>'
+                 f'<span class="go">&rarr;</span></a>')
+    else:
+        needs = ('<a class="needs calm" href="/approvals">'
+                 + ICONS["tasks"] + '<span>Nothing needs your yes right now'
+                 '</span><span class="go">&rarr;</span></a>')
+
     waiting = sorted((r for r in WORLD.d.ledger.runs.values()
                       if r.tenant_id == tid and r.state is RunState.AWAITING_GATE),
                      key=lambda r: r.occurred_at, reverse=True)[:5]
     rows = "".join(
-        f'<a class="arow" href="/tasks">{ICONS["bolt"]}'
-        f'<span>Response to the {esc(COMP.get(r.reason_code, r.reason_code))} dispute '
-        f'&ldquo;{esc(r.claim_text)}&rdquo;'
-        f'<span class="sub">merchant &middot; '
+        f'<a class="arow" href="/approvals">{ICONS["bolt"]}'
+        f'<span>Wrote the reply to the bank for '
+        f'{esc(_account_label(r))}. '
+        f'{PLAIN_REASON.get(r.reason_code, "A buyer is disputing a payment")}.'
+        f'<span class="sub">Waiting on you &middot; '
         f'{_logo(_account_label(r))}{esc(_account_label(r))}</span></span>'
         f'<span class="when">{r.occurred_at.strftime("%b %-d")}</span></a>'
         for r in waiting)
-    active = (f'<div class="active-h"><span>Active</span>'
-              f'<a href="/tasks">Review all &rarr;</a></div>{rows}') if rows else ""
+    active = (f'<div class="active-h"><span>What your team did today</span>'
+              f'<a href="/approvals">See all &rarr;</a></div>{rows}') if rows else ""
     page = (CHAT_TEMPLATE
             .replace("__SIDEBAR__", sidebar_html("cmd", tid, convs=conv_list_html(tid, cid)))
             .replace("__CONVTITLE__", title)
@@ -4146,9 +4360,10 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__SAMPLE__", sample_html)
             .replace("__ROLEPILLS__", role_html)
             .replace("__GREET__", greet)
+            .replace("__MONEY__", money if not cid else "")
+            .replace("__NEEDS__", needs if not cid else "")
             .replace("__BRIEF__", brief)
             .replace("__CHIPS__", chips_html)
-            .replace("__RESUME__", resume_html)
             .replace("__ACTIVE__", active)
             .replace("__USER__", esc(email))
             .replace("__INITIAL__", esc((email or "?")[0]))

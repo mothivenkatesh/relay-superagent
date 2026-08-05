@@ -14,24 +14,67 @@ The gap that makes this solvable: at a small merchant the **labor line is roughl
 
 Millions of small merchants running on teams of five to ten. Non-technical. No API keys to bring, no integrations project to run, nobody whose job is "owning the tool." They don't want a canvas to configure — they want to describe an outcome in a few lines and have it handled. Relay holds every credential and connection itself; there is no setup project.
 
-## The six agents: one order, six moments
+## The rule every agent must pass
 
-Relay's lineup is the money motion of a single commerce order, in lifecycle order. Each entry lists what the work costs today — that gap is the product.
+**An agent only earns a place if it replaces a real job and costs less than that job does.** Not "assists with," not "speeds up" — replaces. Every card in the product names the job it takes over and roughly what that job costs, because if it can't beat the labour it is displacing, it shouldn't ship.
 
-| Moment | Agent | Today | Status |
-|---|---|---|---|
-| Cart dropped | **Cart Rescue** | A WhatsApp blast recovers a fraction; nobody can call 400 dropped carts a day | Roadmap |
-| Payment failed | **Payment Rescue** | A failed UPI payment is just a lost order; nobody reads a decline code | Roadmap |
-| Before dispatch | **COD Guard** | Someone works the COD list every morning; COD is 50–65% of orders, 15–25% come back | Roadmap |
-| Refund claimed | **Refund Shield** | Claims get paid before review, because reviewing every claim costs more than the fraud | Roadmap |
-| Dispute filed | **Dispute Defender** | Evidence sits across store, courier and inbox; by the time it's gathered the window closed | **Wired end-to-end** |
-| Money settles | **Reconciliation** | A finance exec ties out lines by hand daily; tools reach ~80%, failures surface weeks late | Roadmap |
+## The office: 14 agents doing the work of 6 hires
 
-## Why one super agent, not six tools
+A founder thinks "I need an accounts person," never "I need a finance desk." So the office is organised as the people you would otherwise put on payroll.
 
-Every one of those moments keys off the same object: **the order**. A dropped cart, a declined payment, a COD confirmation, a refund claim, a chargeback, and a settlement break are six views of one order. Point tools each hold one view and are blind to the rest.
+**Your accounts manager**
 
-Relay holds the whole graph — order → payment → shipment → conversation → refund → dispute → settlement — and that's where compounding comes from. Dispute Defender wins because COD Guard logged the delivery confirmation. Refund Shield holds a claim because Reconciliation knows the payment never settled. COD Guard blocks an address because it failed twice before. **Each agent added makes the others better**, which is a property no point tool can copy.
+| Agent | Does | Replaces |
+|---|---|---|
+| **3-Way Reconciliation** | Matches every order to the payout to the bank credit | An accounts executive tying out the bank, ₹20–30k/mo |
+| **Settlement Insights** | What's landing, when, what was deducted, what's stuck | The part of the accounts job spent reading statements |
+| **Cashflow Forecast** | What cash lands this week, what's committed, when it gets tight | The finance person keeping the cash sheet, ₹25–40k/mo |
+| **Payouts Desk** | Pays vendors, staff and refunds on time, each their way | The accounts payable clerk, ₹20–28k/mo |
+
+**Your inventory manager**
+
+| Agent | Does | Replaces |
+|---|---|---|
+| **Stock Watch** | Watches stock across channels, stops you selling what you don't have | An inventory executive, ₹18–25k/mo |
+
+**Your risk & compliance manager**
+
+| Agent | Does | Replaces |
+|---|---|---|
+| **Refund Shield** | Scores every refund claim for fraud before you pay | A fraud reviewer you almost certainly never hired |
+| **GST & Compliance** | Ties GST, TDS and e-invoices to real orders before filing | The monthly compliance scramble your CA bills for |
+| **KYC Desk** | Verifies PAN, Aadhaar, GST, RC or DL in seconds, keeps the proof | A KYC executive checking documents by hand, ₹18–25k/mo |
+
+**Your support manager**
+
+| Agent | Does | Replaces |
+|---|---|---|
+| **Dispute Defender** *(wired end-to-end)* | Gathers proof, writes the reply, files before the deadline | The support executive chasing proof, ₹18–25k/mo |
+| **Returns Desk** | Follows a return from pickup to restock, then releases the refund | The returns coordinator between courier, warehouse and refund |
+
+**Your telecaller**
+
+| Agent | Does | Replaces |
+|---|---|---|
+| **Cart Rescue** | Calls buyers who left without paying, sends a payment link | A telecaller, ₹15–22k/mo |
+| **Payment Rescue** | Reads the decline reason, waits, calls, sends a fresh link | A telecaller, ₹15–22k/mo |
+| **COD Guard** | Confirms COD before dispatch, blocks addresses that keep failing | The morning COD calling shift, ₹15–22k/mo |
+
+**Your MIS analyst**
+
+| Agent | Does | Replaces |
+|---|---|---|
+| **Daily MIS** | The numbers that matter each morning, and what changed and why | An MIS executive, ₹25–35k/mo |
+
+Salary bands are indicative Indian small-business ranges for framing the arbitrage, not sourced figures — replace them with real data before any external use.
+
+The surface is deliberately plain: the reader is a shop owner, not a risk lead. A five-person business has no ops lead and no finance lead; one person wears every hat, and every screen is written for that person.
+
+## Why one back office, not fourteen tools
+
+Every one of those jobs keys off the same object: **the order**. A dropped cart, a declined payment, a COD confirmation, a stock line, a refund claim, a chargeback, a GST line and a settlement break are all views of one order. Point tools each hold one view and are blind to the rest.
+
+Relay holds the whole graph — order → payment → shipment → conversation → refund → dispute → settlement — and that's where compounding comes from. Dispute Defender wins because COD Guard logged the delivery confirmation. Refund Shield holds a claim because 3-Way Reconciliation knows the payment never settled. COD Guard blocks an address because it failed twice before. **Each agent added makes the others better**, which is a property no point tool can copy.
 
 ## The rules (enforced by code, not policy)
 
@@ -44,7 +87,7 @@ Relay holds the whole graph — order → payment → shipment → conversation 
 
 - **The engine, fully tested:** trigger → classify → draft → check → gate → act as a strict run state machine; append-only Postgres ledger with row-level security and write-once gate fields; ports-and-fakes adapters; multi-tenancy; supervisor stall detection. 108 tests, ~1s, no credentials needed.
 - **Dispute Defender, domain-complete:** disputes arrive as structured webhooks with a reason code; the agent structures the claim, assembles an evidence pack matched to that code, drafts the response, and files once the merchant approves. Disputes are never held out of treatment — a missed deadline is real money.
-- **The demo workspace:** Home (prompt), Approvals, Pipeline, Journeys, Evidence, and an Agents console showing all six.
+- **The demo:** Home (one money number, what needs your yes, what the team did today, and a prompt box), Needs you, History, Your team (all 14 agents grouped by the hire they replace), and Settings.
 - **Not live:** every connector runs on fakes. No real bank or PG webhook is attached yet, and the self-serve onboarding that the "no setup project" promise requires is not built.
 
 ## Try it
@@ -56,7 +99,7 @@ make pg                          # local Postgres 17 on :5435
 uv run python demo/server.py     # workspace on http://localhost:8790
 ```
 
-Log in with **"Continue with the demo workspace"**, then walk Home → Approvals → Journeys → Agents.
+Log in with **"Continue with the demo workspace"**, then walk Home → Needs you → History → Your team.
 
 ## Origin
 
