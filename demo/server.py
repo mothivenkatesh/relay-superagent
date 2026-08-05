@@ -2030,6 +2030,29 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 2px}
 .slimcard .go2{flex:none}
 .sec.fam{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .sec.fam .st{flex:none;line-height:1.4}
+.stattiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;margin:16px 0 8px;max-width:880px}
+.stile{display:block;background:#fff;border:1px solid var(--hair);
+  border-radius:14px;padding:16px 20px;color:var(--ink)}
+.stile:hover{border-color:#C7CDF3}
+.stile b{display:block;font-size:26px;font-weight:600;letter-spacing:-.01em}
+.stile span{display:block;font-size:13px;font-weight:500;margin-top:4px}
+.stile i{display:block;font-style:normal;font-size:11.5px;
+  color:var(--mut);margin-top:2px}
+.stile.need b{color:#B47816}
+.lastrun{display:flex;gap:20px;align-items:stretch;background:#fff;
+  border:1px solid var(--hair);border-radius:14px;padding:14px 20px;
+  margin:12px 0 16px;max-width:720px;flex-wrap:wrap}
+.lr-l{flex:1;min-width:260px}
+.lr-h{display:flex;align-items:center;gap:8px;font-weight:600;
+  font-size:13px;color:var(--ink);margin-bottom:4px}
+.lr-when{margin-left:auto;font-weight:400;font-size:12px}
+.lr-t{font-size:13.5px;line-height:1.55}
+.lr-spark{flex:none;display:flex;flex-direction:column;gap:4px;
+  justify-content:center}
+.lr-spark > .mut{font-size:11px}
+.spark{display:flex;gap:3px;align-items:flex-end;height:28px}
+.spark i{width:7px;border-radius:3px 3px 0 0;background:#1E9E5A;opacity:.85}
 .outcome{font-size:24px;font-weight:600;letter-spacing:-.01em;color:var(--ink);
   margin:20px 0 8px;max-width:640px}
 .hsteps{margin:4px 0 8px;max-width:560px}
@@ -3416,6 +3439,67 @@ def worker_name(slug: str) -> str:
         "-", " ").title()
 
 
+def latest_run_html(tid: str, slug: str) -> str:
+    """Paperclip's Latest Run strip, in plain words: what this agent last
+    did and when, with a fortnight of activity beside it."""
+    led = WORLD.d.ledger
+    if slug == "dispute_defender":
+        evs = []
+        for r in led.runs.values():
+            if r.tenant_id == tid:
+                for e in led.trace_for(r.run_id):
+                    evs.append((e["ts"], e, r))
+        if evs:
+            ts, e, r = max(evs, key=lambda x: x[0])
+            what, sub = plain_step(e, r)
+            line = f'{what}. <span class="mut">{sub}</span>'
+            when = ts.strftime("%-d %b, %H:%M")
+        else:
+            line, when = "Waiting for the first dispute.", ""
+        badge = '<span class="st ok">did its job</span>'
+    elif slug in PROPS_DEF:
+        p = prop_state(tid, slug)
+        d = PROPS_DEF[slug]
+        if p["state"] == "waiting":
+            line = (f'Brought you a finished call: <b>{d["title"]}</b>. '
+                    f'<span class="mut">One yes closes it.</span>')
+            badge = '<span class="st wait">waiting on you</span>'
+        elif p["state"] == "approved":
+            line = d["approved"]
+            badge = '<span class="st ok">did its job</span>'
+        else:
+            line = d["declined"]
+            badge = '<span class="st mut">stood down</span>'
+        when = "today"
+    else:
+        line = ("Wrote today&rsquo;s note into the <b>Morning brief</b>, "
+                "before you sat down.")
+        when = "8:00"
+        badge = '<span class="st ok">did its job</span>'
+    if slug == "dispute_defender":
+        from datetime import datetime as _dt
+        today = _dt.utcnow().date()
+        counts = [0] * 14
+        for r in led.runs.values():
+            if r.tenant_id == tid:
+                dlt = (today - r.occurred_at.date()).days
+                if 0 <= dlt < 14:
+                    counts[13 - dlt] += 1
+    else:
+        h = _hashlib.sha256(slug.encode()).digest()
+        counts = [1 + h[i] % 7 for i in range(14)]
+    mx = max(counts) or 1
+    bars = "".join(
+        f'<i style="height:{max(3, round(28 * c / mx))}px" title="{c}"></i>'
+        for c in counts)
+    return (f'<div class="lastrun"><div class="lr-l">'
+            f'<div class="lr-h">Latest run {badge}'
+            f'<span class="mut lr-when">{when}</span></div>'
+            f'<div class="lr-t">{line}</div></div>'
+            f'<div class="lr-spark"><span class="mut">Last 14 days</span>'
+            f'<div class="spark">{bars}</div></div></div>')
+
+
 def roster_detail_content(tid: str, a: dict) -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
@@ -3502,7 +3586,10 @@ def roster_detail_content(tid: str, a: dict) -> str:
         f'<div><h1>{a["role"]}</h1>'
         f'<div class="meta">{state}<span>&middot;</span>'
         f'<span>{a["name"]}</span></div></div>'
-        f'<div style="margin-left:auto">{action}</div></div>'
+        f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
+        f'<a class="btn ghost" href="/?say=Ask {esc(a["role"])} to ">'
+        f'Give it a job</a>{action}</div></div>'
+        f'{latest_run_html(tid, a["slug"])}'
         f'<div class="outcome">{story.get("outcome", a["desc"])}</div>'
         f'<p class="mut" style="max-width:560px;margin:0 0 8px">{a["desc"]}</p>'
         f'<p class="mut" style="font-size:12.5px;margin:0 0 24px">'
@@ -4013,11 +4100,30 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     n_all = len(RELAY_AGENTS)
     n_on = sum(1 for a in RELAY_AGENTS
                if a["status"] == "live" or DEMO_ON.get(a["slug"]))
+    led2 = WORLD.d.ledger
+    truns = [r for r in led2.runs.values() if r.tenant_id == tid]
+    n_yes = sum(1 for r in truns
+                if r.state is RunState.AWAITING_GATE) + props_waiting(tid)
+    kept2, n_wins2, _w = recovered(tid)
+    n_live = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
+    tiles = (
+        f'<div class="stattiles">'
+        f'<a class="stile" href="/agents?f=active"><b>{n_on}</b>'
+        f'<span>Agents on</span><i>{n_live} working &middot; '
+        f'{n_on - n_live} watching</i></a>'
+        f'<a class="stile need" href="/approvals"><b>{n_yes}</b>'
+        f'<span>Need your yes</span><i>replies, holds, payouts</i></a>'
+        f'<a class="stile" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
+        f'<span>Kept for you</span><i>{n_wins2} disputes won</i></a>'
+        f'<a class="stile" href="/impact"><b>{len(truns)}</b>'
+        f'<span>Jobs done</span><i>every one in History</i></a>'
+        f'</div>')
     return (f'<h1 class="page">Your team</h1>'
             f'<div class="pagehint">{n_all} agents in three families: the '
             f'people you would otherwise hire. Nothing that touches money '
             f'or a customer goes out until you say yes. '
             f'{n_on} working; open any of the rest to switch it on.</div>'
+            f'{tiles}'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span></div>'
@@ -5311,8 +5417,9 @@ class Handler(BaseHTTPRequestHandler):
             conv = _pq(_up(self.path).query).get("c", [""])[0]
             from urllib.parse import parse_qs as _pq, urlparse as _up
             _as = _pq(_up(self.path).query).get("as", ["owner"])[0]
+            say = _pq(_up(self.path).query).get("say", [""])[0][:120]
             self._html(chat_render(sess["tenant_id"], conv,
-                                   sess.get("email", ""), _as))
+                                   sess.get("email", ""), _as, say=say))
         elif self.path in ("/tasks", "/approvals"):
             sess = self._session()
             if not sess:
@@ -6846,7 +6953,7 @@ __SIDEBAR__
   </div></main>
   <div class="composer" id="composer">
   <form class="hcomposer" onsubmit="event.preventDefault();send(box.value)">
-    <input id="box" placeholder="Ask anything, or tell Relay what to do" autofocus autocomplete="off">
+    <input id="box" placeholder="Ask anything, or tell Relay what to do" value="__SAYVAL__" autofocus autocomplete="off">
     <div class="hrow">
       __MODEUI__
       <button class="sendbtn" aria-label="Send">
@@ -7194,7 +7301,7 @@ def brief_note_content(tid: str) -> str:
             f'stay in <a href="/journeys"><b>History</b></a>.</div>')
 
 
-def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner") -> str:
+def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner", say: str = "") -> str:
     c = CONVS.get(conv_id)
     if c and c["tenant"] != tid:
         c = None
@@ -7272,6 +7379,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__SIDEBAR__", sidebar_html("cmd", tid, convs=conv_list_html(tid, cid)))
             .replace("__CONVTITLE__", title)
             .replace("__CONVID__", cid)
+            .replace("__SAYVAL__", esc(say))
             .replace("__SAMPLE__", sample_html)
             .replace("__ROLEPILLS__", role_html)
             .replace("__GREET__", greet)
