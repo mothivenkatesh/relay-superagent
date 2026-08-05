@@ -6932,6 +6932,28 @@ class Handler(BaseHTTPRequestHandler):
                         c["pending"] = res[key].split('id="prop-')[1].split('"')[0]
             _touch(c)
             return self._json({**res, "conv_id": c["id"], "title": c["title"]})
+        if self.path == "/api/agent_build_draft":
+            sess = self._session() or {"tenant_id": "t1"}
+            payload = json.loads(raw)
+            bid = payload.get("bid", "")
+            d = PENDING_BUILDS.get(bid)
+            if d is None:
+                return self._json({"reply": "That draft is gone. Describe "
+                                   "the job again and I will redraw it.",
+                                   "cards": "", "summary": "", "steps": []})
+            ans = payload.get("answers")
+            d["answers"] = ans if isinstance(ans, dict) else {}
+            out = _build_draft_res(sess["tenant_id"], bid)
+            c = CONVS.get(payload.get("conv_id") or "")
+            if c and c["tenant"] == sess["tenant_id"]:
+                c["msgs"].append({"who": "cards", "html": out["summary"]})
+                c["msgs"].append({"who": "steps",
+                                  "html": steps_html(list(_BUILD_STEPS),
+                                                     done=True)})
+                c["msgs"].append({"who": "msg bot", "html": out["reply"]})
+                c["msgs"].append({"who": "cards", "html": out["cards"]})
+                _touch(c)
+            return self._json(out)
         if self.path == "/api/agent_build_confirm":
             sess = self._session() or {"tenant_id": "t1"}
             payload = json.loads(raw)
@@ -7687,32 +7709,120 @@ def _build_draft(msg: str) -> dict:
     return dict(name=name, kind=kind, slug=slug, watches=watches)
 
 
+def _build_questions(kind: str) -> list[dict]:
+    """Three quick taps before drafting, Khatabook-plain: when it acts, what
+    it may touch, when it must ask. Options carry a one-line consequence and
+    one is marked Recommended; every question takes a typed answer too."""
+    touch = {
+        "risk": [
+            ("Orders and holds", "It can stop an order or let it through."),
+            ("Buyer messages", "It can message the buyer to double-check."),
+            ("Refunds", "It can hold a refund until the check clears.")],
+        "calling": [
+            ("Calls", "It can ring the buyer and talk."),
+            ("WhatsApp messages", "It can follow up in writing."),
+            ("Payment links", "It can send a fresh link to pay.")],
+        "accounts": [
+            ("The numbers, read only", "It reads statements and orders, "
+             "touches nothing."),
+            ("Payment drafts", "It can line up a payment for your yes."),
+            ("Vendor records", "It can update who is owed what.")],
+        "inventory": [
+            ("Stock counts", "It watches what is running low."),
+            ("Reorder drafts", "It can write the reorder for your yes."),
+            ("Supplier messages", "It can ask the supplier for dates.")],
+        "support": [
+            ("Buyer replies", "It can draft the answer to a buyer."),
+            ("Order records", "It reads the order to get the story right."),
+            ("Courier tickets", "It can raise a ticket when a parcel is "
+             "stuck.")],
+    }[kind]
+    return [
+        dict(key="act", type="one", q="When should it act?", opts=[
+            ("The moment it spots one",
+             "Acts as things come in, day or night.", True),
+            ("Once a day",
+             "Works quietly, reports in the morning brief.", False),
+            ("Only when I ask",
+             "Sits ready; you call it with /.", False)]),
+        dict(key="touch", type="many", q="What may it touch?",
+             opts=[(lbl, sub, i == 0) for i, (lbl, sub) in enumerate(touch)]),
+        dict(key="gate", type="one", q="When must it check with you?", opts=[
+            ("Before anything moves",
+             "Every send and hold lands in Needs you first.", True),
+            ("Only above ₹5,000",
+             "Small ones go on their own; big ones wait for you.", False),
+            ("Only the unusual ones",
+             "Routine work flows; anything odd waits for you.", False)]),
+    ]
+
+
+def _default_answers(qs: list[dict], ans: dict) -> dict:
+    """Skipped questions fall back to the Recommended option, so a skipped
+    stepper still yields a complete, safe draft."""
+    out = {}
+    for q in qs:
+        v = ans.get(q["key"])
+        rec = next((o[0] for o in q["opts"] if o[2]), q["opts"][0][0])
+        if q["type"] == "many":
+            v = [x for x in (v or []) if isinstance(x, str) and x.strip()]
+            out[q["key"]] = v[:4] or [rec]
+        else:
+            out[q["key"]] = v.strip()[:80] if isinstance(v, str) and v.strip() else rec
+    return out
+
+
 def _build_res(tid: str, msg: str) -> dict:
-    """The chat answer for a described job: three visible steps of drafting,
-    then the teammate as a card with the one yes that makes it real."""
+    """The chat answer for a described job: not a draft yet, but the three
+    questions that shape it. The card itself is drawn by the client."""
     global _build_n
     d = _build_draft(msg)
     _build_n += 1
     bid = f"bld{_build_n}"
     PENDING_BUILDS[bid] = {**d, "tenant": tid}
+    reply = ("Before I draft it, three quick taps: when it acts, what it "
+             "may touch, and when it must ask you.")
+    return {"reply": reply, "cards": "", "steps": [],
+            "qz": {"bid": bid, "name": d["name"],
+                   "questions": _build_questions(d["kind"])},
+            "proposal": None, "product": "", "case": ""}
+
+
+def _build_draft_res(tid: str, bid: str) -> dict:
+    """Answers in hand: the compact record of what was chosen, then the
+    teammate as a card with the one yes that makes it real."""
+    d = PENDING_BUILDS[bid]
+    qs = _build_questions(d["kind"])
+    ans = _default_answers(qs, d.get("answers") or {})
+    gate = ans["gate"]
+    ask_line = ("Anything it wants to send or hold lands in Needs you first."
+                if gate == "Before anything moves" else
+                esc(gate) + ". Everything else lands in Needs you first.")
+    summary = ('<div class="qzsum">' + "".join(
+        f'<div class="qzsq">{q["q"]}</div>'
+        f'<div class="qzsa">'
+        f'{esc(", ".join(ans[q["key"]]) if q["type"] == "many" else ans[q["key"]])}'
+        f'</div>'
+        for q in qs) + '</div>')
     card = (
         f'<div class="bcard" id="bld-{bid}">'
         f'<div class="bhead">{avatar(d["slug"], 34, True)}'
         f'<b>{d["name"]}</b>'
         f'<span class="st mut">Built by you &middot; draft</span></div>'
         f'<div class="cashrow"><span>The job</span>{esc(d["watches"])}</div>'
-        f'<div class="cashrow"><span>How</span>{_BUILD_DOES[d["kind"]]}</div>'
-        f'<div class="cashrow"><span>Asks you</span>Anything it wants to '
-        f'send or hold lands in Needs you first.</div>'
+        f'<div class="cashrow"><span>Acts</span>{esc(ans["act"])}</div>'
+        f'<div class="cashrow"><span>May touch</span>'
+        f'{esc(", ".join(ans["touch"]))}</div>'
+        f'<div class="cashrow"><span>Asks you</span>{ask_line}</div>'
         f'<div class="bacts" id="bact-{bid}">'
         f'<button class="btn primary sm" onclick="buildAdd(\'{bid}\')">'
         f'Add to my agents</button>'
         f'<button class="btn ghost sm" onclick="buildSkip(\'{bid}\')">'
         f'Not now</button></div></div>')
-    reply = ("Here is who I would put on it. Look it over: it does nothing "
-             "until you add it.")
-    return {"reply": reply, "cards": card, "steps": list(_BUILD_STEPS),
-            "proposal": None, "product": "", "case": ""}
+    reply = ("Here is who I would put on it, shaped by your answers. It "
+             "does nothing until you add it.")
+    return {"reply": reply, "cards": card, "summary": summary,
+            "steps": list(_BUILD_STEPS)}
 
 
 def _build_confirm(tid: str, bid: str) -> str:
@@ -7867,7 +7977,8 @@ def seed_conversations() -> None:
     live("What needs a person", "what needs a person")
 
     # The two conversations the composer's new powers point at: an insight
-    # that ends already closed, and an agent built from one described job.
+    # that ends already closed, and an agent built from one described job,
+    # shaped by the three answered questions.
     authored(
         "Tuesday's payment dip", "Why did payments dip on Tuesday?",
         "Tuesday closed <b>18% under</b> a normal Tuesday, and it was one "
@@ -7882,15 +7993,18 @@ def seed_conversations() -> None:
     q = ("Build me an agent that watches COD orders during sale weeks and "
          "holds anything over ₹3,000 from a first-time buyer")
     res = _build_res("t1", q)
-    bid = res["cards"].split('id="bld-')[1].split('"')[0]
+    bid = res["qz"]["bid"]
+    dres = _build_draft_res("t1", bid)
     card_added = _re.sub(r'<div class="bacts".*?</div>',
-                         '<span class="st ok">Added</span>', res["cards"],
+                         '<span class="st ok">Added</span>', dres["cards"],
                          flags=_re.S)
     reply2 = _build_confirm("t1", bid)
     c["msgs"] += [
         {"who": "msg user", "html": esc(q)},
-        {"who": "steps", "html": steps_html(list(_BUILD_STEPS), done=True)},
         {"who": "msg bot", "html": res["reply"]},
+        {"who": "cards", "html": dres["summary"]},
+        {"who": "steps", "html": steps_html(list(_BUILD_STEPS), done=True)},
+        {"who": "msg bot", "html": dres["reply"]},
         {"who": "cards", "html": card_added},
         {"who": "msg user", "html": "Yes, add it"},
         {"who": "msg bot", "html": reply2},
@@ -8204,6 +8318,37 @@ background:none}
 .bhead b{font-size:15px;color:var(--ink)}
 .bhead .st{margin-left:auto}
 .bacts{display:flex;gap:8px;margin-top:12px}
+.qz{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:16px;max-width:640px}
+.qzhead{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.qzhead b{font-size:14.5px;color:var(--ink)}
+.qzcount{flex:none;font-size:11.5px;font-weight:600;color:#8A6A15;
+  background:#F6EFDA;border-radius:7px;padding:2px 7px}
+.qzopt{display:flex;align-items:center;gap:12px;background:#F5F5F7;
+  border:1.5px solid transparent;border-radius:10px;padding:10px 14px;
+  margin-bottom:8px;cursor:pointer}
+.qzopt:hover{background:#EFEFF3}
+.qzopt.on{border-color:var(--accent);background:#F3F5FE}
+.qzl{flex:1;min-width:0}
+.qzl b{display:block;font-size:13.5px;color:var(--ink)}
+.qzl span{font-size:12.5px;color:var(--mut)}
+.qzrec{font-size:10.5px;font-weight:600;color:#177245;background:#E5F4EC;
+  border-radius:6px;padding:1px 6px;margin-left:6px}
+.qznum{flex:none;font-size:12px;color:#B9BCC7}
+.qzbox{flex:none;width:16px;height:16px;border-radius:4px;
+  border:1.5px solid #C6C8D2;background:#fff}
+.qzbox.on{background:var(--accent);border-color:var(--accent);
+  box-shadow:inset 0 0 0 3px #fff}
+.qzother{cursor:default;background:#FAFAFC}
+.qzin{border:1px solid var(--hair);border-radius:8px;padding:6px 10px;
+  font:inherit;font-size:13px;width:100%;margin-top:6px;outline:none;
+  background:#fff}
+.qzin:focus{border-color:#98A5F0}
+.qzfoot{display:flex;gap:8px;margin-top:4px;align-items:center}
+.qzsum{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:8px 16px;max-width:640px}
+.qzsq{font-size:12.5px;color:var(--mut);margin-top:10px}
+.qzsa{font-size:13.5px;color:var(--ink);font-weight:500;margin:2px 0 10px}
 </style></head><body>
 __SIDEBAR__
 <div class="main">
@@ -8323,6 +8468,95 @@ async function buildAdd(bid){
 function buildSkip(bid){
   document.getElementById('bld-' + bid)?.remove();
   bubble('msg bot', 'Left as a draft: nothing was created.');
+}
+let QZ = null;
+function qzStart(qz){
+  QZ = {bid: qz.bid, qs: qz.questions, i: 0, ans: {}};
+  QZ.card = bubble('cards', '<div class="qz" id="qzcard"></div>');
+  qzRender();
+}
+function qzRender(){
+  const q = QZ.qs[QZ.i];
+  const many = q.type === 'many';
+  const sel = QZ.ans[q.key];
+  const opts = q.opts.map((o, j) => {
+    const on = many ? (sel || []).includes(o[0]) : sel === o[0];
+    return '<div class="qzopt' + (on ? ' on' : '') + '" onclick="qzPick(' + j + ')">'
+      + '<div class="qzl"><b>' + o[0]
+      + (o[2] ? ' <span class="qzrec">Recommended</span>' : '') + '</b>'
+      + '<span>' + o[1] + '</span></div>'
+      + (many ? '<span class="qzbox' + (on ? ' on' : '') + '"></span>'
+              : '<span class="qznum">' + (j + 1) + '</span>')
+      + '</div>';
+  }).join('');
+  document.getElementById('qzcard').innerHTML =
+    '<div class="qzhead"><span class="qzcount">' + (QZ.i + 1) + '/'
+    + QZ.qs.length + '</span><b>' + q.q + '</b></div>' + opts
+    + '<div class="qzopt qzother"><div class="qzl"><b>Other</b>'
+    + '<input class="qzin" id="qzin" placeholder="Say it your way"></div>'
+    + '<button class="btn ghost sm" onclick="qzOther()">Use this</button></div>'
+    + '<div class="qzfoot">'
+    + (QZ.i ? '<button class="btn ghost sm" onclick="qzBack()">Back</button>' : '')
+    + '<span style="flex:1"></span>'
+    + '<button class="btn ghost sm" onclick="qzSkip()">Skip</button>'
+    + (many ? '<button class="btn primary sm" onclick="qzNext()">Next</button>' : '')
+    + '</div>';
+  const qin = document.getElementById('qzin');
+  qin.onclick = ev => ev.stopPropagation();
+  qin.onkeydown = ev => { if (ev.key === 'Enter') qzOther(); };
+  QZ.card.scrollIntoView({behavior: 'smooth', block: 'end'});
+}
+function qzPick(j){
+  const q = QZ.qs[QZ.i];
+  const label = q.opts[j][0];
+  if (q.type === 'many'){
+    const cur = QZ.ans[q.key] || [];
+    QZ.ans[q.key] = cur.includes(label)
+      ? cur.filter(x => x !== label) : cur.concat(label);
+    qzRender();
+  } else {
+    QZ.ans[q.key] = label;
+    qzRender();
+    setTimeout(qzNext, 180);
+  }
+}
+function qzOther(){
+  const v = document.getElementById('qzin').value.trim();
+  if (!v) return;
+  const q = QZ.qs[QZ.i];
+  if (q.type === 'many') QZ.ans[q.key] = (QZ.ans[q.key] || []).concat(v);
+  else QZ.ans[q.key] = v;
+  qzNext();
+}
+function qzSkip(){
+  const q = QZ.qs[QZ.i];
+  if (QZ.ans[q.key] == null
+      || (q.type === 'many' && !QZ.ans[q.key].length)){
+    const rec = q.opts.find(o => o[2]) || q.opts[0];
+    QZ.ans[q.key] = q.type === 'many' ? [rec[0]] : rec[0];
+  }
+  qzNext();
+}
+function qzBack(){ QZ.i--; qzRender(); }
+async function qzNext(){
+  if (!QZ) return;
+  const q = QZ.qs[QZ.i];
+  if (q.type === 'many' && !(QZ.ans[q.key] || []).length){
+    const rec = q.opts.find(o => o[2]) || q.opts[0];
+    QZ.ans[q.key] = [rec[0]];
+  }
+  if (QZ.i < QZ.qs.length - 1){ QZ.i++; qzRender(); return; }
+  const body = {bid: QZ.bid, answers: QZ.ans, conv_id: CONV};
+  QZ.card.remove(); QZ = null;
+  const res = await fetch('/api/agent_build_draft', {method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)});
+  const data = await res.json();
+  if (data.summary) bubble('cards', data.summary);
+  await runSteps(data.steps);
+  const b = bubble('msg bot', '');
+  await streamInto(b, data.reply);
+  if (data.cards) bubble('cards', data.cards);
 }
 function mpopScan(){
   const v = box.value;
@@ -8482,6 +8716,7 @@ async function send(text){
   await runSteps(data.steps);
   const b = bubble('msg bot', '');
   await streamInto(b, data.reply);
+  if (data.qz){ qzStart(data.qz); return; }
   if(data.product) bubble('cards', data.product);
   if(data.cards) bubble('cards', data.cards);
 }
