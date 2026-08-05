@@ -3535,7 +3535,7 @@ def latest_run_html(tid: str, slug: str) -> str:
             f'<div class="spark">{bars}</div></div></div>')
 
 
-def roster_detail_content(tid: str, a: dict) -> str:
+def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
     rules it works under, and one button. Brief it like someone joining on
@@ -3615,30 +3615,19 @@ def roster_detail_content(tid: str, a: dict) -> str:
         '<span class="tdesc"><b>While a person has it, this agent waits.</b> '
         '<span class="mut">It never acts on a handed-over case, and the '
         'handover itself is written into the case history.</span></span></div>')
-    return (
-        f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
-        f'{_identicon(a["slug"], 44)}'
-        f'<div><h1>{a["role"]}</h1>'
-        f'<div class="meta">{state}<span>&middot;</span>'
-        f'<span>{a["name"]}</span></div></div>'
-        f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
-        f'<a class="btn ghost" href="/?say=Ask {esc(a["role"])} to ">'
-        f'Give it a job</a>{action}</div></div>'
-        f'{latest_run_html(tid, a["slug"])}'
-        f'<div class="outcome">{story.get("outcome", a["desc"])}</div>'
-        f'<p class="mut" style="max-width:560px;margin:0 0 8px">{a["desc"]}</p>'
-        f'<p class="mut" style="font-size:12.5px;margin:0 0 24px">'
-        f'Replaces {a["replaces"]}.</p>'
-        f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
-        f'<h2 class="sec">What it can touch</h2>'
-        f'<div class="capwrap">{caps}</div>'
-        + (f'<h2 class="sec">'
-           f'{"Waiting on your yes" if prop_state(tid, a["slug"])["state"] == "waiting" else "Its last call"}'
-           f'</h2>{prop_card(tid, a["slug"])}'
-           if a["slug"] in PROPS_DEF else "")
-        + (('<h2 class="sec">Its cases</h2>'
-            '<div class="pagehint">Every buyer dispute this agent is '
-            'working, newest first. The ones waiting on your yes come '
+    slug = a["slug"]
+    # ---- Work: this agent's inbox. What it brought you, nothing else.
+    prop_sec = ""
+    if slug in PROPS_DEF:
+        p_waiting = prop_state(tid, slug)["state"] == "waiting"
+        prop_sec = (f'<h2 class="sec">'
+                    f'{"Waiting on your yes" if p_waiting else "Its last call"}'
+                    f'</h2>{prop_card(tid, slug)}')
+    cases_sec = ""
+    if slug == "dispute_defender":
+        cases_sec = (
+            '<h2 class="sec">Its cases</h2>'
+            '<div class="pagehint">The ones waiting on your yes come '
             'first.</div><div class="caselist">'
             + "".join(
                 f'<a class="rail{" unread" if c["key"] == "need" else ""}" '
@@ -3654,21 +3643,52 @@ def roster_detail_content(tid: str, a: dict) -> str:
                 for c in sorted(rail_cases(tid),
                                 key=lambda c: c["key"] != "need"))
             + '</div>')
-           if a["slug"] == "dispute_defender" else "")
-        + (f'<h2 class="sec">Where its work lands</h2>'
-           f'<div class="trow slim" style="display:flex">'
-           f'<span class="ico">{ICONS["flow"]}</span>'
-           f'<span class="tdesc">Its note is written into the <b>Morning '
-           f'brief</b> every day, before you sit down.</span>'
-           f'<a class="st wait" href="/briefs/morning">read today&rsquo;s '
-           f'&rarr;</a></div>'
-           if a["slug"] in REPORT_AGENTS else "")
-        + f'{thread_html(a["slug"]) or day_html(a["slug"])}'
-        f'{risk_ladder_html() if a["slug"] == "kyc_desk" else ""}'
+    report_sec = ""
+    if slug in REPORT_AGENTS:
+        report_sec = (
+            f'<h2 class="sec">Where its work lands</h2>'
+            f'<div class="trow slim" style="display:flex">'
+            f'<span class="ico">{ICONS["flow"]}</span>'
+            f'<span class="tdesc">Its note is written into the <b>Morning '
+            f'brief</b> every day, before you sit down.</span>'
+            f'<a class="st wait" href="/briefs/morning">read today&rsquo;s '
+            f'&rarr;</a></div>')
+    work_body = (latest_run_html(tid, slug) + prop_sec + cases_sec
+                 + report_sec
+                 + (_kyc_builder(tid) if slug == "kyc_desk" else ""))
+
+    # ---- About: the read-once material. The hire brief, not the inbox.
+    about_body = (
+        f'<div class="outcome">{story.get("outcome", a["desc"])}</div>'
+        f'<p class="mut" style="max-width:560px;margin:0 0 8px">{a["desc"]}</p>'
+        f'<p class="mut" style="font-size:12.5px;margin:0 0 24px">'
+        f'Replaces {a["replaces"]}.</p>'
+        f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
+        + (thread_html(slug) or day_html(slug))
+        + (risk_ladder_html() if slug == "kyc_desk" else "")
+        + f'<h2 class="sec">What it can touch</h2>'
+        f'<div class="capwrap">{caps}</div>'
         f'<h2 class="sec">Rules it works under</h2>{rules}'
         f'<h2 class="sec">When a person takes over</h2>{handoff}'
-        f'{_kyc_builder(tid) if a["slug"] == "kyc_desk" else ""}'
         f'{helpers}')
+
+    tabbar = ('<div class="tabbar">'
+              + "".join(
+                  f'<a class="{"on" if tab == k else ""}" '
+                  f'href="/agents/{slug}?tab={k}">{lbl}</a>'
+                  for k, lbl in [("work", "Work"), ("about", "About")])
+              + '</div>')
+    return (
+        f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
+        f'{_identicon(slug, 44)}'
+        f'<div><h1>{a["role"]}</h1>'
+        f'<div class="meta">{state}<span>&middot;</span>'
+        f'<span>{a["name"]}</span></div></div>'
+        f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
+        f'<a class="btn ghost" href="/?say=/{esc(a["role"])} ">'
+        f'Give it a job</a>{action}</div></div>'
+        f'{tabbar}'
+        + (work_body if tab == "work" else about_body))
 
 
 # Saved KYC procedures, per tenant: the editor's Save and Set live land
@@ -3904,7 +3924,8 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     if not a:
         roster = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
         if roster is not None:
-            return roster_detail_content(tid, roster)
+            return roster_detail_content(
+                tid, roster, tab if tab in ("work", "about") else "work")
         return '<h1 class="page">We don&rsquo;t have anyone by that name</h1>'
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
