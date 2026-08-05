@@ -1233,7 +1233,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       {rows}
     </div>
     <div class="railsys">
-      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Your team</span></a>
+      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
       <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Knowledge</span></a>
       <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
       <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
@@ -4571,7 +4571,7 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         f'<a class="stile" href="/impact"><b>{len(truns)}</b>'
         f'<span>Jobs done</span><i>every one in History</i></a>'
         f'</div>')
-    return (f'<h1 class="page">Your team</h1>'
+    return (f'<h1 class="page">Agents</h1>'
             f'<div class="pagehint">The people you would hire, as '
             f'agents. Nothing goes out without your yes.</div>'
             f'{tiles}'
