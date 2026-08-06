@@ -6232,19 +6232,19 @@ def pricing_content(tid: str) -> str:
     plans = (
         plan("Free", "&#8377;0", "", "For the builder community",
              ["2 pre-built agents", "Unlimited agents built by you",
-              "10,000 runs a month, on your key", "1 workspace",
+              "10,000 credits a month, on your keys", "1 workspace",
               "Community support"])
         + plan("Starter", "&#8377;4,999", "/month", "For your first store",
                ["5 pre-built agents", "1 agent built by you",
-                "2,000 runs a month", "Standard connections"])
+                "5,000 credits a month", "Standard connections"])
         + plan("Growth", "&#8377;19,999", "/month", "For growing brands",
                ["20 pre-built agents", "5 agents built by you",
-                "10,000 runs a month", "All connections", "Teammates and roles"],
+                "25,000 credits a month", "All connections", "Teammates and roles"],
                pick=True, chip="Most picked")
         + plan("Enterprise", "Talk to us", "", "For large teams",
                ["All 26 pre-built agents", "Unlimited agents built by you",
-                "Runs sized to you", "SSO and audit export",
-                "A person who knows your account"])
+                "Credits sized to you", "Outcome pricing: pay per result",
+                "SSO and audit export", "A person who knows your account"])
     )
     return f"""
 <div class="pr-page">
@@ -6269,14 +6269,20 @@ def pricing_content(tid: str) -> str:
 .pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
 </style>
 <h1>Plans</h1>
-<p class="pr-def">Plans are counted in agents, metered in runs.
-1 run = 1 job finished end to end: a call made, a dispute filed,
-a report built. However many steps it takes.</p>
+<p class="pr-def">Plans are counted in agents, metered in credits.
+<b>1 credit = &#8377;1.</b> A job spends credits for what it actually uses:
+model tokens, WhatsApp fees, voice minutes. There is no separate bill
+for any of it.</p>
 <div class="pr-plans">{plans}</div>
-<div class="pr-strip"><b>Past your included runs:</b> &#8377;1 per run.
-<span class="mut">Packs bring it down: 10,000 runs for &#8377;8,000 &middot;
-50,000 runs for &#8377;35,000. Every plan, pre-built or built by you,
-draws from the same pack.</span></div>
+<div class="pr-strip"><b>What a job costs:</b> a message reply 1 credit
+&middot; paperwork, like a dispute filed or a report built, 2 credits
+&middot; a voice call 6 credits. <span class="mut">Heavier work simply
+spends more credits. Same rule for every agent, pre-built or built
+by you.</span></div>
+<div class="pr-strip"><b>Past your included credits:</b> &#8377;1 each.
+<span class="mut">Packs bring it down: 10,000 credits for &#8377;9,000
+&middot; 50,000 for &#8377;40,000. One pool, shared by all your
+agents.</span></div>
 <div class="pr-foot">Nothing billed until your first month closes.
 Every agent asks before it sends.</div>
 </div>
