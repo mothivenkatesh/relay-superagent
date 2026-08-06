@@ -1216,7 +1216,8 @@ def agent_rail_state(tid: str, a: dict) -> tuple:
     return ("Watching &middot; learning your business", False, 0)
 
 
-def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
+def rail_html(tid: str, active: str = "", convs: str | None = None,
+              email: str = "") -> str:
     """The Paperclip read of a chat rail: the persistent contacts are your
     STAFF. One row per agent, unread-bold when it needs your yes, and the
     work aggregates under the agent responsible: 7 disputes are one
@@ -1264,8 +1265,22 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
       <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Knowledge</span></a>
       <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
-      <a class="nav{' on' if active == 'settings' else ''}" href="/settings">{ICONS["gear"]}<span>Settings</span></a>
     </div>
+    <details class="acct railacct">
+      <summary class="railme">
+        <span class="avatar">{user_avatar(email)}</span>
+        <span class="rm-t"><b>{esc(user_name(email))}</b>
+        <span>{BUSINESS}</span></span>
+        {ICONS["gear"]}
+      </summary>
+      <div class="acctmenu">
+        <div class="acct-biz">{esc(user_name(email))}</div>
+        <div class="acct-mail">{esc(email)}</div>
+        <div class="acct-shop">{BUSINESS}</div>
+        <a class="acct-set" href="/settings">Settings</a>
+        <a class="acct-out" href="/logout">Log out</a>
+      </div>
+    </details>
   </aside>
   <div class="spot-scrim" id="spotscrim" onclick="closeSpot()"></div>
   <div class="spot" id="spot" role="dialog" aria-label="Search">
@@ -1365,8 +1380,9 @@ def rail_html(tid: str, active: str = "", convs: str | None = None) -> str:
   </script>"""
 
 
-def sidebar_html(active: str, tid: str = "t1", convs: str | None = None) -> str:
-    return rail_html(tid, active, convs)
+def sidebar_html(active: str, tid: str = "t1", convs: str | None = None,
+                 email: str = "") -> str:
+    return rail_html(tid, active, convs, email)
 
 
 def avatar(slug: str, size: int = 30, on: bool = True) -> str:
@@ -2107,11 +2123,12 @@ def render(tid: str = "t1", email: str = "") -> str:
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
             .replace("__SIDEBAR__", sidebar_html("tasks", tid,
-                                                 convs=conv_list_html(tid)))
+                                                 convs=conv_list_html(tid),
+                                                 email=email))
             .replace("__BIZ__", BUSINESS)
             .replace("__NAME__", esc(user_name(email)))
             .replace("__USER__", esc(email))
-            .replace("__INITIAL__", esc(user_name(email)[0]))
+            .replace("__INITIAL__", user_avatar(email))
             .replace("__NWAIT__", str(len(waiting) + cash_waiting(tid)))
             .replace("__TASKS__", tasks)
             .replace("__PROPS__", props)
@@ -2183,6 +2200,24 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
   font-size:13.5px;text-decoration:none}
 .acct-out:hover{background:#FBF1EF}
+.avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;
+  display:block}
+.railacct{position:relative;margin-top:8px}
+.railacct summary{list-style:none;cursor:pointer}
+.railacct summary::-webkit-details-marker{display:none}
+.railme{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:12px;transition:background .12s}
+.railme:hover{background:#F0F0F4}
+.railme .avatar{width:30px;height:30px;flex:none}
+.rm-t{flex:1;min-width:0;line-height:1.3}
+.rm-t b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
+.rm-t span{display:block;font-size:11.5px;color:var(--mut)}
+.railme > svg{width:15px;height:15px;color:var(--mut);flex:none}
+.railacct .acctmenu{top:auto;bottom:calc(100% + 8px);left:0;right:0;
+  min-width:0}
+.acct-set{display:block;padding:8px 12px;border-radius:8px;
+  color:var(--ink);font-size:13.5px}
+.acct-set:hover{background:#F5F5F8}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
@@ -2850,15 +2885,28 @@ def user_name(email: str) -> str:
     return stem.title() if stem else "there"
 
 
+# The founder's face, embedded so the single-file demo stays single-file.
+MOTHI_PHOTO = "data:image/jpeg;base64,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"
+
+
+def user_avatar(email: str) -> str:
+    """The photo where the letter-mark was. The demo founder gets the
+    face; any other login keeps its initial."""
+    if user_name(email) == "Mothi":
+        return f'<img src="{MOTHI_PHOTO}" alt="Mothi">'
+    return esc(user_name(email)[0])
+
+
 def _shell(content: str, active: str, tid: str, email: str) -> str:
     return (TEMPLATE
             .replace("__CONTENT__", content)
             .replace("__SIDEBAR__", sidebar_html(active, tid,
-                                                 convs=conv_list_html(tid)))
+                                                 convs=conv_list_html(tid),
+                                                 email=email))
             .replace("__BIZ__", BUSINESS)
             .replace("__NAME__", esc(user_name(email)))
             .replace("__USER__", esc(email))
-            .replace("__INITIAL__", esc(user_name(email)[0])))
+            .replace("__INITIAL__", user_avatar(email)))
 
 
 def _card(title: str, sub: str, right: str = "") -> str:
@@ -8412,6 +8460,24 @@ color:var(--mut)}
 .acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
   font-size:13.5px}
 .acct-out:hover{background:#FBF1EF}
+.avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;
+  display:block}
+.railacct{position:relative;margin-top:8px}
+.railacct summary{list-style:none;cursor:pointer}
+.railacct summary::-webkit-details-marker{display:none}
+.railme{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:12px;transition:background .12s}
+.railme:hover{background:#F0F0F4}
+.railme .avatar{width:30px;height:30px;flex:none}
+.rm-t{flex:1;min-width:0;line-height:1.3}
+.rm-t b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
+.rm-t span{display:block;font-size:11.5px;color:var(--mut)}
+.railme > svg{width:15px;height:15px;color:var(--mut);flex:none}
+.railacct .acctmenu{top:auto;bottom:calc(100% + 8px);left:0;right:0;
+  min-width:0}
+.acct-set{display:block;padding:8px 12px;border-radius:8px;
+  color:var(--ink);font-size:13.5px}
+.acct-set:hover{background:#F5F5F8}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
@@ -9673,7 +9739,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
               f'<a href="/approvals">See all &rarr;</a></div>{rows}') if rows else ""
     page = (CHAT_TEMPLATE
             .replace("__MODEUI__", mode_ui(tid))
-            .replace("__SIDEBAR__", sidebar_html("cmd", tid, convs=conv_list_html(tid, cid)))
+            .replace("__SIDEBAR__", sidebar_html("cmd", tid, convs=conv_list_html(tid, cid), email=email))
             .replace("__CONVTITLE__", title)
             .replace("__CONVID__", cid)
             .replace("__SAYVAL__", esc(say))
@@ -9692,7 +9758,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__BIZ__", BUSINESS)
             .replace("__NAME__", esc(user_name(email)))
             .replace("__USER__", esc(email))
-            .replace("__INITIAL__", esc(user_name(email)[0]))
+            .replace("__INITIAL__", user_avatar(email))
             .replace("__THREAD__", thread))
     return page
 
