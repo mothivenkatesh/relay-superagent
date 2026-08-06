@@ -6221,35 +6221,43 @@ def pricing_content(tid: str) -> str:
     The mechanics follow the agent-based model: plans are counts of agents
     (how many AI employees do I have?), runs are the meter, packs make the
     meter cheaper at scale. A run is a whole job, however many steps."""
-    def plan(name, price, per, who, rows, pick=False, chip=""):
+    def plan(name, price, per, who, rows, pick=False, chip="",
+             inc="", cta="Get started", pid=""):
         lis = "".join(f"<li>{r}</li>" for r in rows)
         chip_h = f'<span class="pr-chip">{chip}</span>' if chip else ""
+        inc_h = f'<div class="pr-inc">{inc}</div>' if inc else ""
+        idattr = f' id="{pid}"' if pid else ""
+        btn = (f'<a class="pr-cta{" go" if pick else ""}" href="/">{cta}</a>')
         return (f'<div class="pr-plan{" pick" if pick else ""}">'
                 f'<div class="pr-name">{name}{chip_h}</div>'
-                f'<div class="pr-price">{price}<span>{per}</span></div>'
+                f'<div class="pr-price"><b{idattr}>{price}</b><span>{per}</span></div>'
                 f'<div class="pr-who">{who}</div>'
-                f'<ul class="pr-list">{lis}</ul></div>')
+                f'{inc_h}<ul class="pr-list">{lis}</ul>{btn}</div>')
     plans = (
         plan("Free", "&#8377;0", "", "For the builder community",
              ["2 pre-built agents", "Unlimited agents built by you",
               "10,000 credits a month, on your keys", "1 workspace",
-              "Community support"])
+              "Community support"], cta="Start building")
         + plan("Starter", "&#8377;4,999", "/month", "For your first store",
                ["5 pre-built agents", "1 agent built by you",
-                "5,000 credits a month", "Standard connections"])
+                "5,000 credits a month", "Standard connections"],
+               pid="prPS")
         + plan("Growth", "&#8377;19,999", "/month", "For growing brands",
                ["20 pre-built agents", "5 agents built by you",
-                "25,000 credits a month", "All connections", "Teammates and roles"],
-               pick=True, chip="Most picked")
+                "25,000 credits a month", "All connections",
+                "Teammates and roles"],
+               pick=True, chip="Most picked",
+               inc="Everything in Starter, and:", pid="prPG")
         + plan("Enterprise", "Talk to us", "", "For large teams",
-               ["All 26 pre-built agents", "Unlimited agents built by you",
-                "Credits sized to you", "Outcome pricing: pay per result",
-                "SSO and audit export", "A person who knows your account"])
+               ["All 26 agents", "Unlimited agents built by you",
+                "Credits sized to you", "Outcome pricing",
+                "SSO and audit export", "Dedicated support"],
+               inc="Everything in Growth, and:", cta="Talk to sales")
     )
     return f"""
 <div class="pr-page">
 <style>
-.pr-page{{max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
+.pr-page{{--line:#E4E1D8;max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
 .pr-page h1{{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}}
 .pr-def{{color:#6E7263;font-size:14px;margin:0 0 26px;max-width:62ch}}
 .pr-plans{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}}
@@ -6267,6 +6275,18 @@ def pricing_content(tid: str) -> str:
 .pr-strip b{{font-size:13px}}
 .pr-strip .mut{{color:#6E7263}}
 .pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
+.pr-bill{{display:inline-flex;border:1px solid var(--line);border-radius:100px;background:#fff;padding:3px;margin:2px 0 18px}}
+.pr-bill button{{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;color:#6E7263;border-radius:100px;padding:6px 14px;cursor:pointer}}
+.pr-bill button.on{{background:#0B7A3E;color:#fff}}
+.pr-bill em{{font-style:normal;opacity:.75;font-size:11px}}
+.pr-inc{{font-size:11.5px;font-weight:600;color:#0B7A3E;margin-top:12px}}
+.pr-cta{{margin-top:auto;display:block;height:38px;line-height:36px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-align:center;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;color:#1D221F;text-decoration:none;padding:0}}
+.pr-list{{margin-bottom:16px}}
+.pr-cta.go{{background:#0B7A3E;border-color:#0B7A3E;color:#fff}}
+.pr-faq{{margin-top:22px;border-top:1px solid var(--line)}}
+.pr-faq details{{border-bottom:1px solid var(--line);padding:12px 2px}}
+.pr-faq summary{{font-size:13.5px;font-weight:600;cursor:pointer;list-style-position:outside}}
+.pr-faq p{{font-size:13px;color:#6E7263;margin:8px 0 0;max-width:70ch}}
 .pr-calc{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:18px 20px}}
 .pr-calc-head b{{font-size:13.5px}}
 .pr-calc-head .mut{{color:#6E7263;font-size:12.5px;margin-left:8px}}
@@ -6280,28 +6300,35 @@ def pricing_content(tid: str) -> str:
 .pr-calc-buy{{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:#3D4038}}
 </style>
 <h1>Plans</h1>
-<p class="pr-def">Plans are counted in agents, metered in credits.
-<b>1 credit = &#8377;1.</b> A job spends credits for what it actually uses:
-model tokens, WhatsApp fees, voice minutes. There is no separate bill
-for any of it.</p>
+<div class="pr-bill"><button class="on" id="prBm"
+  onclick="prBill(0)">Monthly</button><button id="prBy"
+  onclick="prBill(1)">Yearly <em>save 20%</em></button></div>
+<p class="pr-def">Counted in agents, metered in credits.
+<b>1 credit = &#8377;1.</b> Tokens, WhatsApp fees and voice minutes
+are inside. No separate bills.</p>
 <div class="pr-plans">{plans}</div>
-<div class="pr-strip"><b>What a job costs:</b> a message reply 1 credit
-&middot; paperwork, like a dispute filed or a report built, 2 credits
-&middot; a voice call 6 credits. <span class="mut">Heavier work simply
-spends more credits. Same rule for every agent, pre-built or built
-by you.</span></div>
+<div class="pr-strip"><b>A reply 1 credit &middot; paperwork 2
+&middot; a voice call 6.</b> <span class="mut">Same rule for every
+agent.</span></div>
 <div class="pr-calc">
-  <div class="pr-calc-head"><b>How many credits do you need?</b>
-  <span class="mut">Beyond your plan, buy packs. The bigger the pack,
-  the cheaper each credit.</span></div>
+  <div class="pr-calc-head"><b>Credit packs</b>
+  <span class="mut">Bigger pack, cheaper credit.</span></div>
   <input type="range" id="prSlide" min="0" max="6" step="1" value="3"
          oninput="prCalc(this.value)">
   <div class="pr-calc-row">
     <div class="pr-calc-n"><b id="prN">10,000</b><span>credits</span></div>
     <div class="pr-calc-p"><b id="prP">&#8377;9,000</b><span id="prR">&#8377;0.90 a credit</span></div>
   </div>
-  <div class="pr-calc-buy" id="prB">Enough for 10,000 replies, or 5,000
-  paperwork jobs, or 1,666 voice calls.</div>
+  <div class="pr-calc-buy" id="prB">= 10,000 replies &middot; 5,000
+  paperwork jobs &middot; 1,666 voice calls</div>
+</div>
+<div class="pr-faq">
+  <details><summary>When credits run low?</summary><p>Relay asks, like it
+  asks before anything sends. Approve a top-up, or pause agents.</p></details>
+  <details><summary>Do credits roll over?</summary><p>Plan credits refresh
+  monthly. Pack credits last 1 year.</p></details>
+  <details><summary>"On your keys"?</summary><p>Builders use their own model
+  and voice accounts and pay those directly.</p></details>
 </div>
 <div class="pr-foot">Nothing billed until your first month closes.
 Every agent asks before it sends.</div>
@@ -6313,6 +6340,17 @@ _PR_CALC_JS = """
 <script>
 var PR_STEPS = [1000, 2500, 5000, 10000, 25000, 50000, 100000];
 function prInr(n) { return n.toLocaleString('en-IN'); }
+var PR_PRICES = [["\u20B9" + "4,999", "\u20B9" + "19,999", "/month"],
+                 ["\u20B9" + "3,999", "\u20B9" + "15,999",
+                  "/month, billed yearly"]];
+function prBill(y) {
+  document.getElementById('prPS').textContent = PR_PRICES[y][0];
+  document.getElementById('prPG').textContent = PR_PRICES[y][1];
+  var spans = document.querySelectorAll('#prPS + span, #prPG + span');
+  spans.forEach(function (el) { el.textContent = PR_PRICES[y][2]; });
+  document.getElementById('prBm').className = y ? '' : 'on';
+  document.getElementById('prBy').className = y ? 'on' : '';
+}
 function prCalc(i) {
   var n = PR_STEPS[+i];
   var rate = n >= 50000 ? 0.80 : n >= 10000 ? 0.90 : 1.00;
@@ -6322,8 +6360,8 @@ function prCalc(i) {
   document.getElementById('prR').textContent =
       '\u20B9' + rate.toFixed(2) + ' a credit';
   document.getElementById('prB').textContent =
-      'Enough for ' + prInr(n) + ' replies, or ' + prInr(Math.floor(n / 2)) +
-      ' paperwork jobs, or ' + prInr(Math.floor(n / 6)) + ' voice calls.';
+      '= ' + prInr(n) + ' replies \u00B7 ' + prInr(Math.floor(n / 2)) +
+      ' paperwork jobs \u00B7 ' + prInr(Math.floor(n / 6)) + ' voice calls';
 }
 </script>
 """
