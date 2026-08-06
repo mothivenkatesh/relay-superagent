@@ -40,7 +40,7 @@ from relay_superagent.tenants import (  # noqa: E402
     TenantContext, TenantRegistry, UnknownTenant, default_policy,
 )
 
-PORT = 8790
+PORT = int(__import__("os").environ.get("PORT", "8790"))
 
 # ------------------------------------------------------------- the business
 # This workspace IS one small business, not a portfolio of them: Heads
@@ -10292,4 +10292,5 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
 if __name__ == "__main__":
     seed_conversations()
     print(f"Relay workspace on http://localhost:{PORT}")
-    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    host = "0.0.0.0" if "PORT" in __import__("os").environ else "127.0.0.1"
+    HTTPServer((host, PORT), Handler).serve_forever()
