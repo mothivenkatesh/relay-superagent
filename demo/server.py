@@ -6267,6 +6267,17 @@ def pricing_content(tid: str) -> str:
 .pr-strip b{{font-size:13px}}
 .pr-strip .mut{{color:#6E7263}}
 .pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
+.pr-calc{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:18px 20px}}
+.pr-calc-head b{{font-size:13.5px}}
+.pr-calc-head .mut{{color:#6E7263;font-size:12.5px;margin-left:8px}}
+.pr-calc input[type=range]{{width:100%;margin:16px 0 10px;accent-color:#0B7A3E}}
+.pr-calc-row{{display:flex;justify-content:space-between;align-items:baseline}}
+.pr-calc-n b{{font-size:22px;letter-spacing:-.02em}}
+.pr-calc-n span{{font-size:12px;color:#6E7263;margin-left:6px}}
+.pr-calc-p{{text-align:right}}
+.pr-calc-p b{{font-size:22px;letter-spacing:-.02em}}
+.pr-calc-p span{{display:block;font-size:11.5px;color:#6E7263;margin-top:1px}}
+.pr-calc-buy{{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:#3D4038}}
 </style>
 <h1>Plans</h1>
 <p class="pr-def">Plans are counted in agents, metered in credits.
@@ -6279,13 +6290,42 @@ for any of it.</p>
 &middot; a voice call 6 credits. <span class="mut">Heavier work simply
 spends more credits. Same rule for every agent, pre-built or built
 by you.</span></div>
-<div class="pr-strip"><b>Past your included credits:</b> &#8377;1 each.
-<span class="mut">Packs bring it down: 10,000 credits for &#8377;9,000
-&middot; 50,000 for &#8377;40,000. One pool, shared by all your
-agents.</span></div>
+<div class="pr-calc">
+  <div class="pr-calc-head"><b>How many credits do you need?</b>
+  <span class="mut">Beyond your plan, buy packs. The bigger the pack,
+  the cheaper each credit.</span></div>
+  <input type="range" id="prSlide" min="0" max="6" step="1" value="3"
+         oninput="prCalc(this.value)">
+  <div class="pr-calc-row">
+    <div class="pr-calc-n"><b id="prN">10,000</b><span>credits</span></div>
+    <div class="pr-calc-p"><b id="prP">&#8377;9,000</b><span id="prR">&#8377;0.90 a credit</span></div>
+  </div>
+  <div class="pr-calc-buy" id="prB">Enough for 10,000 replies, or 5,000
+  paperwork jobs, or 1,666 voice calls.</div>
+</div>
 <div class="pr-foot">Nothing billed until your first month closes.
 Every agent asks before it sends.</div>
 </div>
+""" + _PR_CALC_JS
+
+
+_PR_CALC_JS = """
+<script>
+var PR_STEPS = [1000, 2500, 5000, 10000, 25000, 50000, 100000];
+function prInr(n) { return n.toLocaleString('en-IN'); }
+function prCalc(i) {
+  var n = PR_STEPS[+i];
+  var rate = n >= 50000 ? 0.80 : n >= 10000 ? 0.90 : 1.00;
+  var price = Math.round(n * rate);
+  document.getElementById('prN').textContent = prInr(n);
+  document.getElementById('prP').innerHTML = '\u20B9' + prInr(price);
+  document.getElementById('prR').textContent =
+      '\u20B9' + rate.toFixed(2) + ' a credit';
+  document.getElementById('prB').textContent =
+      'Enough for ' + prInr(n) + ' replies, or ' + prInr(Math.floor(n / 2)) +
+      ' paperwork jobs, or ' + prInr(Math.floor(n / 6)) + ' voice calls.';
+}
+</script>
 """
 
 
