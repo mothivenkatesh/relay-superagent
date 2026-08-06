@@ -6250,7 +6250,7 @@ def pricing_content(tid: str) -> str:
                inc="Everything in Starter, and:", pid="prPG")
         + plan("Enterprise", "Talk to us", "", "For large teams",
                ["All 26 agents", "Unlimited agents built by you",
-                "Credits sized to you", "Outcome pricing",
+                "Credits sized to you", "Volume pricing",
                 "SSO and audit export", "Dedicated support"],
                inc="Everything in Growth, and:", cta="Talk to sales")
     )
@@ -6274,6 +6274,7 @@ def pricing_content(tid: str) -> str:
 .pr-strip{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper-2);padding:14px 18px;font-size:13px;color:#3D4038}}
 .pr-strip b{{font-size:13px}}
 .pr-strip .mut{{color:#6E7263}}
+.pr-strip.cap{{border-color:#0B7A3E;background:#F2F9EE}}
 .pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
 .pr-bill{{display:inline-flex;border:1px solid var(--line);border-radius:100px;background:#fff;padding:3px;margin:2px 0 18px}}
 .pr-bill button{{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;color:#6E7263;border-radius:100px;padding:6px 14px;cursor:pointer}}
@@ -6307,61 +6308,77 @@ def pricing_content(tid: str) -> str:
 <b>1 credit = &#8377;1.</b> Tokens, WhatsApp fees and voice minutes
 are inside. No separate bills.</p>
 <div class="pr-plans">{plans}</div>
+<div class="pr-strip cap"><b>Your bill never crosses your plan
+without your yes.</b> <span class="mut">Top-ups are approved like
+everything else.</span></div>
 <div class="pr-strip"><b>A reply 1 credit &middot; paperwork 2
 &middot; a voice call 6.</b> <span class="mut">Same rule for every
 agent.</span></div>
 <div class="pr-calc">
-  <div class="pr-calc-head"><b>Credit packs</b>
-  <span class="mut">Bigger pack, cheaper credit.</span></div>
+  <div class="pr-calc-head"><b>What will my month cost?</b>
+  <span class="mut">Slide to your monthly orders.</span></div>
   <input type="range" id="prSlide" min="0" max="6" step="1" value="3"
          oninput="prCalc(this.value)">
   <div class="pr-calc-row">
-    <div class="pr-calc-n"><b id="prN">10,000</b><span>credits</span></div>
-    <div class="pr-calc-p"><b id="prP">&#8377;9,000</b><span id="prR">&#8377;0.90 a credit</span></div>
+    <div class="pr-calc-n"><b id="prN">3,000</b><span>orders a month</span></div>
+    <div class="pr-calc-p"><b id="prP">Growth &middot; &#8377;19,999</b><span id="prR">/month</span></div>
   </div>
-  <div class="pr-calc-buy" id="prB">= 10,000 replies &middot; 5,000
-  paperwork jobs &middot; 1,666 voice calls</div>
+  <div class="pr-calc-buy" id="prB">&#8776; 9,000 credits of calls,
+  paperwork and replies. Growth includes 25,000.</div>
 </div>
 <div class="pr-faq">
-  <details><summary>When credits run low?</summary><p>Relay asks, like it
-  asks before anything sends. Approve a top-up, or pause agents.</p></details>
+  <details><summary>When credits run low?</summary><p>Relay asks.
+  Approve a top-up (10,000 for &#8377;9,000 &middot; 50,000 for
+  &#8377;40,000) or pause agents. Revenue agents draw credits
+  first.</p></details>
   <details><summary>Do credits roll over?</summary><p>Plan credits refresh
   monthly. Pack credits last 1 year.</p></details>
   <details><summary>"On your keys"?</summary><p>Builders use their own model
   and voice accounts and pay those directly.</p></details>
 </div>
 <div class="pr-foot">Nothing billed until your first month closes.
-Every agent asks before it sends.</div>
+Every bill comes with what the agents won that month.</div>
 </div>
 """ + _PR_CALC_JS
 
 
 _PR_CALC_JS = """
 <script>
-var PR_STEPS = [1000, 2500, 5000, 10000, 25000, 50000, 100000];
+var PR_ORDERS = [500, 1000, 2000, 3000, 5000, 10000, 25000];
 function prInr(n) { return n.toLocaleString('en-IN'); }
-var PR_PRICES = [["\u20B9" + "4,999", "\u20B9" + "19,999", "/month"],
-                 ["\u20B9" + "3,999", "\u20B9" + "15,999",
-                  "/month, billed yearly"]];
 function prBill(y) {
-  document.getElementById('prPS').textContent = PR_PRICES[y][0];
-  document.getElementById('prPG').textContent = PR_PRICES[y][1];
+  var P = [["\u20B9" + "4,999", "\u20B9" + "19,999", "/month"],
+           ["\u20B9" + "3,999", "\u20B9" + "15,999",
+            "/month, billed yearly"]];
+  document.getElementById('prPS').textContent = P[y][0];
+  document.getElementById('prPG').textContent = P[y][1];
   var spans = document.querySelectorAll('#prPS + span, #prPG + span');
-  spans.forEach(function (el) { el.textContent = PR_PRICES[y][2]; });
+  spans.forEach(function (el) { el.textContent = P[y][2]; });
   document.getElementById('prBm').className = y ? '' : 'on';
   document.getElementById('prBy').className = y ? 'on' : '';
 }
 function prCalc(i) {
-  var n = PR_STEPS[+i];
-  var rate = n >= 50000 ? 0.80 : n >= 10000 ? 0.90 : 1.00;
-  var price = Math.round(n * rate);
-  document.getElementById('prN').textContent = prInr(n);
-  document.getElementById('prP').innerHTML = '\u20B9' + prInr(price);
+  var orders = PR_ORDERS[+i];
+  var credits = orders * 3;
+  var plan, price, note;
+  if (credits <= 5000) {
+    plan = 'Starter'; price = '\u20B9' + '4,999';
+    note = 'Starter includes 5,000.';
+  } else if (credits <= 25000) {
+    plan = 'Growth'; price = '\u20B9' + '19,999';
+    note = 'Growth includes 25,000.';
+  } else {
+    plan = 'Enterprise'; price = 'Talk to us';
+    note = 'Beyond Growth: credits sized to you.';
+  }
+  document.getElementById('prN').textContent = prInr(orders);
+  document.getElementById('prP').innerHTML =
+      plan === 'Enterprise' ? 'Enterprise' : plan + ' \u00B7 ' + price;
   document.getElementById('prR').textContent =
-      '\u20B9' + rate.toFixed(2) + ' a credit';
+      plan === 'Enterprise' ? 'Talk to us' : '/month';
   document.getElementById('prB').textContent =
-      '= ' + prInr(n) + ' replies \u00B7 ' + prInr(Math.floor(n / 2)) +
-      ' paperwork jobs \u00B7 ' + prInr(Math.floor(n / 6)) + ' voice calls';
+      '\u2248 ' + prInr(credits) +
+      ' credits of calls, paperwork and replies. ' + note;
 }
 </script>
 """
