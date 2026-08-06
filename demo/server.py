@@ -8505,7 +8505,23 @@ color:#fff;display:inline-flex;align-items:center;justify-content:center;
 font-size:12px;font-weight:650;text-transform:uppercase}
 main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .thread{max-width:740px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:16px}
-.hero{margin-top:7vh}
+.hero{display:flex;flex-direction:column;
+  min-height:calc(100vh - 250px)}
+.hero-mid{margin:10vh 0 24px}
+.tpl{max-width:740px;margin:auto auto 4px;width:100%;text-align:left}
+.tpl-h{display:flex;align-items:center;justify-content:space-between;
+  font-size:13px;color:var(--mut);margin:0 2px 10px}
+.tpl-shuf{border:0;background:none;cursor:pointer;color:var(--mut);
+  width:28px;height:28px;border-radius:8px;display:inline-flex;
+  align-items:center;justify-content:center}
+.tpl-shuf:hover{background:#F0F0F5;color:var(--ink)}
+.tpl-shuf svg{width:15px;height:15px}
+.tpl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tplcard{border:1px solid var(--hair);background:#fff;border-radius:12px;
+  padding:14px 16px;font:inherit;font-size:13.5px;color:var(--ink);
+  cursor:pointer;text-align:left;transition:border-color .12s,background .12s}
+.tplcard:hover{border-color:#98A5F0;background:#FBFBFE}
+@media (max-width:760px){.tpl-grid{grid-template-columns:1fr 1fr}}
 .ideas{max-width:560px;margin:48px auto 0;text-align:left}
 .ideas-h{font-size:13px;color:var(--mut);margin:0 0 8px 12px}
 .idea{display:flex;align-items:center;gap:14px;width:100%;border:0;
@@ -8762,10 +8778,13 @@ __SIDEBAR__
       </div></details></span></div>
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
-      __ROLEPILLS__<h1>__GREET__</h1>
-      <div class="ideas">
-        <div class="ideas-h">Ideas for you</div>
-        __IDEAS__
+      <div class="hero-mid">__ROLEPILLS__<h1>__GREET__</h1></div>
+      <div class="tpl">
+        <div class="tpl-h"><span>Start with a job</span>
+          <button class="tpl-shuf" onclick="tplShuffle()" aria-label="Shuffle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></svg>
+          </button></div>
+        <div class="tpl-grid" id="tplgrid"></div>
       </div>
     </div>
   </div></main>
@@ -8798,6 +8817,21 @@ __SIDEBAR__
 <script>
 let CONV = "__CONVID__";
 const MENT = __MENTIONS__;
+const TPL = __TPLPOOL__;
+function tplRender(list){
+  const g = document.getElementById('tplgrid');
+  if (!g) return;
+  g.innerHTML = list.slice(0, 6).map(t =>
+    '<button class="tplcard" data-q="' + t.replace(/"/g, '&quot;') + '">'
+    + t.replace(/</g, '&lt;') + '</button>').join('');
+  g.onclick = ev => {
+    const b = ev.target.closest('.tplcard');
+    if (b) send(b.dataset.q);
+  };
+}
+function tplShuffle(){
+  tplRender([...TPL].sort(() => Math.random() - .5));
+}
 function closeMenus(){
   document.getElementById('plusmenu').hidden = true;
 }
@@ -8994,6 +9028,7 @@ const box = document.getElementById('box');
 if (CONV) document.getElementById('empty')?.remove();
 if (!CONV){
   document.getElementById('ctitle').style.visibility = 'hidden';
+  tplRender(TPL);
 }
 function convMenu(ev, id, pinned){
   ev.preventDefault(); ev.stopPropagation();
@@ -9660,24 +9695,20 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     chips_html = "".join(
         f'<span class="hint" onclick="send(this.textContent)">{c}</span>' for c in chips)
 
-    def _idea_icon(c):
-        cl = c.lower()
-        if "yes" in cl:
-            return "tasks"
-        if "how is" in cl:
-            return "bot"
-        if "pay" in cl:
-            return "send"
-        if "amla" in cl or "stock" in cl:
-            return "folder"
-        if "thursday" in cl or "cash" in cl:
-            return "flow"
-        return "cmd"
-    ideas_html = "".join(
-        f'<button class="idea" onclick="send(this.dataset.q)" '
-        f'data-q="{esc(c)}"><span class="idea-ico">'
-        f'{ICONS[_idea_icon(c)]}</span><span>{esc(c)}</span></button>'
-        for c in chips[:3])
+    import json as _json
+    # The first-delegation library: today's live questions plus the
+    # evergreen jobs, shuffled client-side. Every entry has a real
+    # handler behind it; nothing on this grid dead-ends.
+    pool = chips + [
+        "Build me an agent that reads every one-star review",
+        "What did we win?",
+        "Which proof wins?",
+        "Show me the never-arrived ones",
+        "What needs a person?",
+    ]
+    seen = set()
+    pool = [c for c in pool if not (c in seen or seen.add(c))]
+    tpl_pool = _json.dumps(pool)
 
     # "Continue where you left off" is gone from Home on purpose: at this
     # simplicity level the owner needs one number, one ask, and one list.
@@ -9749,7 +9780,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__SAMPLE__", sample_html)
             .replace("__ROLEPILLS__", role_html)
             .replace("__GREET__", greet)
-            .replace("__IDEAS__", ideas_html)
+            .replace("__TPLPOOL__", tpl_pool)
             .replace("__MONEY__", money if not cid else "")
             .replace("__NEEDS__", needs if not cid else "")
             .replace("__BRIEF__", brief)
