@@ -5035,18 +5035,20 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     if q:
         agents = [a for a in agents if q.lower() in a["name"].lower()]
 
-    # Grouped as product families, the way Fin groups its surface: three
-    # names a founder can hold, not six org-chart desks.
+    # Grouped by the founder's objective, not our org chart: what each
+    # agent does FOR the business, in the language of the P&L.
     FAMILIES = [
-        ("Relay for Commerce", ("support", "calling", "inventory"),
-         "The order side: buyers, calls, deliveries, disputes, stock."),
-        ("Relay for Finance", ("accounts", "analyst"),
-         "The money side: settlements, cash, payouts, the daily numbers."),
-        ("Relay for Trust", ("risk",),
-         "The checks: refund fraud, filings, KYC, mule accounts."),
-        ("Built by you", ("custom",),
-         "Described in chat, drafted by Relay. Same rule: nothing sends "
-         "without your yes."),
+        ("Grow revenue",
+         ("cart_rescue", "payment_rescue", "payment_forms")),
+        ("Prevent losses",
+         ("dispute_defender", "refund_shield", "cod_guard",
+          "returns_desk", "stock_watch")),
+        ("Know your money",
+         ("three_way_recon", "settlement_insights", "cashflow_forecast",
+          "daily_mis", "payouts_desk")),
+        ("Stay compliant",
+         ("gst_compliance", "kyc_desk")),
+        ("Built by you", ("__custom__",)),
     ]
     def _needs(a):
         sl = a["slug"]
@@ -5059,8 +5061,11 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
                 and prop_state(tid, sl)["state"] == "waiting")
 
     desks = ""
-    for title, keys, line in FAMILIES:
-        mine = [a for a in agents if a["desk"] in keys]
+    for title, keys in FAMILIES:
+        if keys == ("__custom__",):
+            mine = [a for a in agents if a["desk"] == "custom"]
+        else:
+            mine = [a for a in agents if a["slug"] in keys]
         if not mine:
             continue
         mine.sort(key=lambda a: (not _needs(a), a["status"] != "live"))
@@ -6324,6 +6329,9 @@ agent.</span></div>
   monthly. Pack credits last 1 year.</p></details>
   <details><summary>"On your keys"?</summary><p>Builders use their own model
   and voice accounts and pay those directly.</p></details>
+  <details><summary>Which AI model runs my jobs?</summary><p>The best one
+  for each step, at the lowest cost. Routing is inside; you never pick
+  a model.</p></details>
 </div>
 <div class="pr-foot">Nothing billed until your first month closes.
 Every bill comes with what the agents won that month.</div>
