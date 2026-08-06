@@ -2218,6 +2218,40 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .acct-set{display:block;padding:8px 12px;border-radius:8px;
   color:var(--ink);font-size:13.5px}
 .acct-set:hover{background:#F5F5F8}
+.hubtabs{display:flex;gap:24px;border-bottom:1px solid var(--hair);
+  margin:0 0 24px}
+.hubtabs a{padding:0 0 10px;font-size:13.5px;font-weight:500;
+  color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
+.hubtabs a.on{color:var(--ink);border-color:var(--ink)}
+.hubhead{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:24px;margin-bottom:12px}
+.hubsearch{width:280px;border:1px solid var(--hair);border-radius:10px;
+  padding:9px 14px;font:inherit;font-size:13.5px;outline:none;
+  background:#fff;flex:none}
+.hubsearch:focus{border-color:#98A5F0}
+.hubtoolrow{display:flex;align-items:center;justify-content:space-between;
+  margin:0 0 12px}
+.hubpills{display:flex;gap:8px}
+.hubpill{border:1px solid var(--hair);background:#fff;border-radius:999px;
+  padding:6px 14px;font:inherit;font-size:12.5px;font-weight:500;
+  color:var(--ink);cursor:pointer;transition:background .12s}
+.hubpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.hubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+  margin:0 0 8px}
+.hubgrid.two{grid-template-columns:1fr 1fr}
+@media (max-width:900px){.hubgrid,.hubgrid.two{grid-template-columns:1fr}}
+.hubcard{border:1px solid var(--hair);background:#fff;border-radius:14px;
+  padding:14px 16px;display:flex;gap:12px;align-items:flex-start;
+  position:relative}
+.hubcard .rtools{position:absolute;right:10px;bottom:8px;background:#fff;
+  padding:2px 4px;border-radius:8px}
+.hubcard .hc-t{flex:1;min-width:0}
+.hubcard .hc-t b{display:block;font-size:14px;color:var(--ink)}
+.hubcard .hc-t span{font-size:12.5px;color:var(--mut);line-height:1.45;
+  display:block;margin-top:2px}
+.hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  flex:none}
+.hubsec h2.sec{margin-top:20px}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
@@ -2412,7 +2446,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
   border-radius:50%;background:#fff;transition:left .12s}
 .tglbtn.on i{left:16px}
 .rtools{display:flex;gap:4px;flex:none;opacity:0;transition:opacity .12s}
-.trow:hover .rtools{opacity:1}
+.trow:hover .rtools,.hubcard:hover .rtools{opacity:1}
 .rtool{font:inherit;font-size:12px;color:var(--mut);background:none;border:0;
   cursor:pointer;padding:4px 8px;border-radius:7px}
 .rtool:hover{background:#F0F0F5;color:var(--ink)}
@@ -2697,6 +2731,33 @@ document.addEventListener('click', e => {
     if (!d.contains(e.target)) d.removeAttribute('open');
   });
 });
+function hubFilter(inp){
+  const sel = inp.dataset.sel || '[data-hub]';
+  const q = inp.value.toLowerCase();
+  document.querySelectorAll(sel).forEach(el => {
+    el.style.display =
+      el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  hubSections();
+}
+function hubPill(btn){
+  document.querySelectorAll('.hubpill').forEach(b =>
+    b.classList.toggle('on', b === btn));
+  const f = btn.dataset.f;
+  document.querySelectorAll('[data-hub]').forEach(el => {
+    el.style.display =
+      (f === 'all' || el.dataset.hub === f
+       || el.dataset.hub === 'template') ? '' : 'none';
+  });
+  hubSections();
+}
+function hubSections(){
+  document.querySelectorAll('.hubsec').forEach(sec => {
+    const any = [...sec.querySelectorAll('[data-hub]')]
+      .some(el => el.style.display !== 'none');
+    sec.style.display = any ? '' : 'none';
+  });
+}
 function toggleEdit(id){document.getElementById(id).toggleAttribute('hidden')}
 function bulksync(){
   const sel = document.querySelectorAll('.selrun:checked');
@@ -6140,9 +6201,11 @@ if (!localStorage.getItem('relay_seen_scheduled')){
 
 
 def scheduled_content(tid: str) -> str:
-    # A real list, not a painting: every routine can be paused, reworded
-    # or removed, and a fresh one says when its first run comes.
-    rows = ""
+    # The hub grammar, with the full lifecycle kept: pause, reword inline,
+    # remove, add in a sentence, one-click templates, and every routine's
+    # latest note one tap away.
+    cards = ""
+    n_run = n_paused = 0
     for i, r in enumerate(routines_for(tid)):
         if r["on"] and r["last"]:
             stat = f'<span class="st ok">{r["last"]}</span>'
@@ -6150,36 +6213,43 @@ def scheduled_content(tid: str) -> str:
             stat = '<span class="st wait">first run tonight</span>'
         else:
             stat = '<span class="st mut">paused</span>'
+        n_run += 1 if r["on"] else 0
+        n_paused += 0 if r["on"] else 1
         toggle = (f'<form method="post" action="/api/routine_toggle" '
                   f'style="display:contents"><input type="hidden" name="i" '
                   f'value="{i}"><button class="tglbtn {"on" if r["on"] else ""}" '
                   f'title="{"Pause" if r["on"] else "Resume"}" '
                   f'aria-label="{"Pause" if r["on"] else "Resume"}">'
                   f'<i></i></button></form>')
+        out = r.get("out")
+        readit = (f'<a class="st wait" href="/briefs/{out}">read it '
+                  f'&rarr;</a>' if out else "")
         tools = (f'<span class="rtools">'
-                 f'<button class="rtool" title="Reword" '
+                 f'<button class="rtool" '
                  f'onclick="routineEdit({i}, this)">Edit</button>'
                  f'<form method="post" action="/api/routine_del" '
                  f'style="display:contents"><input type="hidden" name="i" '
                  f'value="{i}"><button class="rtool danger" title="Remove">'
                  f'Remove</button></form></span>')
-        inner = (f'{toggle}'
-                 f'<span class="tdesc" data-name="{esc(r["name"])}">'
-                 f'<b>{esc(r["name"])}</b> '
-                 f'<span class="mut">{r["when"]}. {r["what"]}</span></span>'
-                 f'{stat}{tools}')
-        out = r.get("out")
-        if out:
-            # Every run leaves a note; the row opens the latest one. The
-            # CoWorker Reports idea: outputs on a shelf, stamped fresh.
-            rows += (f'<div class="trow slim" style="display:flex">{inner}'
-                     f'<a class="st wait" href="/briefs/{out}">read it '
-                     f'&rarr;</a></div>')
-        else:
-            rows += f'<div class="trow slim" style="display:flex">{inner}</div>'
-    rows += """<script>
+        cards += (f'<div class="hubcard sched" '
+                  f'data-hub="{"running" if r["on"] else "paused"}">'
+                  f'{toggle}'
+                  f'<span class="tdesc hc-t" data-name="{esc(r["name"])}">'
+                  f'<b>{esc(r["name"])}</b> '
+                  f'<span class="mut">{r["when"]}. {r["what"]}</span></span>'
+                  f'<span class="hc-act">{stat}{readit}{tools}</span></div>')
+    tpls = "".join(
+        f'<div class="hubcard" data-hub="template">'
+        f'<span class="idea-ico">{ICONS["flow"]}</span>'
+        f'<span class="hc-t"><b>{name}</b><span>{esc(t)}</span></span>'
+        f'<span class="hc-act"><form method="post" action="/api/routine" '
+        f'style="display:contents">'
+        f'<input type="hidden" name="text" value="{esc(t)}">'
+        f'<button class="btn ghost sm">+ Add</button></form></span></div>'
+        for name, t in TPL_ROUTINES)
+    script = """<script>
 function routineEdit(i, btn){
-  const row = btn.closest('.trow');
+  const row = btn.closest('.hubcard');
   if (row.querySelector('.inedit')) return;
   const td = row.querySelector('.tdesc');
   td.dataset.prev = td.innerHTML;
@@ -6199,17 +6269,25 @@ function routineCancel(el){
   td.innerHTML = td.dataset.prev;
 }
 </script>"""
-    return (f'<h1 class="page">Scheduled</h1>'
-            f'<div class="pagehint">Work your team does on its own clock '
-            f': while you sleep, over the weekend, on the first of the '
-            f'month. Each run leaves a note you can open and read, and '
-            f'nothing is ever sent anywhere without your yes.</div>'
-            + rows +
-            f'<form class="notebar" method="post" action="/api/routine">'
-            f'<input class="jfind notein" name="text" maxlength="200" '
-            f'placeholder="Say what you want and when: e.g. every '
-            f'Friday evening, tell me what we won this week">'
-            f'<button class="btn primary sm">Add</button></form>'
+    return (hub_bar("scheduled")
+            + hub_head("Scheduled",
+                       "Work your team does on its own clock. Each run "
+                       "leaves a note you can open, and nothing is ever "
+                       "sent without your yes.",
+                       "Search scheduled",
+                       [("all", "All"), ("running", "Running"),
+                        ("paused", "Paused")])
+            + f'<div class="hubsec"><h2 class="sec">Yours '
+              f'({n_run} running{", " + str(n_paused) + " paused" if n_paused else ""})'
+              f'</h2><div class="hubgrid two">{cards}</div></div>'
+            + f'<div class="hubsec"><h2 class="sec">Start one</h2>'
+              f'<div class="hubgrid">{tpls}</div></div>'
+            + f'<form class="notebar" method="post" action="/api/routine">'
+              f'<input class="jfind notein" name="text" maxlength="200" '
+              f'placeholder="Or say it your way: every Friday evening, '
+              f'tell me what we won this week">'
+              f'<button class="btn primary sm">Add</button></form>'
+            + script
             + _SCHED_INTRO)
 
 
@@ -6318,9 +6396,13 @@ def memory_content(tid: str, tab: str = "voice") -> str:
                 f'kept as notes you can read</span></span>'
                 f'<span class="st ok">every night</span></div>')
 
-    return (f'<h1 class="page">Knowledge</h1>'
+    return (hub_bar("memory")
+            + f'<div class="hubhead"><div><h1 class="page">Knowledge</h1>'
             f'<div class="pagehint">Everything your team knows about your '
             f'business. Add to it, correct it; nothing is forgotten.</div>'
+            f'</div>'
+            f'<input class="hubsearch" placeholder="Search this tab" '
+            f'data-sel=".trow" oninput="hubFilter(this)"></div>'
             f'{tiles}{body}')
 
 # Every decision leaves a line: who, what, when, where to see it.
@@ -6392,6 +6474,187 @@ def conn_state(tid: str) -> dict:
         tid, {n: "on" for n, _ in CONN_DEFS})
 
 
+# ------------------------------------------------------------- capability hub
+# One grammar for the four capability surfaces (the Comet pattern): a tab
+# strip across them, a title with a working search, filter pills, and
+# sectioned card grids. Filtering is client-side and instant.
+HUB_TABS = [("connections", "Connections", "/connections"),
+            ("skills", "Skills", "/skills"),
+            ("scheduled", "Scheduled", "/scheduled"),
+            ("memory", "Knowledge", "/memory")]
+
+
+def hub_bar(active: str) -> str:
+    return ('<div class="hubtabs">' + "".join(
+        f'<a class="{"on" if k == active else ""}" href="{href}">{lbl}</a>'
+        for k, lbl, href in HUB_TABS) + '</div>')
+
+
+def hub_head(title: str, sub: str, placeholder: str,
+             pills=None, right: str = "") -> str:
+    pillrow = ""
+    if pills:
+        pillrow = ('<div class="hubpills">' + "".join(
+            f'<button class="hubpill{" on" if i == 0 else ""}" '
+            f'data-f="{key}" onclick="hubPill(this)">{lbl}</button>'
+            for i, (key, lbl) in enumerate(pills)) + '</div>')
+    return (
+        f'<div class="hubhead"><div><h1 class="page">{title}</h1>'
+        f'<div class="pagehint">{sub}</div></div>'
+        f'<input class="hubsearch" placeholder="{placeholder}" '
+        f'oninput="hubFilter(this)"></div>'
+        + (f'<div class="hubtoolrow">{pillrow}{right}</div>'
+           if (pills or right) else ""))
+
+
+def connections_hub(tid: str) -> str:
+    st = conn_state(tid)
+
+    def card(n, d, state):
+        if state in ("on", "paused"):
+            paused = state == "paused"
+            chip = ('<span class="st mut">paused</span>' if paused
+                    else '<span class="st ok">connected</span>')
+            acts = (
+                '<span class="rtools">'
+                '<form method="post" action="/api/conn_act" '
+                'style="display:contents">'
+                '<input type="hidden" name="name" value="' + n + '">'
+                '<input type="hidden" name="act" value="'
+                + ("resume" if paused else "pause") + '">'
+                '<button class="rtool">'
+                + ("Resume" if paused else "Pause") + '</button></form>'
+                '<form method="post" action="/api/conn_act" '
+                'style="display:contents">'
+                '<input type="hidden" name="name" value="' + n + '">'
+                '<input type="hidden" name="act" value="disconnect">'
+                '<button class="rtool danger">Disconnect</button></form>'
+                '</span>')
+            data = "connected"
+        else:
+            chip = ""
+            acts = ('<form method="post" action="/api/conn_act" '
+                    'style="display:contents">'
+                    '<input type="hidden" name="name" value="' + n + '">'
+                    '<input type="hidden" name="act" value="connect">'
+                    '<button class="btn ghost sm">+ Connect</button></form>')
+            data = "available"
+        return (f'<div class="hubcard" data-hub="{data}">{_logo(n, 34)}'
+                f'<span class="hc-t"><b>{n}</b><span>{d}</span></span>'
+                f'<span class="hc-act">{chip}{acts}</span></div>')
+
+    pairs = CONN_DEFS + CONN_MORE
+    connected = [(n, d) for n, d in pairs if st.get(n) in ("on", "paused")]
+    avail = [(n, d) for n, d in pairs
+             if st.get(n) not in ("on", "paused")]
+    return (
+        hub_bar("connections")
+        + hub_head("Connections",
+                   "Relay holds every key itself: nothing to set up, "
+                   "nothing to lose. Pause stops the reading; disconnect "
+                   "removes it.",
+                   "Search connections",
+                   [("all", "All"), ("connected", "Connected"),
+                    ("available", "Available")])
+        + f'<div class="hubsec"><h2 class="sec">Connected '
+          f'({len(connected)})</h2><div class="hubgrid">'
+        + "".join(card(n, d, st.get(n, "off")) for n, d in connected)
+        + '</div></div>'
+        + f'<div class="hubsec"><h2 class="sec">Available '
+          f'({len(avail)})</h2><div class="hubgrid">'
+        + "".join(card(n, d, "off") for n, d in avail)
+        + '</div></div>')
+
+
+def seed_skills(tid: str) -> list:
+    lst = KYC_PROCS.setdefault(tid, [])
+    if not lst:
+        lst.extend([
+            dict(title="Clear a flagged buyer", mode="live",
+                 when="A buyer trips the quick check. Runs the deep check, "
+                      "clears or refuses politely, writes the why into "
+                      "the case."),
+            dict(title="Advance payment with PAN check", mode="live",
+                 when="Any order above ₹2 lakh. One form takes the PAN "
+                      "and the advance together; the order holds until "
+                      "both clear."),
+            dict(title="Refund only after the photos check out",
+                 mode="draft",
+                 when="A return lands. The photos must match the batch "
+                      "seal before any money moves."),
+        ])
+    return lst
+
+
+def skills_hub(tid: str) -> str:
+    procs = seed_skills(tid)
+
+    def card(i, p):
+        live = p.get("mode") == "live"
+        chip = ('<span class="st ok">Live</span>' if live
+                else '<span class="st mut">draft</span>')
+        acts = (
+            f'<span class="rtools">'
+            f'<a class="rtool" href="/procedures/new?ask='
+            f'{esc(p["title"])}">Open</a>'
+            f'<form method="post" action="/api/skill_act" '
+            f'style="display:contents">'
+            f'<input type="hidden" name="i" value="{i}">'
+            f'<input type="hidden" name="act" '
+            f'value="{"draft" if live else "live"}">'
+            f'<button class="rtool">'
+            f'{"Back to draft" if live else "Set live"}</button></form>'
+            f'<form method="post" action="/api/skill_act" '
+            f'style="display:contents">'
+            f'<input type="hidden" name="i" value="{i}">'
+            f'<input type="hidden" name="act" value="del">'
+            f'<button class="rtool danger">Remove</button></form></span>')
+        return (f'<div class="hubcard" data-hub='
+                f'"{"live" if live else "draft"}">'
+                f'<span class="idea-ico">{ICONS["note"]}</span>'
+                f'<span class="hc-t"><b>{esc(p["title"])}</b>'
+                f'<span>{esc((p.get("when") or "")[:120])}</span></span>'
+                f'<span class="hc-act">{chip}{acts}</span></div>')
+
+    live = [(i, p) for i, p in enumerate(procs) if p.get("mode") == "live"]
+    drafts = [(i, p) for i, p in enumerate(procs)
+              if p.get("mode") != "live"]
+    out = (hub_bar("skills")
+           + hub_head("Skills",
+                      "What your agents know how to do: steps they "
+                      "follow, written in your words. Nothing goes live "
+                      "until you say yes.",
+                      "Search skills",
+                      [("all", "All"), ("live", "Live"),
+                       ("draft", "Drafts")],
+                      '<a class="btn primary sm" href="/procedures/new">'
+                      '+ Create skill</a>'))
+    if live:
+        out += (f'<div class="hubsec"><h2 class="sec">Live '
+                f'({len(live)})</h2><div class="hubgrid">'
+                + "".join(card(i, p) for i, p in live) + '</div></div>')
+    if drafts:
+        out += (f'<div class="hubsec"><h2 class="sec">Drafts '
+                f'({len(drafts)})</h2><div class="hubgrid">'
+                + "".join(card(i, p) for i, p in drafts) + '</div></div>')
+    if not procs:
+        out += ('<div class="empty">No skills yet. Describe one and it '
+                'opens in the editor.</div>')
+    return out
+
+
+# One-click starts for Scheduled: each becomes a real routine on add.
+TPL_ROUTINES = [
+    ("Evening COD summary",
+     "every evening at 7, tell me which COD orders confirmed and "
+     "which held"),
+    ("Friday vendor dues",
+     "every Friday morning, list what vendors are owed next week"),
+    ("Six o'clock stock check",
+     "every day at 6 PM, flag anything under ten days of stock"),
+]
+
+
 def settings_content(tid: str, s: str = "team") -> str:
     # Each tab is a job the founder actually comes here to do, named as
     # that job — not as a module.
@@ -6402,9 +6665,10 @@ def settings_content(tid: str, s: str = "team") -> str:
                 ("data", "Your data")]
     if s not in {k for k, _ in SECTIONS}:
         s = "team"
-    tabs = '<div class="tabbar">' + "".join(
+    tabs = ('<div class="tabbar">' + "".join(
         f'<a class="{"on" if k == s else ""}" href="/settings?s={k}">{t}</a>'
-        for k, t in SECTIONS) + "</div>"
+        for k, t in SECTIONS) + "</div>").replace(
+        '/settings?s=connectors', '/connections')
 
     if s == "team":
         body = (f'<div class="pagehint">Nothing that touches money or a '
@@ -6691,6 +6955,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+        elif self.path == "/settings?s=connectors" \
+                or self.path.startswith("/settings?s=connectors&"):
+            return self._redirect("/connections")
         elif self.path.split("?")[0] == "/settings":
             sess = self._session()
             if not sess:
@@ -6728,6 +6995,20 @@ class Handler(BaseHTTPRequestHandler):
                                      qs.get("tab", ["overview"])[0],
                                      int(qs.get("item", ["0"])[0] or 0)),
                 "agents", sess["tenant_id"], sess.get("email", "")))
+        elif self.path == "/connections":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            self._html(_shell(connections_hub(sess["tenant_id"]),
+                              "settings", sess["tenant_id"],
+                              sess.get("email", "")))
+        elif self.path == "/skills":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            self._html(_shell(skills_hub(sess["tenant_id"]),
+                              "memory", sess["tenant_id"],
+                              sess.get("email", "")))
         elif self.path.split("?")[0] == "/agents":
             sess = self._session()
             if not sess:
@@ -6980,6 +7261,36 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(303)
             self.send_header("Location", "/")
             self.end_headers(); return
+        if self.path == "/api/skill_act":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            tid = sess["tenant_id"]
+            me = (sess.get("email") or "you").split("@")[0]
+            try:
+                i = int((form.get("i") or ["-1"])[0])
+            except ValueError:
+                i = -1
+            act = (form.get("act") or [""])[0]
+            lst = seed_skills(tid)
+            if 0 <= i < len(lst):
+                p = lst[i]
+                if act == "del":
+                    lst.pop(i)
+                    log_decision(tid, me, "Removed the skill <b>"
+                                 + esc(p["title"]) + "</b>", "/skills")
+                elif act in ("live", "draft"):
+                    p["mode"] = act
+                    log_decision(tid, me,
+                                 ("Set the skill <b>" + esc(p["title"])
+                                  + "</b> live") if act == "live" else
+                                 ("Moved the skill <b>" + esc(p["title"])
+                                  + "</b> back to draft"), "/skills")
+            self.send_response(303)
+            self.send_header("Location", "/skills")
+            self.end_headers()
+            return
         if self.path == "/api/conn_act":
             sess = self._session()
             if not sess:
@@ -6996,22 +7307,22 @@ class Handler(BaseHTTPRequestHandler):
                     st[name] = "paused"
                     log_decision(tid, me, "Paused the <b>" + esc(name)
                                  + "</b> connection",
-                                 "/settings?s=connectors")
+                                 "/connections")
                 elif act == "resume" and st.get(name) == "paused":
                     st[name] = "on"
                     log_decision(tid, me, "Resumed the <b>" + esc(name)
                                  + "</b> connection",
-                                 "/settings?s=connectors")
+                                 "/connections")
                 elif act == "disconnect" and st.get(name) in ("on", "paused"):
                     st[name] = "off"
                     log_decision(tid, me, "Disconnected <b>" + esc(name)
-                                 + "</b>", "/settings?s=connectors")
+                                 + "</b>", "/connections")
                 elif act == "connect" and st.get(name, "off") == "off":
                     st[name] = "on"
                     log_decision(tid, me, "Connected <b>" + esc(name)
-                                 + "</b>", "/settings?s=connectors")
+                                 + "</b>", "/connections")
             self.send_response(303)
-            self.send_header("Location", "/settings?s=connectors")
+            self.send_header("Location", "/connections")
             self.end_headers(); return
         if self.path in ("/api/prop_act", "/api/cashflow_act"):
             sess = self._session()
@@ -8478,6 +8789,40 @@ color:var(--mut)}
 .acct-set{display:block;padding:8px 12px;border-radius:8px;
   color:var(--ink);font-size:13.5px}
 .acct-set:hover{background:#F5F5F8}
+.hubtabs{display:flex;gap:24px;border-bottom:1px solid var(--hair);
+  margin:0 0 24px}
+.hubtabs a{padding:0 0 10px;font-size:13.5px;font-weight:500;
+  color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
+.hubtabs a.on{color:var(--ink);border-color:var(--ink)}
+.hubhead{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:24px;margin-bottom:12px}
+.hubsearch{width:280px;border:1px solid var(--hair);border-radius:10px;
+  padding:9px 14px;font:inherit;font-size:13.5px;outline:none;
+  background:#fff;flex:none}
+.hubsearch:focus{border-color:#98A5F0}
+.hubtoolrow{display:flex;align-items:center;justify-content:space-between;
+  margin:0 0 12px}
+.hubpills{display:flex;gap:8px}
+.hubpill{border:1px solid var(--hair);background:#fff;border-radius:999px;
+  padding:6px 14px;font:inherit;font-size:12.5px;font-weight:500;
+  color:var(--ink);cursor:pointer;transition:background .12s}
+.hubpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.hubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+  margin:0 0 8px}
+.hubgrid.two{grid-template-columns:1fr 1fr}
+@media (max-width:900px){.hubgrid,.hubgrid.two{grid-template-columns:1fr}}
+.hubcard{border:1px solid var(--hair);background:#fff;border-radius:14px;
+  padding:14px 16px;display:flex;gap:12px;align-items:flex-start;
+  position:relative}
+.hubcard .rtools{position:absolute;right:10px;bottom:8px;background:#fff;
+  padding:2px 4px;border-radius:8px}
+.hubcard .hc-t{flex:1;min-width:0}
+.hubcard .hc-t b{display:block;font-size:14px;color:var(--ink)}
+.hubcard .hc-t span{font-size:12.5px;color:var(--mut);line-height:1.45;
+  display:block;margin-top:2px}
+.hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  flex:none}
+.hubsec h2.sec{margin-top:20px}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
