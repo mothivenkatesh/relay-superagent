@@ -823,7 +823,9 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .qyes{color:#177245}
 .qacts{display:flex;gap:8px;align-items:center;flex:none}
 .qmore{border:0;background:none;color:var(--mut);cursor:pointer;
-  font-size:15px;padding:4px 8px;border-radius:8px}
+  width:28px;height:28px;border-radius:8px;display:inline-flex;
+  align-items:center;justify-content:center;transition:transform .15s}
+.qmore svg{width:16px;height:16px}
 .qmore:hover{background:#F0F0F5}
 .qmore.open{transform:rotate(180deg)}
 .qdetail{padding:0 0 16px 42px}
@@ -2251,6 +2253,18 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
+.hubcard.sched{flex-direction:column;align-items:stretch;gap:8px}
+.schedhead{display:flex;align-items:center;justify-content:space-between;
+  gap:12px}
+.schedhead b{font-size:14px;color:var(--ink)}
+.schedbody{font-size:12.5px;line-height:1.5}
+.schedfoot{display:flex;align-items:center;gap:12px;margin-top:auto;
+  min-height:28px}
+.readit{font-size:12.5px;font-weight:500;color:var(--accent);
+  margin-left:auto}
+.readit:hover{text-decoration:underline}
+.hubcard.sched .rtools{position:static;background:none;padding:0}
+.notebar.wide .notein{max-width:none}
 .cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
   align-items:center;justify-content:center}
 .cico svg{width:18px;height:18px}
@@ -5939,14 +5953,16 @@ def prop_row(tid: str, slug: str) -> str:
         f'<div class="qacts">'
         f'<form method="post" action="/api/prop_act" style="display:contents">'
         f'<input type="hidden" name="slug" value="{slug}">'
-        f'<input type="hidden" name="action" value="approve">'
-        f'<button class="btn primary sm">{d["yes"]}</button></form>'
-        f'<form method="post" action="/api/prop_act" style="display:contents">'
-        f'<input type="hidden" name="slug" value="{slug}">'
         f'<input type="hidden" name="action" value="decline">'
         f'<button class="btn ghost sm">{d["no"]}</button></form>'
-        f'<button class="qmore" onclick="qToggle(this)" '
-        f'aria-label="Details">&#8964;</button>'
+        f'<form method="post" action="/api/prop_act" style="display:contents">'
+        f'<input type="hidden" name="slug" value="{slug}">'
+        f'<input type="hidden" name="action" value="approve">'
+        f'<button class="btn primary sm">{d["yes"]}</button></form>'
+        f'<button class="qmore" onclick="qToggle(this)" aria-label="Details">'
+        f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        f'<path d="m6 9 6 6 6-6"/></svg></button>'
         f'</div></div>'
         f'<div class="qdetail" hidden>'
         f'<div class="wp-kicker">{d["kicker"]} &middot; {role}</div>'
@@ -6216,7 +6232,7 @@ def scheduled_content(tid: str) -> str:
                   f'aria-label="{"Pause" if r["on"] else "Resume"}">'
                   f'<i></i></button></form>')
         out = r.get("out")
-        readit = (f'<a class="st wait" href="/briefs/{out}">read it '
+        readit = (f'<a class="readit" href="/briefs/{out}">read it '
                   f'&rarr;</a>' if out else "")
         tools = (f'<span class="rtools">'
                  f'<button class="rtool" '
@@ -6227,14 +6243,15 @@ def scheduled_content(tid: str) -> str:
                  f'Remove</button></form></span>')
         cards += (f'<div class="hubcard sched" '
                   f'data-hub="{"running" if r["on"] else "paused"}">'
-                  f'{toggle}'
-                  f'<span class="tdesc hc-t" data-name="{esc(r["name"])}">'
-                  f'<b>{esc(r["name"])}</b> '
-                  f'<span class="mut">{r["when"]}. {r["what"]}</span></span>'
-                  f'<span class="hc-act">{stat}{readit}{tools}</span></div>')
+                  f'<div class="schedhead">'
+                  f'<span class="tdesc" data-name="{esc(r["name"])}">'
+                  f'<b>{esc(r["name"])}</b></span>{toggle}</div>'
+                  f'<div class="schedbody mut">{r["when"]}. {r["what"]}'
+                  f'</div>'
+                  f'<div class="schedfoot">{stat}{tools}{readit}</div>'
+                  f'</div>')
     tpls = "".join(
         f'<div class="hubcard" data-hub="template">'
-        f'<span class="idea-ico">{ICONS["flow"]}</span>'
         f'<span class="hc-t"><b>{name}</b><span>{esc(t)}</span></span>'
         f'<span class="hc-act"><form method="post" action="/api/routine" '
         f'style="display:contents">'
@@ -6275,7 +6292,7 @@ function routineCancel(el){
               f'</h2><div class="hubgrid two">{cards}</div></div>'
             + f'<div class="hubsec"><h2 class="sec">Start one</h2>'
               f'<div class="hubgrid">{tpls}</div></div>'
-            + f'<form class="notebar" method="post" action="/api/routine">'
+            + f'<form class="notebar wide" method="post" action="/api/routine">'
               f'<input class="jfind notein" name="text" maxlength="200" '
               f'placeholder="Or say it your way: every Friday evening, '
               f'tell me what we won this week">'
@@ -8930,6 +8947,18 @@ color:var(--mut)}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
+.hubcard.sched{flex-direction:column;align-items:stretch;gap:8px}
+.schedhead{display:flex;align-items:center;justify-content:space-between;
+  gap:12px}
+.schedhead b{font-size:14px;color:var(--ink)}
+.schedbody{font-size:12.5px;line-height:1.5}
+.schedfoot{display:flex;align-items:center;gap:12px;margin-top:auto;
+  min-height:28px}
+.readit{font-size:12.5px;font-weight:500;color:var(--accent);
+  margin-left:auto}
+.readit:hover{text-decoration:underline}
+.hubcard.sched .rtools{position:static;background:none;padding:0}
+.notebar.wide .notein{max-width:none}
 .cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
   align-items:center;justify-content:center}
 .cico svg{width:18px;height:18px}
