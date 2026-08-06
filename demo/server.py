@@ -4989,37 +4989,31 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
         since, n = _working_since(tid)
         if a["slug"] in ("cart_rescue", "payment_rescue"):
             pstate = prop_state(tid, a["slug"])["state"]
-            horizon = ("Working &middot; tonight&rsquo;s list waits on "
-                       "your yes" if pstate == "waiting" else
-                       "Working &middot; calling now, outcomes land in "
-                       "your chats" if pstate == "approved" else
-                       "Working &middot; standing by, next list this evening")
+            horizon = ("Tonight&rsquo;s list waits on your yes"
+                       if pstate == "waiting" else
+                       "Calling now" if pstate == "approved" else
+                       "Next list this evening")
             horizon = f'<div class="hzn on">{horizon}</div>'
             switch = '<span class="st ok">On</span>'
             inner = (f'<div class="aname" style="margin-bottom:8px;'
                      f'flex-wrap:wrap;row-gap:8px">'
                      f'{avatar(a["slug"], 34, True)}'
                      f'<b style="font-size:15px">{a["role"]}</b>'
-                     f'<span class="st mut" style="flex:none">{a["name"]}</span>'
                      f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
                      f'<div style="margin:4px 0 8px">{a["desc"]}</div>'
                      f'{goal_mini(tid, a["slug"])}'
-                     f'<div class="repl">Replaces {a["replaces"]}.</div>'
                      f'{horizon}')
             return (f'<a class="arow2" style="display:block;padding:16px" '
                     f'href="/agents/{a["slug"]}">{inner}</a>')
-        horizon = (f'Working since {since} &middot; {n} disputes checked '
-                   f'&middot; never sleeps' if since
-                   else "Switched on &middot; never sleeps")
+        horizon = (f'{n} disputes checked since {since}' if since
+                   else "Switched on")
         inner = (f'<div class="aname" style="margin-bottom:8px;flex-wrap:wrap;'
                  f'row-gap:8px">'
                  f'{avatar(a["slug"], 34, True)}'
                  f'<b style="font-size:15px">{a["role"]}</b>'
-                 f'<span class="st mut" style="flex:none">{a["name"]}</span>'
                  f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
                  f'<div style="margin:2px 0 8px">{a["desc"]}</div>'
                  f'{goal_mini(tid, a["slug"])}'
-                 f'<div class="repl">Replaces {a["replaces"]}.</div>'
                  f'<div class="hzn on">{horizon}</div>')
         return (f'<a class="arow2" style="display:block;padding:16px" '
                 f'href="/agents/{a["slug"]}">{inner}</a>')
@@ -5079,7 +5073,6 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
                   + (f'<span class="st need2">{n_need_fam} pending</span>'
                      if n_need_fam else '')
                   + '</h2>'
-                  f'<div class="pagehint">{line}</div>'
                   f'<div class="atable" style="grid-template-columns:1fr">'
                   + "".join(_relay_agent_card(a, tid) for a in mine) + '</div>')
     if not desks:
@@ -5102,20 +5095,16 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         f'<span>Agents on</span><i>{n_live} working &middot; '
         f'{n_on - n_live} watching</i></a>'
         f'<a class="stile need" href="/approvals"><b>{n_yes}</b>'
-        f'<span>Pending approval</span><i>replies, holds, payouts</i></a>'
+        f'<span>Pending approval</span></a>'
         f'<a class="stile" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
         f'<span>Kept for you</span><i>{n_wins2} disputes won</i></a>'
         f'<a class="stile" href="/impact"><b>{len(truns)}</b>'
-        f'<span>Jobs done</span><i>every one in History</i></a>'
+        f'<span>Jobs done</span></a>'
         f'</div>')
     return (f'<h1 class="page">Agents</h1>'
-            f'<div class="pagehint">The people you would hire, as '
-            f'agents. Nothing goes out without your yes.</div>'
             f'{tiles}'
             f'<div class="onemem">{ICONS["book"]}<span><b>One memory, '
-            f'fifteen hands.</b> Every agent reads and writes the same '
-            f'order record, so each one you switch on makes the rest '
-            f'sharper.</span>'
+            f'fifteen hands.</b></span>'
             f'<a href="/memory?t=teach">see what they teach each other '
             f'&rarr;</a></div>'
             f'<div class="atoolbar">'
