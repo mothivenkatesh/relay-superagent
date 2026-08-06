@@ -8508,6 +8508,11 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .hero{display:flex;flex-direction:column;
   min-height:calc(100vh - 250px)}
 .hero-mid{margin:10vh 0 24px}
+.hero-mid h1{display:flex;align-items:center;justify-content:center;gap:16px}
+.hero-face{width:44px;height:44px;border-radius:50%;overflow:hidden;flex:none;
+  background:var(--accent);color:#fff;display:inline-flex;align-items:center;
+  justify-content:center;font-size:19px;font-weight:650}
+.hero-face img{width:100%;height:100%;object-fit:cover;display:block}
 .tpl{max-width:740px;margin:auto auto 4px;width:100%;text-align:left}
 .tpl-h{display:flex;align-items:center;justify-content:space-between;
   font-size:13px;color:var(--mut);margin:0 2px 10px}
@@ -9689,7 +9694,8 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         thread = "".join(f'<div class="{m["who"]}">{m["html"]}</div>' for m in c["msgs"])
         title, cid = esc(c["title"]), c["id"]
     greet, brief, chips = _briefing(tid, persona)
-    greet = f"{greet}, {esc(user_name(email))}"
+    greet = (f'<span class="hero-face">{user_avatar(email)}</span>'
+             f'{greet}, {esc(user_name(email))}')
     role_html = ""
     name = (CONVS and "") or ""
     chips_html = "".join(
