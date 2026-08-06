@@ -6317,11 +6317,11 @@ def memory_content(tid: str, tab: str = "voice") -> str:
     if tab not in {k for k, _, _ in TABS}:
         tab = "voice"
 
-    tiles = ('<div class="stattiles">'
+    tiles = ('<div class="hubtoolrow"><div class="hubpills">'
              + "".join(
-        f'<a class="stile{" on" if tab == k else ""}" href="/memory?t={k}">'
-        f'<b>{n}</b><span>{lbl}</span></a>'
-        for k, lbl, n in TABS) + '</div>')
+        f'<a class="hubpill{" on" if tab == k else ""}" '
+        f'href="/memory?t={k}">{lbl} &middot; {n}</a>'
+        for k, lbl, n in TABS) + '</div></div>')
 
     if tab == "voice":
         body = ('<div class="pagehint">Learned from the wording you '
@@ -6496,7 +6496,7 @@ def hub_head(title: str, sub: str, placeholder: str,
            if (pills or right) else ""))
 
 
-def connections_hub(tid: str) -> str:
+def connections_hub(tid: str, embed: bool = False) -> str:
     st = conn_state(tid)
 
     def card(n, d, state):
@@ -6536,6 +6536,30 @@ def connections_hub(tid: str) -> str:
     connected = [(n, d) for n, d in pairs if st.get(n) in ("on", "paused")]
     avail = [(n, d) for n, d in pairs
              if st.get(n) not in ("on", "paused")]
+    sections = (
+        f'<div class="hubsec"><h2 class="sec">Connected '
+        f'({len(connected)})</h2><div class="hubgrid">'
+        + "".join(card(n, d, st.get(n, "off")) for n, d in connected)
+        + '</div></div>'
+        + f'<div class="hubsec"><h2 class="sec">Available '
+          f'({len(avail)})</h2><div class="hubgrid">'
+        + "".join(card(n, d, "off") for n, d in avail)
+        + '</div></div>')
+    if embed:
+        return (
+            '<div class="pagehint">Relay holds every key itself: nothing '
+            'to set up, nothing to lose. Pause stops the reading; '
+            'disconnect removes it.</div>'
+            '<div class="hubtoolrow"><div class="hubpills">'
+            '<button class="hubpill on" data-f="all" '
+            'onclick="hubPill(this)">All</button>'
+            '<button class="hubpill" data-f="connected" '
+            'onclick="hubPill(this)">Connected</button>'
+            '<button class="hubpill" data-f="available" '
+            'onclick="hubPill(this)">Available</button></div>'
+            '<input class="hubsearch" placeholder="Search connections" '
+            'oninput="hubFilter(this)"></div>'
+            + sections)
     return (
         hub_bar("connections")
         + hub_head("Connections",
@@ -6545,14 +6569,7 @@ def connections_hub(tid: str) -> str:
                    "Search connections",
                    [("all", "All"), ("connected", "Connected"),
                     ("available", "Available")])
-        + f'<div class="hubsec"><h2 class="sec">Connected '
-          f'({len(connected)})</h2><div class="hubgrid">'
-        + "".join(card(n, d, st.get(n, "off")) for n, d in connected)
-        + '</div></div>'
-        + f'<div class="hubsec"><h2 class="sec">Available '
-          f'({len(avail)})</h2><div class="hubgrid">'
-        + "".join(card(n, d, "off") for n, d in avail)
-        + '</div></div>')
+        + sections)
 
 
 def seed_skills(tid: str) -> list:
@@ -6658,7 +6675,6 @@ def settings_content(tid: str, s: str = "team") -> str:
     tabs = ('<div class="tabbar">' + "".join(
         f'<a class="{"on" if k == s else ""}" href="/settings?s={k}">{t}</a>'
         for k, t in SECTIONS) + "</div>").replace(
-        '/settings?s=connectors', '/connections').replace(
         '/settings?s=knowledge', '/memory')
 
     if s == "team":
@@ -6703,55 +6719,7 @@ def settings_content(tid: str, s: str = "team") -> str:
                  f'hand over. You don&rsquo;t manage them: they come '
                  f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
-        st = conn_state(tid)
-        rows = ""
-        for n, d in CONN_DEFS + CONN_MORE:
-            state = st.get(n, "off")
-            if state == "off":
-                continue
-            paused = state == "paused"
-            rows += (
-                '<div class="trow slim" style="display:flex">'
-                '<span class="ico">' + ICONS["flow"] + '</span>'
-                '<span class="tdesc"><b>' + n + '</b> '
-                '<span class="mut">' + d + '</span></span>'
-                + ('<span class="st mut">paused</span>' if paused
-                   else '<span class="st ok">connected</span>')
-                + '<span class="rtools">'
-                '<form method="post" action="/api/conn_act" '
-                'style="display:contents">'
-                '<input type="hidden" name="name" value="' + n + '">'
-                '<input type="hidden" name="act" value="'
-                + ("resume" if paused else "pause") + '">'
-                '<button class="rtool">'
-                + ("Resume" if paused else "Pause") + '</button></form>'
-                '<form method="post" action="/api/conn_act" '
-                'style="display:contents">'
-                '<input type="hidden" name="name" value="' + n + '">'
-                '<input type="hidden" name="act" value="disconnect">'
-                '<button class="rtool danger">Disconnect</button></form>'
-                '</span></div>')
-        more = ""
-        for n, d in CONN_MORE + [(n2, d2) for n2, d2 in CONN_DEFS
-                                 if st.get(n2) == "off"]:
-            if st.get(n) in ("on", "paused"):
-                continue
-            more += (
-                '<div class="trow slim" style="display:flex">'
-                '<span class="ico">' + ICONS["flow"] + '</span>'
-                '<span class="tdesc"><b>' + n + '</b> '
-                '<span class="mut">' + d + '</span></span>'
-                '<form method="post" action="/api/conn_act" '
-                'style="display:contents">'
-                '<input type="hidden" name="name" value="' + n + '">'
-                '<input type="hidden" name="act" value="connect">'
-                '<button class="btn ghost sm">Connect</button></form>'
-                '</div>')
-        body = ('<div class="pagehint">Relay holds every key itself: '
-                'nothing to set up, nothing to lose. Pause stops reading; '
-                'disconnect removes it.</div>'
-                + rows
-                + '<h2 class="sec">More you can plug in</h2>' + more)
+        body = connections_hub(tid, embed=True)
     elif s == "decisions":
         body = decisions_content(tid)
     elif s == "data":
@@ -6946,9 +6914,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
-        elif self.path == "/settings?s=connectors" \
-                or self.path.startswith("/settings?s=connectors&"):
-            return self._redirect("/connections")
         elif self.path.split("?")[0] == "/settings":
             sess = self._session()
             if not sess:
@@ -7313,7 +7278,10 @@ class Handler(BaseHTTPRequestHandler):
                     log_decision(tid, me, "Connected <b>" + esc(name)
                                  + "</b>", "/connections")
             self.send_response(303)
-            self.send_header("Location", "/connections")
+            ref = self.headers.get("Referer") or ""
+            self.send_header("Location",
+                             "/settings?s=connectors"
+                             if "settings" in ref else "/connections")
             self.end_headers(); return
         if self.path in ("/api/prop_act", "/api/cashflow_act"):
             sess = self._session()
