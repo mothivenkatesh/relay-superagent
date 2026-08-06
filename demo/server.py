@@ -6005,18 +6005,20 @@ def mode_ui(tid: str) -> str:
 ROUTINES: dict[str, list[dict]] = {}
 
 _DEFAULT_ROUTINES = [
-    dict(name="Morning brief", brief=True, when="Every morning, 8:00",
+    dict(name="Morning brief", brief=True, out="morning",
+         when="Every morning, 8:00",
          what="What came in overnight, what your team already handled, and "
               "the few things waiting on your yes.",
          last="ran this morning", on=True),
-    dict(name="Weekly wins", when="Every Friday evening",
+    dict(name="Weekly wins", out="wins", when="Every Friday evening",
          what="What your team won this week, in rupees, and what it learned.",
          last="ran last Friday", on=True),
-    dict(name="Proof check", when="Every Monday",
+    dict(name="Proof check", out="proof", when="Every Monday",
          what="Goes over the proof on file and flags anything gone stale "
               ": a dead link, an old policy page.",
          last="ran Monday", on=True),
-    dict(name="Month-end tie-out", when="First of the month",
+    dict(name="Month-end tie-out", out="monthend",
+         when="First of the month",
          what="Ties the month's numbers out against the bank and writes you "
               "a one-page summary.",
          last="", on=False),
@@ -6118,11 +6120,12 @@ def scheduled_content(tid: str) -> str:
                  f'<b>{esc(r["name"])}</b> '
                  f'<span class="mut">{r["when"]}. {r["what"]}</span></span>'
                  f'{stat}{tools}')
-        if r.get("brief"):
-            # The run leaves a note; the row opens it. This is the promise
-            # from the intro cards, kept.
+        out = r.get("out")
+        if out:
+            # Every run leaves a note; the row opens the latest one. The
+            # CoWorker Reports idea: outputs on a shelf, stamped fresh.
             rows += (f'<div class="trow slim" style="display:flex">{inner}'
-                     f'<a class="st wait" href="/briefs/morning">read it '
+                     f'<a class="st wait" href="/briefs/{out}">read it '
                      f'&rarr;</a></div>')
         else:
             rows += f'<div class="trow slim" style="display:flex">{inner}</div>'
@@ -6685,11 +6688,13 @@ class Handler(BaseHTTPRequestHandler):
             f = _pq(_up(self.path).query).get("f", ["all"])[0]
             self._html(_shell(agents_content(sess["tenant_id"], f), "agents",
                               sess["tenant_id"], sess.get("email", "")))
-        elif self.path == "/briefs/morning":
+        elif self.path.startswith("/briefs/"):
             sess = self._session()
             if not sess:
                 return self._redirect("/login")
-            self._html(_shell(brief_note_content(sess["tenant_id"]), "scheduled",
+            slug = self.path.rsplit("/", 1)[-1]
+            self._html(_shell(_brief_page(sess["tenant_id"], slug),
+                              "scheduled",
                               sess["tenant_id"], sess.get("email", "")))
         elif self.path.split("?")[0] == "/procedures/new":
             sess = self._session()
@@ -7177,7 +7182,9 @@ class Handler(BaseHTTPRequestHandler):
                 msg = _re.sub("@" + _re.escape(t), t, msg, flags=_re.I)
             build = (payload.get("mode") == "build"
                      or bool(_BUILD_PAT.search(msg)))
+            state = None if build else _state_answer(sess["tenant_id"], msg)
             res = (_build_res(sess["tenant_id"], msg) if build
+                   else state if state is not None
                    else ask(msg))
             if called:
                 res["reply"] = (f'<b>{esc(called)}</b> here. '
@@ -8295,6 +8302,7 @@ def _polish_reply(question: str, res: dict) -> dict:
     (facts only), and the meta line says exactly which path ran."""
     from relay_superagent.secrets import get_secret
     res.pop("_routed_model", None)
+    tool0 = res.get("_tool")
     if get_secret("anthropic") and res.get("reply"):
         global _LIVE_LLM
         try:
@@ -8310,6 +8318,11 @@ def _polish_reply(question: str, res: dict) -> dict:
     res.pop("_tool", None)
     # One plain line of provenance: no model, no routing, no jargon.
     # just the promise that every number came from the merchant's own record.
+    go = res.pop("_go", None) or _GO_LINKS.get(tool0)
+    if go:
+        res["reply"] = (res.get("reply", "")
+                        + f'<a class="golink" href="{go[0]}">{go[1]} '
+                          f'&rarr;</a>')
     res["reply"] = (res.get("reply", "")
                     + '<span class="rmeta">Every number here comes straight '
                       'from your own records</span>')
@@ -8616,6 +8629,9 @@ background:none}
 .bhead b{font-size:15px;color:var(--ink)}
 .bhead .st{margin-left:auto}
 .bacts{display:flex;gap:8px;margin-top:12px}
+.golink{display:inline-block;margin-top:12px;color:var(--accent);
+  font-weight:500;font-size:13.5px}
+.golink:hover{text-decoration:underline}
 .qz{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px;max-width:640px}
 .qzhead{display:flex;gap:10px;align-items:center;margin-bottom:12px}
@@ -9111,17 +9127,26 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
     # Owner: no summary sentence. The money number and the "needs your yes"
     # line above it already say the whole state of the business.
+    # The chips ask what the record makes urgent TODAY, so the composer
+    # reads like a colleague who knows the morning, not a menu.
     chips = []
     if waiting:
         chips.append("What needs my yes?")
-        chips.append(f"Say yes to {esc(_account_label(waiting[0]))}")
+    custom = next((a for a in RELAY_AGENTS if a["desk"] == "custom"), None)
+    if custom:
+        chips.append(f"How is {custom['name']} doing?")
+    if prop_state(tid, "payouts_desk")["state"] == "waiting":
+        chips.append("Should I pay tomorrow's 14 payments?")
+    if prop_state(tid, "stock_watch")["state"] == "waiting":
+        chips.append("How long will Amla Juice last?")
+    if prop_state(tid, "cashflow_forecast")["state"] == "waiting":
+        chips.append("Is Thursday still tight?")
     if esc_n:
         chips.append("What needs a person?")
     if wins:
         chips.append("What did we win?")
     if not chips:
         chips = ["What can you do?", "Show me the history"]
-    chips.append("Which proof wins?")
     return (f"Good {tod}", "", chips[:4])
 
 
@@ -9208,6 +9233,140 @@ def morning_brief_html(tid: str) -> str:
             f'8:00</span></div>{rows}'
             f'<span class="bmore">From your Scheduled routine &middot; '
             f'read it &rarr;</span></a>')
+
+
+# ------------------------------------------------- state answers + go links
+# CoWorker patterns, Relay-shaped. The chat's suggestion chips ask what the
+# record makes urgent TODAY, and each has a real answer: the number first,
+# the still-open proposal as a card, and one link into the right surface.
+_GO_LINKS = {
+    "queue": ("/approvals", "Open Approvals"),
+    "escalations": ("/approvals", "Open Approvals"),
+    "metrics": ("/impact", "Open History"),
+    "runs": ("/impact", "Open History"),
+    "evidence": ("/memory?t=proof", "Open Knowledge"),
+    "shadow": ("/shadow", "Open the test scan"),
+}
+
+
+def _state_answer(tid: str, msg: str):
+    """Answers for the day's live questions. Returns an ask()-shaped dict,
+    or None so the normal router runs."""
+    t = msg.lower()
+
+    def waiting(slug):
+        return prop_state(tid, slug)["state"] == "waiting"
+
+    if "amla" in t or ("stock" in t and ("last" in t or "left" in t)):
+        w = waiting("stock_watch")
+        reply = ("<b>6 days</b> at this pace, and the sale week is what "
+                 "changed the pace. Stock Watch has the six-week reorder "
+                 "drafted"
+                 + (", waiting on your yes below." if w
+                    else "; you have already settled it."))
+        return {"reply": reply,
+                "cards": prop_card(tid, "stock_watch") if w else "",
+                "steps": [], "proposal": None, "product": "", "case": "",
+                "_go": ("/agents/stock_watch", "Open Inventory Controller")}
+
+    if ("14" in t and "pay" in t) or "payout" in t or "vendor" in t and "pay" in t:
+        w = waiting("payouts_desk")
+        reply = ("Tomorrow&rsquo;s <b>14 payments</b> are lined up: "
+                 "vendors, the courier and two refunds, each in the way "
+                 "they want to be paid."
+                 + (" One yes below sends them all on time."
+                    if w else " You have already settled them."))
+        return {"reply": reply,
+                "cards": prop_card(tid, "payouts_desk") if w else "",
+                "steps": [], "proposal": None, "product": "", "case": "",
+                "_go": ("/agents/payouts_desk", "Open Payouts Clerk")}
+
+    if "thursday" in t or ("cash" in t and ("tight" in t or "crunch" in t)):
+        w = waiting("cashflow_forecast")
+        reply = ("Still tight: vendor day and the GST debit land together, "
+                 "and Thursday dips to <b>&minus;&#8377;12,400</b> if "
+                 "nothing moves. Moving the courier payout by two days "
+                 "keeps Thursday at <b>+&#8377;35,800</b>."
+                 + (" The move waits on your yes below."
+                    if w else " You have already settled the move."))
+        return {"reply": reply,
+                "cards": prop_card(tid, "cashflow_forecast") if w else "",
+                "steps": [], "proposal": None, "product": "", "case": "",
+                "_go": ("/agents/cashflow_forecast", "Open Cashflow Planner")}
+
+    if "how is" in t or "how's" in t:
+        for a in RELAY_AGENTS:
+            if a["desk"] == "custom" and a["name"].lower() in t:
+                reply = (f'<b>{a["name"]}</b> has been watching since you '
+                         f'added it. {a["desc"]} Its first find will land '
+                         f'in Approvals; nothing is sent or held without '
+                         f'your yes.')
+                return {"reply": reply, "cards": "", "steps": [],
+                        "proposal": None, "product": "", "case": "",
+                        "_go": (f'/agents/{a["slug"]}',
+                                f'Open {a["name"]}')}
+    return None
+
+
+# ------------------------------------------------- scheduled: the outputs
+# The CoWorker Reports idea, Relay-shaped: every routine leaves a named note
+# you can open, stamped with when it last ran. The morning brief already
+# worked this way; now every default routine keeps the same promise.
+def _brief_page(tid: str, slug: str) -> str:
+    from datetime import datetime as _dt
+    if slug == "wins":
+        kept, n_wins, window = recovered(tid)
+        lines = [
+            ("chart", f"<b>&#8377;{inr(kept)}</b> kept {window}, across "
+                      f"<b>{n_wins}</b> disputes your team won."),
+            ("bolt", "Cart Rescue brought <b>7 carts</b> back this week; "
+                     "Payment Rescue recovered <b>7 of 12</b> failed "
+                     "payments from Tuesday&rsquo;s UPI dip."),
+            ("send", "COD Guard confirmed <b>31 of 38</b> orders before "
+                     "dispatch; 3 held after two unanswered calls."),
+            ("book", "What it learned: pincode 4000xx answers after 6 PM. "
+                     "COD Guard wrote it down; Cart Rescue already uses "
+                     "it."),
+        ]
+        head, chip, when = ("Weekly wins", "ran last Friday",
+                            "Every Friday evening")
+    elif slug == "proof":
+        lines = [
+            ("shield", "<b>14 pieces</b> of proof checked: delivery "
+                       "slips, WhatsApp threads, refill logs, policy "
+                       "pages."),
+            ("alert", "One flag: the returns policy page changed on the "
+                      "9th. Replies now cite the page as it read on the "
+                      "order date."),
+            ("book", "The pair that wins never-arrived claims is intact: "
+                     "signed delivery proof plus the buyer&rsquo;s own "
+                     "WhatsApp message."),
+        ]
+        head, chip, when = ("Proof check", "ran Monday", "Every Monday")
+    elif slug == "monthend":
+        lines = [
+            ("ledger", "<b>211 of 214</b> lines tied out on their own: "
+                       "store to gateway to bank."),
+            ("alert", "One payout short by <b>&#8377;4,310</b>, named, "
+                      "with the bank reference beside it."),
+            ("note", "The GST debit is set aside so Thursday&rsquo;s cash "
+                     "plan already sees it."),
+        ]
+        head, chip, when = ("Month-end tie-out", "CA ready",
+                            "First of the month")
+    else:
+        return brief_note_content(tid)
+    rows = "".join(
+        f'<div class="trow slim"><span class="ico">{ICONS[i]}</span>'
+        f'<span class="tdesc">{txt}</span></div>' for i, txt in lines)
+    return (f'<div class="dhead"><a class="back2" href="/scheduled">'
+            f'&lsaquo;</a><div><h1>{head}</h1>'
+            f'<div class="meta"><span class="st ok">{chip}</span>'
+            f'<span>&middot;</span><span>{when}</span></div></div></div>'
+            f'{rows}'
+            f'<div class="pagehint" style="margin-top:16px">Rewritten every '
+            f'run from your own record. Earlier notes stay in '
+            f'<a href="/journeys"><b>History</b></a>.</div>')
 
 
 def brief_note_content(tid: str) -> str:
