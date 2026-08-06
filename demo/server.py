@@ -6230,8 +6230,9 @@ def pricing_content(tid: str) -> str:
                 f'<div class="pr-who">{who}</div>'
                 f'<ul class="pr-list">{lis}</ul></div>')
     plans = (
-        plan("Free", "&#8377;0", "", "To try it out",
-             ["2 pre-built agents", "500 runs a month", "1 workspace",
+        plan("Free", "&#8377;0", "", "For the builder community",
+             ["2 pre-built agents", "10,000 runs a month",
+              "Bring your own model key", "1 workspace",
               "Community support"])
         + plan("Starter", "&#8377;4,999", "/month", "For your first store",
                ["5 pre-built agents", "1 agent built by you",
