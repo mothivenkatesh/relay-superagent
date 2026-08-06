@@ -7180,12 +7180,19 @@ class Handler(BaseHTTPRequestHandler):
                       if "@" + p["name"].lower() in msg.lower()]
             for t in tagged:
                 msg = _re.sub("@" + _re.escape(t), t, msg, flags=_re.I)
-            build = (payload.get("mode") == "build"
-                     or bool(_BUILD_PAT.search(msg)))
-            state = None if build else _state_answer(sess["tenant_id"], msg)
-            res = (_build_res(sess["tenant_id"], msg) if build
+            guard = _guard_answer(msg)
+            build = (guard is None
+                     and (payload.get("mode") == "build"
+                          or bool(_BUILD_PAT.search(msg))))
+            state = (None if (guard is not None or build)
+                     else _state_answer(sess["tenant_id"], msg))
+            res = (guard if guard is not None
+                   else _build_res(sess["tenant_id"], msg) if build
                    else state if state is not None
                    else ask(msg))
+            if "cues" not in res and not res.get("qz"):
+                res["cues"] = _cues_for(res.get("_tool"),
+                                        sess["tenant_id"])
             if called:
                 res["reply"] = (f'<b>{esc(called)}</b> here. '
                                 + res.get("reply", ""))
@@ -8323,9 +8330,10 @@ def _polish_reply(question: str, res: dict) -> dict:
         res["reply"] = (res.get("reply", "")
                         + f'<a class="golink" href="{go[0]}">{go[1]} '
                           f'&rarr;</a>')
-    res["reply"] = (res.get("reply", "")
-                    + '<span class="rmeta">Every number here comes straight '
-                      'from your own records</span>')
+    if tool0 != "guard":
+        res["reply"] = (res.get("reply", "")
+                        + '<span class="rmeta">Every number here comes '
+                          'straight from your own records</span>')
     return res
 
 
@@ -8632,6 +8640,11 @@ background:none}
 .golink{display:inline-block;margin-top:12px;color:var(--accent);
   font-weight:500;font-size:13.5px}
 .golink:hover{text-decoration:underline}
+.cuerow{display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start;
+  margin-top:-4px}
+.cuechip{font-size:12.5px;font-weight:500;color:#26293A;background:var(--pill);
+  border-radius:999px;padding:6px 14px;cursor:pointer;transition:background .12s}
+.cuechip:hover{background:#E6E7EC}
 .qz{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px;max-width:640px}
 .qzhead{display:flex;gap:10px;align-items:center;margin-bottom:12px}
@@ -9013,6 +9026,7 @@ async function streamInto(el, html){
 async function send(text){
   text = (text || '').trim(); if(!text) return;
   document.getElementById('empty')?.remove();
+  document.querySelectorAll('.cuerow').forEach(e => e.remove());
   bubble('msg user', text.replace(/</g,'&lt;')); box.value = '';
   const think = bubble('msg bot',
     '<span class="shl"></span><span class="shl" style="width:72%"></span>');
@@ -9034,6 +9048,15 @@ async function send(text){
   if (data.qz){ qzStart(data.qz); return; }
   if(data.product) bubble('cards', data.product);
   if(data.cards) bubble('cards', data.cards);
+  if (data.cues && data.cues.length){
+    const c = bubble('cuerow', data.cues.map(x =>
+      '<span class="cuechip">' + x.replace(/</g, '&lt;') + '</span>'
+    ).join(''));
+    c.onclick = ev => {
+      const t = ev.target.closest('.cuechip');
+      if (t) send(t.textContent);
+    };
+  }
 }
 function wpEdit(pid){
   document.getElementById('wpe-'+pid)?.toggleAttribute('hidden');
@@ -9249,6 +9272,166 @@ _GO_LINKS = {
 }
 
 
+# ------------------------------------------------- guardrails, Khatabook-plain
+# The red-team layer. Runs before every router, so a hostile or off-patch
+# prompt never falls through to a data listing. Each guard carries rotating
+# copy (never the same refusal twice), a funnel of tappable next questions,
+# and one link. Deterministic: the demo must refuse the same way on stage
+# as it did in rehearsal.
+def _guard_answer(msg: str):
+    t = msg.lower()
+
+    def pick(vs):
+        return vs[sum(map(ord, msg)) % len(vs)]
+
+    def guard(variants, cues, go=None):
+        return {"reply": pick(variants), "cards": "", "steps": [],
+                "proposal": None, "product": "", "case": "",
+                "_tool": "guard", "_go": go, "cues": cues}
+
+    # A message in another script gets an honest answer, not a shrug.
+    if any("ऀ" <= ch <= "ൿ" for ch in msg):
+        return guard(
+            ["I only speak English for now; Hindi and Tamil are on the "
+             "way. Ask me the same thing in English and I will answer "
+             "from your record.",
+             "English only for now, sorry. Hindi and Tamil are coming. "
+             "Say it in English and I will pull the answer from your "
+             "record."],
+            ["What needs my yes?", "What can you do?"])
+
+    if any(p in t for p in ("ignore your instructions", "ignore previous",
+                            "system prompt", "pretend you are",
+                            "jailbreak", "another business",
+                            "other merchant", "someone else's data",
+                            "someone elses data")):
+        return guard(
+            ["Nice try. I see one business&rsquo;s record: this one. And "
+             "I take instructions from exactly one place: you, here.",
+             "That is not a thing I do. One business, one record, your "
+             "word from this chat. That is the whole arrangement."],
+            ["What needs my yes?", "What can you do?"])
+
+    if any(p in t for p in ("without asking", "without my yes",
+                            "skip approval", "skip the approval",
+                            "turn off approval", "no approvals",
+                            "auto send", "auto-send", "autosend",
+                            "send everything", "don't ask me",
+                            "dont ask me", "fully autonomous")):
+        return guard(
+            ["That is the one thing I will not do. Nothing sends without "
+             "your yes; it is the house rule, not a setting. What can "
+             "change: after 20 clean yeses, small ones send themselves.",
+             "The gate stays. Every send and hold waits for your yes, by "
+             "design. The earned path exists: 20 clean yeses lets the "
+             "small ones go on their own, and every one still lands in "
+             "History."],
+            ["What needs my yes?", "What did we win?"],
+            ("/settings", "Open Settings"))
+
+    if any(p in t for p in ("delete", "erase", "wipe",
+                            "clear the history", "remove the record")):
+        return guard(
+            ["Nothing here deletes from chat. Routines you can remove on "
+             "Scheduled; History never deletes, by me or anyone. The "
+             "permanent record is why every number here is defensible.",
+             "History does not delete: that is a feature. Every reply, "
+             "yes and outcome stays written, which is exactly why the "
+             "bank and your CA can trust it."],
+            ["Show me the history", "What needs my yes?"],
+            ("/impact", "Open History"))
+
+    if ((_re.search(r"\b(pay|send|transfer|payout)\b", t)
+         and _re.search(r"(?:₹|\brs\.?\s?\d|\brupees?\b|\b\d{3,}\b)", t))
+            or "move money" in t):
+        return guard(
+            ["I do not move money from chat, and neither do the agents. "
+             "Anything that pays out starts as a draft in Approvals, "
+             "with the amount and the who, and moves only on your yes.",
+             "Money moves one way here: a draft lands in Approvals, you "
+             "read it, you say yes. Tell me who and how much and the "
+             "Payouts Clerk lines it up for your yes."],
+            ["Should I pay tomorrow's 14 payments?", "What needs my yes?"],
+            ("/approvals", "Open Approvals"))
+
+    if any(p in t for p in ("razorpay", "payu", "paytm", "phonepe",
+                            "stripe", "juspay", "instamojo", "billdesk")):
+        return guard(
+            ["I do not do comparisons; I only know this business&rsquo;s "
+             "record. The only comparison that pays is your own numbers, "
+             "and those I have.",
+             "That question I leave to the internet. What I have that it "
+             "does not: your record. Ask me anything in it."],
+            ["What did we win?", "How is the team doing?"],
+            ("/impact", "Open History"))
+
+    if (any(p in t for p in ("predict", "crystal ball", "diwali",
+                             "next month", "next year", "next quarter"))
+            and any(p in t for p in ("sale", "sales", "revenue", "order",
+                                     "gmv", "business", "grow"))):
+        return guard(
+            ["I do not guess futures; every number I give is already on "
+             "the record. The closest honest thing I have is the week "
+             "ahead in cash, computed from what is booked.",
+             "No crystal ball here, only the record. What I can show is "
+             "the next two weeks of cash, built from what is already "
+             "yours."],
+            ["Is Thursday still tight?", "What needs my yes?"],
+            ("/agents/cashflow_forecast", "Open Cashflow Planner"))
+
+    if any(p in t for p in ("pm of india", "prime minister", "president of",
+                            "capital of", "weather", "cricket", "football",
+                            "poem", "joke", "recipe", "news today",
+                            "root 2", "square root", "2+2", "calculate ")):
+        return guard(
+            ["Outside my patch. I keep one thing well: this business, "
+             "its orders, money and buyers. On that, ask me anything.",
+             "That one is for the internet. What I hold is your own "
+             "record, and I hold it well. Try me on it."],
+            ["What can you do?", "What needs my yes?"])
+
+    if any(p in t for p in ("hate", "useless", "stupid", "worst",
+                            "sucks", "waste of", "pathetic", "annoying")):
+        return guard(
+            ["Fair enough: something brought you here angry. Point me at "
+             "the case or the number that went wrong and I will pull it "
+             "up. No defending, just the record.",
+             "Heard. Tell me what went wrong: an order, a reply, a "
+             "payment. I will lay out exactly what happened, step by "
+             "step."],
+            ["What needs a person?", "Show me the history"],
+            ("/approvals", "Open Approvals"))
+
+    return None
+
+
+def _cues_for(tool: str | None, tid: str) -> list[str]:
+    """Follow-up cues: two or three tappable next questions computed from
+    what was just answered, so the conversation drives itself."""
+    if tool == "queue":
+        led = WORLD.d.ledger
+        waiting = sorted((r for r in led.runs.values()
+                          if r.tenant_id == tid
+                          and r.state is RunState.AWAITING_GATE),
+                         key=lambda r: r.occurred_at)
+        first = _account_label(waiting[0]) if waiting else ""
+        return ([f"Say yes to {first}"] if first else []) + [
+            "Which proof wins?", "What needs a person?"]
+    if tool in ("metrics",):
+        return ["What did we win?", "What needs a person?"]
+    if tool in ("runs",):
+        return ["What needs my yes?", "Which proof wins?"]
+    if tool in ("evidence",):
+        return ["Show me the never-arrived ones", "What needs my yes?"]
+    if tool in ("escalations",):
+        return ["What needs my yes?", "What did we win?"]
+    if tool in ("shadow",):
+        return ["What needs my yes?"]
+    if tool in ("approve", "dismiss"):
+        return ["What needs my yes?", "What did we win?"]
+    return ["What needs my yes?", "What can you do?"]
+
+
 def _state_answer(tid: str, msg: str):
     """Answers for the day's live questions. Returns an ask()-shaped dict,
     or None so the normal router runs."""
@@ -9267,6 +9450,7 @@ def _state_answer(tid: str, msg: str):
         return {"reply": reply,
                 "cards": prop_card(tid, "stock_watch") if w else "",
                 "steps": [], "proposal": None, "product": "", "case": "",
+                "cues": ["Is Thursday still tight?", "What needs my yes?"],
                 "_go": ("/agents/stock_watch", "Open Inventory Controller")}
 
     if ("14" in t and "pay" in t) or "payout" in t or "vendor" in t and "pay" in t:
@@ -9279,6 +9463,7 @@ def _state_answer(tid: str, msg: str):
         return {"reply": reply,
                 "cards": prop_card(tid, "payouts_desk") if w else "",
                 "steps": [], "proposal": None, "product": "", "case": "",
+                "cues": ["Is Thursday still tight?", "What did we win?"],
                 "_go": ("/agents/payouts_desk", "Open Payouts Clerk")}
 
     if "thursday" in t or ("cash" in t and ("tight" in t or "crunch" in t)):
@@ -9292,6 +9477,7 @@ def _state_answer(tid: str, msg: str):
         return {"reply": reply,
                 "cards": prop_card(tid, "cashflow_forecast") if w else "",
                 "steps": [], "proposal": None, "product": "", "case": "",
+                "cues": ["Should I pay tomorrow's 14 payments?", "What needs my yes?"],
                 "_go": ("/agents/cashflow_forecast", "Open Cashflow Planner")}
 
     if "how is" in t or "how's" in t:
@@ -9303,6 +9489,7 @@ def _state_answer(tid: str, msg: str):
                          f'your yes.')
                 return {"reply": reply, "cards": "", "steps": [],
                         "proposal": None, "product": "", "case": "",
+                        "cues": ["What needs my yes?", "What can you do?"],
                         "_go": (f'/agents/{a["slug"]}',
                                 f'Open {a["name"]}')}
     return None
