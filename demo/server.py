@@ -1578,9 +1578,9 @@ def case_no(order_id: str | None) -> str:
     """The number the owner says out loud. Derived, never stored."""
     tail = (order_id or "").rsplit("_", 1)[-1]
     if tail.isdigit():
-        return f"OJW-{4600 + 13 * int(tail)}"
+        return f"HUFT-{4600 + 13 * int(tail)}"
     seed = int(_hashlib.sha256((order_id or "?").encode()).hexdigest()[:6], 16)
-    return f"OJW-{4000 + seed % 900}"
+    return f"HUFT-{4000 + seed % 900}"
 
 
 def price_of(order_id: str | None) -> int:
