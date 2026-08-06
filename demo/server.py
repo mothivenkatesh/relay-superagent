@@ -43,9 +43,9 @@ from relay_superagent.tenants import (  # noqa: E402
 PORT = 8790
 
 # ------------------------------------------------------------- the business
-# This workspace IS one small business, not a portfolio of them: Ojas
-# Wellness, an invented Indian D2C Ayurvedic brand — cold-pressed juices,
-# A2 ghee, capsules and monthly refills. Eight people. Its own store plus
+# This workspace IS one small business, not a portfolio of them: Heads
+# Up For Tails, the Indian pet-care D2C brand — food, treats, toys, beds
+# and monthly food refills. Small HQ team here. Its own store plus
 # Amazon, Flipkart and quick commerce. ~₹50L a month, most orders between
 # ₹700 and ₹1,400, a lot of it cash on delivery. The logged-in user is the
 # founder.
@@ -54,9 +54,11 @@ PORT = 8790
 # value here. The people raising chargebacks are this business's own buyers,
 # and they are display-only seed data (CUSTOMERS below), never a field on
 # the domain model.
-BUSINESS = "Ojas Wellness"
-BUSINESS_TAG = "Ayurvedic wellness &middot; Bengaluru"
-BUSINESS_CHANNELS = ("ojaswellness.in, Amazon, Flipkart and quick commerce")
+BUSINESS = "Heads Up For Tails"
+HUFT_LOGO = "data:image/png;base64,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"
+HUFT_FAV = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAJGVYSWZJSSoACAAAAAEAPAECAAkAAAAaAAAAAAAAAGltYWdlcnk0AAAnPYy6AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAKvSURBVHgB7VZJchMxFP0ey2PF2bHsnABnx9K+QXKC2CcgN4DcgJwAZ8USOEHaO3aYEyB27GjKQ7k88p6RKNnIbbXTUJWqvCrZGvpLT/r/P0nkMaFer180AEkRubjBarXaLBaLz+bz+Xe2C4XCu+VyeYp2KCkh7+oslUpBNpu9X6/XAduVSiXKZDI9tJtofpMUkd23OKqB1d3A4tesgMiJ/EsCWPzVzuK7UJIiNi6Arzv6uJ+jXMh/RIY/8PEP/PlGt5pMJmeSEjYugF8HCWwCSREbAkitLv7ufI0gBYGkhA2B6XTKY+0g509xGiSjYmwUdOBBYmSL2VYWRMB4PO6tVqv2HhLsC1E68gDMZrNrU3cq4WKxiHAaP+V3RlCEPqGEKKL7XmCcJ/FFjgAU9Qq2H1l3KiE1H2mpUL1FOUGdi7bsb9DXQ/q2QOoun88r3R2JziZsIjDfYnzA02WdQidWxmVcBGq1WouT4qi+Sjx4OkpL9CGQQIjShM0NXb2XgAH0gQQC1xjvBvz1SQAxcy/+oHvPzIlkJTmiXC53iR10uYvRaBSi70MC+4YdhIcIOAVqOBxuLYgddSUZmr4EXFHeQPC9tXNZH2cknrBv1FgC2Nkb18QIuo7s3B1wS5epKn5QXgS4M0za3iXBAMSQsvvoFsREGwHJiypO1hV04MaLAIFJB5j03L6w0N4rQEbW8a5wqilO79Ym75UFnBREzkXvDJMHh2yYHS5Jh613rDgBbejx/eD7OubDFt+vTUE7iWb8DS5MAnxF+drg+9c2CSqtGUssRDowB+bF7AOdTX8ePrC9OpqAniCRH43sIvovdar2jyagfc8LRfna6BtwYKLfXESJCZTL5ZfmhsRuQl87PvVBuK997/302wKjmRGsi8/1u9k5vv3MogPwvTxhB78A/aEpZNY+R1sAAAAASUVORK5CYII="
+BUSINESS_TAG = "Pet care &middot; Gurugram"
+BUSINESS_CHANNELS = ("headsupfortails.com, Amazon, Flipkart and quick commerce")
 BUSINESS_ID = "m_ojas"
 
 # The one exception to the single-id rule: a marketplace account that has not
@@ -67,25 +69,25 @@ UNLINKED_CHANNEL_ID = "m_ojas_marketplace_unlinked"
 # order_id -> (customer, what they bought, where they bought it). Display
 # only: the buyer never touches the engine, the ledger or the SQL.
 CUSTOMERS: dict[str, tuple[str, str, str]] = {
-    "order_1":  ("Priya S.",   "A2 Desi Ghee 500ml",         "our store"),
-    "order_2":  ("Rahul M.",   "Ashwagandha Gold capsules",  "monthly refill"),
-    "order_3":  ("Anjali K.",  "Aloe Vera Juice 1L",         "Amazon"),
-    "order_4":  ("Vikram R.",  "Shilajit Resin 20g",         "our store"),
-    "order_5":  ("Sneha D.",   "Amla Juice 1L",              "monthly refill"),
-    "order_6":  ("Farhan A.",  "Triphala tablets",           "Flipkart"),
-    "order_7":  ("Meera J.",   "Karela Jamun Juice 1L",      "quick commerce"),
-    "order_9":  ("Karthik V.", "Moringa capsules",           "Amazon"),
-    "order_10": ("Divya P.",   "Wild Turmeric powder",       "our store"),
-    "order_11": ("Arun N.",    "Ashwagandha Gold capsules",  "monthly refill"),
-    "order_12": ("Ritu B.",    "A2 Desi Ghee 500ml",         "Flipkart"),
-    "order_13": ("Sameer T.",  "Shilajit Resin 20g",         "our store"),
-    "order_14": ("Nandini G.", "Aloe Vera Juice 1L",         "quick commerce"),
-    "order_15": ("Harsh V.",   "Amla Juice 1L",              "Amazon"),
-    "order_16": ("Ishita R.",  "Triphala tablets",           "our store"),
-    "order_17": ("Gaurav S.",  "Karela Jamun Juice 1L",      "our store"),
-    "order_18": ("Pooja M.",   "Moringa capsules",           "monthly refill"),
-    "order_19": ("Tarun K.",   "Wild Turmeric powder",       "Amazon"),
-    "order_20": ("Lata S.",    "A2 Desi Ghee 500ml",         "our store"),
+    "order_1":  ("Priya S.",   "Sara's Peanut Butter for Dogs", "our store"),
+    "order_2":  ("Rahul M.",   "Meowsi Salmon &amp; Chicken Treats", "monthly refill"),
+    "order_3":  ("Anjali K.",  "Sheba Tuna Cat Food (12 pack)", "Amazon"),
+    "order_4":  ("Vikram R.",  "Snuggle Sphere Donut Bed",   "our store"),
+    "order_5":  ("Sneha D.",   "Sara's Chicken &amp; Rice Dog Food", "monthly refill"),
+    "order_6":  ("Farhan A.",  "Meowsi Power Bites Cat Treats", "Flipkart"),
+    "order_7":  ("Meera J.",   "Squeakeroo Mouse Toy (Pack of 2)", "quick commerce"),
+    "order_9":  ("Karthik V.", "Meowsi Crunchies Party Pack", "Amazon"),
+    "order_10": ("Divya P.",   "Glitterfly Wand Toy",        "our store"),
+    "order_11": ("Arun N.",    "Meowsi Salmon &amp; Chicken Treats", "monthly refill"),
+    "order_12": ("Ritu B.",    "Sara's Peanut Butter for Dogs", "Flipkart"),
+    "order_13": ("Sameer T.",  "Snuggle Sphere Donut Bed",   "our store"),
+    "order_14": ("Nandini G.", "Sheba Tuna Cat Food (12 pack)", "quick commerce"),
+    "order_15": ("Harsh V.",   "Sara's Chicken &amp; Rice Dog Food", "Amazon"),
+    "order_16": ("Ishita R.",  "Meowsi Power Bites Cat Treats", "our store"),
+    "order_17": ("Gaurav S.",  "Squeakeroo Mouse Toy (Pack of 2)", "our store"),
+    "order_18": ("Pooja M.",   "Meowsi Crunchies Party Pack", "monthly refill"),
+    "order_19": ("Tarun K.",   "Glitterfly Wand Toy",        "Amazon"),
+    "order_20": ("Lata S.",    "Sara's Peanut Butter for Dogs", "our store"),
 }
 ORDER_IDS = list(CUSTOMERS)
 
@@ -185,34 +187,34 @@ def build_world() -> Pipeline:
     evidence = [
         EvidenceItem("ev_pod", "t1", "RG", "delivery_proof",
                      "Courier proof-of-delivery, signed and GPS-stamped at the door",
-                     "https://ojaswellness.example/proof/delivery"),
+                     "https://headsupfortails.example/proof/delivery"),
         EvidenceItem("ev_wa", "t1", "RG", "communication_log",
                      "WhatsApp thread where the buyer confirms the parcel arrived",
-                     "https://ojaswellness.example/proof/whatsapp"),
+                     "https://headsupfortails.example/proof/whatsapp"),
         EvidenceItem("ev_inv", "t1", "RD", "invoice",
                      "The order invoice, tied to one payment reference",
-                     "https://ojaswellness.example/proof/invoice"),
+                     "https://headsupfortails.example/proof/invoice"),
         EvidenceItem("ev_bank", "t1", "RD", "communication_log",
                      "Bank settlement excerpt showing one debit on this order, not two",
-                     "https://ojaswellness.example/proof/settlement"),
+                     "https://headsupfortails.example/proof/settlement"),
         EvidenceItem("ev_listing", "t1", "RN", "invoice",
                      "Product page snapshot from the order date, with the batch and seal detail",
-                     "https://ojaswellness.example/proof/listing"),
+                     "https://headsupfortails.example/proof/listing"),
         EvidenceItem("ev_returnphotos", "t1", "RN", "communication_log",
                      "The buyer's own return-request photos of the bottle and its seal",
-                     "https://ojaswellness.example/proof/return-photos"),
+                     "https://headsupfortails.example/proof/return-photos"),
         EvidenceItem("ev_subs", "t1", "RC", "communication_log",
                      "Refill subscription log, showing to the minute when it was paused or cancelled",
-                     "https://ojaswellness.example/proof/subscription-log"),
+                     "https://headsupfortails.example/proof/subscription-log"),
         EvidenceItem("ev_policy", "t1", "RC", "refund_policy",
                      "The refills and cancellation policy page as it stood on the order date",
-                     "https://ojaswellness.example/proof/refill-policy"),
+                     "https://headsupfortails.example/proof/refill-policy"),
         EvidenceItem("ev_device", "t1", "RF", "communication_log",
                      "Device, phone and delivery address matched to the buyer's earlier orders",
-                     "https://ojaswellness.example/proof/device-match"),
+                     "https://headsupfortails.example/proof/device-match"),
         EvidenceItem("ev_otp", "t1", "RF", "invoice",
                      "The one-time password confirmation captured on this order at checkout",
-                     "https://ojaswellness.example/proof/otp"),
+                     "https://headsupfortails.example/proof/otp"),
     ]
     deps = Deps(clock=clock, llm=ScriptedLlm(), crm=crm, slack=FakeSlack(),
                 url_checker=FakeUrlChecker(), ledger=_make_ledger(), policy=policy,
@@ -221,7 +223,7 @@ def build_world() -> Pipeline:
 
     def fire(ref, order, reason, text, claim, counter=None, cites=None,
              merchant=BUSINESS_ID):
-        """One dispute from one of Ojas Wellness's own buyers. `merchant` is
+        """One dispute from one of Heads Up For Tails's own buyers. `merchant` is
         the business, always: the buyer lives in CUSTOMERS, keyed by order."""
         counter = counter or RESP[reason].format(sku=bought(order))
         cites = cites or CITES[reason]
@@ -255,19 +257,19 @@ def build_world() -> Pipeline:
 
     # 1) a run that will time out and escalate
     fire("c_old", "order_6", "RD",
-         "Chargeback filed on Flipkart: buyer says the Triphala order was billed twice.",
+         "Chargeback filed on Flipkart: buyer says the Power Bites order was billed twice.",
          "Charged twice for the triphala tablets")
     clock.advance(hours=25)
     Supervisor(deps.ledger, clock, deps.slack, policy).sweep()
 
     # 2) resolved win — approved 6 weeks ago, dispute won
     r = fire("c_won", "order_1", "RG",
-             "Chargeback filed: buyer says the ghee order never arrived.",
-             "Says the ghee never arrived")
+             "Chargeback filed: buyer says the peanut butter order never arrived.",
+             "Says the peanut butter never arrived")
     clock.advance(minutes=4)
     p.approve(r, BUSINESS_ID)
     clock.advance(days=40)
-    p.record_resolution(r, won=True, amount_paise=499_600)   # a 4-jar ghee box
+    p.record_resolution(r, won=True, amount_paise=499_600)   # a 4-jar peanut butter box
 
     # 3) an edit (non-material) that landed and is still open
     r = fire("c_edit", "order_2", "RD",
@@ -285,8 +287,8 @@ def build_world() -> Pipeline:
 
     # 4) rejected
     r = fire("c_rej", "order_3", "RN",
-             "Chargeback filed on Amazon: buyer says the aloe vera juice arrived unsealed.",
-             "Says the seal on the aloe vera juice was broken")
+             "Chargeback filed on Amazon: buyer says the cat food pack arrived unsealed.",
+             "Says the seal on the cat food pack was broken")
     clock.advance(minutes=27)
     p.reject(r, BUSINESS_ID)
 
@@ -305,8 +307,8 @@ def build_world() -> Pipeline:
          "Says she cancelled the refill before it shipped")
     clock.advance(minutes=6)
     fire("c_live3", "order_7", "RN",
-         "Chargeback filed on a quick-commerce order: buyer says the juice is not what was listed.",
-         "Says the juice that arrived is not what the page showed")
+         "Chargeback filed on a quick-commerce order: buyer says the cat food is not what was listed.",
+         "Says the cat food that arrived is not what the page showed")
 
     # a quarter of this business's own disputes: same evidence bank, same
     # checks, one buyer per row.
@@ -315,10 +317,10 @@ def build_world() -> Pipeline:
         ("q1",  "order_9",  "Says a second moringa parcel never arrived",     "RG", "approve", 224_700),
         ("q2",  "order_10", "Statement shows the turmeric order twice",       "RD", "approve", 119_800),
         ("q3",  "order_11", "Says the ashwagandha refill was never delivered","RG", "approve",    None),
-        ("q4",  "order_12", "Bank flagged a repeat charge on the ghee order", "RD", "edit",    249_800),
+        ("q4",  "order_12", "Bank flagged a repeat charge on the peanut butter order", "RD", "edit",    249_800),
         ("q5",  "order_13", "Says the shilajit resin never showed up",        "RG", "edit",       None),
         ("q6",  "order_14", "Says the delivery slot came and went",           "RG", "reject",     None),
-        ("q7",  "order_15", "Statement lists the amla juice order twice",     "RD", "approve",    None),
+        ("q7",  "order_15", "Statement lists the dog food order twice",     "RD", "approve",    None),
         ("q8",  "order_16", "Says the triphala order never left the warehouse","RG", "wait",      None),
         ("q9",  "order_9",  "Reopened: still says the moringa parcel is missing", "RG", "wait",  None),
         ("q10", "order_11", "Bank is disputing the ashwagandha refill charge","RD", "wait",       None),
@@ -356,22 +358,22 @@ def build_world() -> Pipeline:
     # signal heard + gated (the chargeback notice forwarded by email this time)
     clock.advance(hours=3)
     deps.llm.mention = {"is_competitive": True,
-                        "claim_text": "Says the juice order never arrived",
+                        "claim_text": "Says the food order never arrived",
                         "confidence": .9}
-    deps.llm.claim = {"claim_text": "Says the juice order never arrived",
+    deps.llm.claim = {"claim_text": "Says the food order never arrived",
                       "speaker_role": "buyer", "confidence": .9}
     deps.llm.draft = {"counter_text":
         "The delivery address on the order matches the courier's "
         "proof-of-delivery scan, signed the same afternoon the buyer filed; "
         "the WhatsApp confirmation from that day is attached, and there is no "
-        "return request on this karela jamun juice order before the dispute.",
+        "return request on this Squeakeroo toy order before the dispute.",
         "cited_evidence_ids": ["ev_pod", "ev_wa"], "confidence": .8,
         "escalate": False}
     r = p.handle_event(TriggerEvent(
         tenant_id="t1", source="email_forward", source_ref="m_lifecycle_1",
         occurred_at=clock.now(), order_id="order_17",
         merchant_id=BUSINESS_ID, dispute_id="dp_m_lifecycle_1", reason_code="RG",
-        text="Forwarding the chargeback notice: buyer says the juice order never arrived."))
+        text="Forwarding the chargeback notice: buyer says the food order never arrived."))
     mark("review", r)
 
     # a material edit, then filed
@@ -417,8 +419,8 @@ def build_world() -> Pipeline:
     # QA blocks a draft that breaks the rules (banned superlative)
     clock.advance(hours=1)
     r4 = fire("lc_qa", "order_20", "RG",
-              "Chargeback filed: buyer says the whole case of ghee is missing.",
-              "Says the whole case of ghee never came",
+              "Chargeback filed: buyer says the whole case of peanut butter is missing.",
+              "Says the whole case of peanut butter never came",
               counter="Our delivery record is simply the best in the trade and "
                       "everyone knows it; the numbers speak for themselves and "
                       "the buyer is clearly wrong about the whole thing.",
@@ -436,7 +438,7 @@ def build_world() -> Pipeline:
     mark("not_actionable", r5)
 
     deps.llm.mention = {"is_competitive": True,
-                        "claim_text": "Says the amla juice refill never arrived",
+                        "claim_text": "Says the food refill never arrived",
                         "confidence": .9}
     r6 = p.handle_event(TriggerEvent(
         tenant_id="t1", source="bank_webhook", source_ref="lc_unlinked",
@@ -459,8 +461,8 @@ def build_world() -> Pipeline:
     # one buyer's saga in full, for texture beyond the single-run exemplars
     clock.advance(days=2)
     r10 = fire("lc_1", "order_1", "RG",
-               "Buyer reopened: says the replacement ghee jar never showed either.",
-               "Says the replacement ghee jar never showed")
+               "Buyer reopened: says the replacement jar never showed either.",
+               "Says the replacement jar never showed")
     clock.advance(minutes=31)
     p.reject(r10, BUSINESS_ID)
 
@@ -472,7 +474,7 @@ def build_world() -> Pipeline:
     deps.llm.diff = {"changed": "tightened to the bank's escalation format",
                      "is_material": False, "implies": "mirror the bank's own language"}
     p.edit(r11, BUSINESS_ID,
-           "The courier's GPS-stamped scan places this ghee order at the "
+           "The courier's GPS-stamped scan places this peanut butter order at the "
            "address on file, and the buyer's own WhatsApp message thanking the "
            "rider is timestamped the same afternoon. Both are attached again "
            "for the bank's escalation review.")
@@ -627,7 +629,7 @@ PLAIN_REASON = {
     "RC": "Buyer says they had already cancelled",
 }
 
-# The eight people who actually run Ojas Wellness, plus the small Relay-side
+# The people who actually run Heads Up For Tails, plus the small Relay-side
 # crew who pick up anything the agents hand over. "Says yes or no" marks the
 # people who can approve a reply before it goes to a bank.
 TEAM = [
@@ -664,7 +666,7 @@ def auth_page(mode: str, error: str = "") -> str:
     passwords go form → WorkOS over TLS, nothing stored here."""
     signup = mode == "signup"
     company = ('<label>Company<input name="company" required '
-               'placeholder="Ojas Wellness"></label>') if signup else ""
+               'placeholder="Heads Up For Tails"></label>') if signup else ""
     err = f'<div class="err">{esc(error)}</div>' if error else ""
     swap = (('Already have an account? <a href="/login">Log in</a>') if signup
             else ('New here? <a href="/signup">Create a workspace</a>'))
@@ -1251,7 +1253,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
   <aside class="sidebar">
     <div class="brand"><span class="logo">R</span>
-      <span class="bname"><b>Relay</b><span class="biz">{BUSINESS}</span></span></div>
+      <span class="bname"><b>Relay</b><img class="bizlogo" src="{HUFT_LOGO}" alt="{BUSINESS}"></span></div>
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
       <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New</span></a>
@@ -1468,7 +1470,7 @@ def plain_detail(d: str) -> str:
 
 
 def _account_label(r) -> str:
-    """Whose dispute this is, on screen: the Ojas Wellness buyer who raised
+    """Whose dispute this is, on screen: the Heads Up For Tails buyer who raised
     it. Held in the demo seed against the order, never on the run: the run
     only knows whose business it belongs to."""
     return customer_of(r.order_id)
@@ -1560,15 +1562,15 @@ def ledger_row(r) -> str:
 # =========================================================================
 
 SKU_PRICE = {                                # paise, display only
-    "A2 Desi Ghee 500ml": 124_900,
-    "Ashwagandha Gold capsules": 89_900,
-    "Aloe Vera Juice 1L": 49_900,
-    "Shilajit Resin 20g": 189_900,
-    "Amla Juice 1L": 44_900,
-    "Triphala tablets": 39_900,
-    "Karela Jamun Juice 1L": 54_900,
-    "Moringa capsules": 74_900,
-    "Wild Turmeric powder": 59_900,
+    "Sara's Peanut Butter for Dogs": 124_900,
+    "Meowsi Salmon &amp; Chicken Treats": 89_900,
+    "Sheba Tuna Cat Food (12 pack)": 49_900,
+    "Snuggle Sphere Donut Bed": 189_900,
+    "Sara's Chicken &amp; Rice Dog Food": 44_900,
+    "Meowsi Power Bites Cat Treats": 39_900,
+    "Squeakeroo Mouse Toy (Pack of 2)": 54_900,
+    "Meowsi Crunchies Party Pack": 74_900,
+    "Glitterfly Wand Toy": 59_900,
 }
 
 
@@ -2270,6 +2272,8 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .cico svg{width:18px;height:18px}
 .cico.brand{background:#fff;border:1px solid var(--hair)}
 .cico.brand img{width:22px;height:22px;object-fit:contain;border-radius:4px}
+.bizlogo{height:13px;display:block;margin-top:3px}
+.bizlogo.lg{height:20px;display:inline-block;vertical-align:middle}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
@@ -3191,15 +3195,15 @@ def _agent_chips(slugs: list[str]) -> str:
 # order the buyer disputed.
 GOAL_META = {
     "order_1":  ("Never-arrived claims",
-                 "Keep winning Priya S.&rsquo;s ghee claim, even when the bank asks twice."),
+                 "Keep winning Priya S.&rsquo;s peanut-butter claim, even when the bank asks twice."),
     "order_2":  ("Charged-twice claims",
                  "Clear Rahul M.&rsquo;s charged-twice claim on the ashwagandha refill before the next payout."),
     "order_3":  ("Broken-seal claims",
-                 "Settle Anjali K.&rsquo;s broken-seal claim on the aloe vera juice without paying the bank&rsquo;s fee."),
+                 "Settle Anjali K.&rsquo;s broken-seal claim on the cat food pack without paying the bank&rsquo;s fee."),
     "order_4":  ("Unknown-order claims",
                  "Show that Vikram R. placed and confirmed the shilajit order himself."),
     "order_5":  ("Cancelled-refill claims",
-                 "Prove when Sneha D.&rsquo;s amla juice refill was actually cancelled."),
+                 "Prove when Sneha D.&rsquo;s food refill was actually cancelled."),
 }
 
 
@@ -3627,7 +3631,7 @@ DEMO_ON.update({a["slug"]: True for a in RELAY_AGENTS
 # stable however long the demo has been up.
 AGENT_THREADS = {
     "cart_rescue": dict(
-        opening="6:12 PM. Vikram leaves a &#8377;1,899 Shilajit order at checkout.",
+        opening="6:12 PM. Vikram leaves a &#8377;1,899 Donut Bed order at checkout.",
         closing="Won back &#8377;1,899. Three touches over two days, then it "
                 "stops. A buyer who says stop is never contacted again.",
         won="&#8377;1,899 paid",
@@ -3686,7 +3690,7 @@ AGENT_DAYS = {
         ("2:12 PM", "Buyer paid in one step. The books already know.", "paid")],
     "stock_watch": [
         ("9:00 AM", "Counted every channel: store, Amazon, Flipkart, quick commerce.", ""),
-        ("9:01 AM", "Amla Juice: 6 days left at this pace. The supplier needs 10.", "warned"),
+        ("9:01 AM", "Sara's Chicken &amp; Rice: 6 days left at this pace. The supplier needs 10.", "warned"),
         ("9:02 AM", "Drafted the reorder. It goes nowhere until your yes.", "your yes")],
     "refund_shield": [
         ("4:40 PM", "Refund claim: &ldquo;bottle arrived broken&rdquo;, &#8377;1,249.", ""),
@@ -3697,7 +3701,7 @@ AGENT_DAYS = {
         ("10:01 AM", "Named both, with the fix for each.", "flagged"),
         ("10:02 AM", "One clean file to your CA. Nothing rebuilt by hand.", "done")],
     "returns_desk": [
-        ("Monday", "Return picked up: Shilajit Resin, &#8377;1,899.", "tracking"),
+        ("Monday", "Return picked up: Snuggle Sphere Donut Bed, &#8377;1,899.", "tracking"),
         ("Wednesday", "Reached the warehouse. Seal checked, item fine.", "checked"),
         ("Wednesday", "Refund released the same hour. It never went out early.", "done")],
     "cod_guard": [
@@ -4082,7 +4086,7 @@ TEACHINGS = [
      ["payment_forms"], "builds their forms with UPI first"),
     ("cashflow_forecast", "Vendor day and the GST debit collide on Thursdays",
      ["payouts_desk"], "queues payments around it without being told"),
-    ("stock_watch", "Amla Juice sells 3x faster after a festival week",
+    ("stock_watch", "Sara's dog food sells 3x faster after a festival week",
      ["cart_rescue"], "calls those carts first while stock lasts"),
 ]
 
@@ -4239,7 +4243,7 @@ AGENT_GOALS = {
         how="Fast-moving products in stock, out of the ten that sell "
             "most. Counted daily.",
         actions=[
-            ("Spotted Amla Juice down to 6 days at this pace",
+            ("Spotted Sara's Chicken &amp; Rice down to 6 days at this pace",
              "caught early"),
             ("Drafted the reorder for six weeks of cover",
              "pending approval"),
@@ -5603,20 +5607,20 @@ def run_trace_content(tid: str, run_id: str) -> str:
 
 
 # (days ago, customer, reason label, buyer claim, verdict, evidence, draft)
-# The look-back: what Dispute Defender would have done with Ojas Wellness's
+# The look-back: what Dispute Defender would have done with Heads Up For Tails's
 # own last 30 days, before it was switched on. Nothing here was ever sent.
 SHADOW_ROWS = [
-    (27, "Ananya B.",  "Says it never arrived",   "A2 ghee jar never arrived",              "send", "2 proofs",
+    (27, "Ananya B.",  "Says it never arrived",   "Peanut butter jar never arrived",              "send", "2 proofs",
      "The courier's delivery proof is signed and stamped at the door; the WhatsApp thread confirms it arrived the same evening."),
     (25, "Rohit K.",   "Says charged twice",      "Two debits for one ashwagandha refill",  "send", "2 proofs",
      "One payment, one debit. The second line is a hold the bank releases on its own."),
     (24, "Shruti M.",  "",                        "Asking where a refund is, not a dispute", "skip", "",
      ""),
-    (21, "Devang P.",  "Says it never arrived",   "Shilajit resin marked delivered, not received", "send", "2 proofs",
+    (21, "Devang P.",  "Says it never arrived",   "Donut bed marked delivered, not received", "send", "2 proofs",
      "It was delivered two days before the complaint, and the buyer's own message from that day is attached."),
-    (19, "Nisha T.",   "Says it was wrong",       "Aloe vera juice seal looked tampered",   "send", "1 proof",
+    (19, "Nisha T.",   "Says it was wrong",       "Cat food pack seal looked tampered",   "send", "1 proof",
      "The listing from the order date matches the batch and the seal that shipped, exactly."),
-    (17, "Imran S.",   "Says charged twice",      "Amla juice order billed twice on Amazon","send", "2 proofs",
+    (17, "Imran S.",   "Says charged twice",      "Dog food order billed twice on Amazon","send", "2 proofs",
      "The invoice and the bank statement agree: one charge for this order."),
     (16, "Bhavna R.",  "",                        "Buyer praised the delivery speed",       "skip", "",
      ""),
@@ -5624,13 +5628,13 @@ SHADOW_ROWS = [
      ""),
     (12, "Aparna V.",  "Says charged twice",      "Statement lists the turmeric powder twice", "send", "2 proofs",
      "The payment and the bill tie this order to one charge; the second line never went through."),
-    (9,  "Yash D.",    "Says it never arrived",   "Moringa capsules marked undelivered",    "send", "1 proof",
+    (9,  "Yash D.",    "Says it never arrived",   "Crunchies pack marked undelivered",    "send", "1 proof",
      "The courier's scan puts the parcel at the address they gave, signed for on the spot."),
     (7,  "Kiran L.",   "",                        "Asking to change the refill date",       "skip", "",
      ""),
-    (5,  "Neelam J.",  "Says it never arrived",   "Karela jamun juice box never showed",    "send", "2 proofs",
+    (5,  "Neelam J.",  "Says it never arrived",   "Squeakeroo toy pack never showed",    "send", "2 proofs",
      "Delivery proof plus the buyer's own WhatsApp message from the day it arrived. Both go with the reply."),
-    (2,  "Ganesh A.",  "Says they had cancelled", "Says the amla refill was cancelled first", "send", "2 proofs",
+    (2,  "Ganesh A.",  "Says they had cancelled", "Says the food refill was cancelled first", "send", "2 proofs",
      "The refill log timestamps the cancellation after the parcel left the warehouse, and the policy that day credits the next cycle."),
 ]
 
@@ -5764,9 +5768,9 @@ PROPS_DEF = {
                  "warns you again the day before."),
     "stock_watch": dict(
         stake="&#8377;68,400", stake_n=68400,
-        ifno="Out of Amla Juice in 6 days", ifyes="Covered for six weeks",
+        ifno="Out of Sara's dog food in 6 days", ifyes="Covered for six weeks",
         kicker="Reorder", rail="Reorder draft",
-        title="Reorder Amla Juice before it runs out",
+        title="Reorder Sara's dog food before it runs out",
         why="6 days of stock left at this pace, across every channel. The "
             "supplier needs 10 to deliver.",
         rows=[("The order", "40 cases, <b>&#8377;68,400</b>, Vasudha Farms. "
@@ -6469,7 +6473,7 @@ def decisions_content(tid):
 # Connections the founder can actually manage. Relay still holds every
 # key; pausing stops reads, disconnecting removes it, connecting adds.
 CONN_DEFS = [
-    ("Your store", "ojaswellness.in orders and disputes"),
+    ("Your store", "headsupfortails.com orders and disputes"),
     ("Amazon", "orders, claims and settlements"),
     ("Flipkart", "orders, claims and settlements"),
     ("WhatsApp", "buyer messages, and your yeses on the go"),
@@ -6580,6 +6584,9 @@ CONN_LOGOS = {
 
 
 def conn_icon(name: str) -> str:
+    if name == "Your store":
+        return ('<span class="cico brand">'
+                f'<img src="{HUFT_FAV}" alt="Heads Up For Tails"></span>')
     uri = CONN_LOGOS.get(name)
     if uri:
         return (f'<span class="cico brand">'
@@ -6933,7 +6940,7 @@ def settings_content(tid: str, s: str = "team",
                  "the safe your computer already uses for passwords. "
                  "nowhere you could lose them")]))
     ident = (f'<div class="trow slim"><span class="ico">{ICONS["bm"]}</span>'
-             f'<span class="tdesc"><b>{BUSINESS}</b> '
+             f'<span class="tdesc"><img class="bizlogo lg" src="{HUFT_LOGO}" alt="{BUSINESS}"> '
              f'<span class="mut">{BUSINESS_TAG} &middot; sells on '
              f'{BUSINESS_CHANNELS}</span></span>'
              f'<span class="st ok">this workspace</span></div>')
@@ -8331,30 +8338,30 @@ def confirm(pid: str, action: str | None = None, text: str = "",
 # dispute webhook. Everything is labeled sample via trigger_source.
 _SAMPLE_SCENARIOS = [
     # (customer, product, channel, reason_code, claim, narrative, response)
-    ("Rekha S.", "A2 Desi Ghee 500ml", "our store", "RG",
-     "Says the ghee order never arrived",
-     "Chargeback filed: buyer says the A2 Desi Ghee order never arrived.",
+    ("Rekha S.", "Sara's Peanut Butter for Dogs", "our store", "RG",
+     "Says the peanut butter order never arrived",
+     "Chargeback filed: buyer says the peanut butter order never arrived.",
      "The courier proof-of-delivery is signed and GPS-stamped at the address "
      "on file two days before this dispute was filed, and the WhatsApp thread "
      "carries the buyer's own delivery-day confirmation. Both documents are "
      "attached to this reply."),
-    ("Jatin M.", "Amla Juice 1L", "Amazon", "RD",
-     "Says one juice order was charged twice",
+    ("Jatin M.", "Sara's Chicken &amp; Rice Dog Food", "Amazon", "RD",
+     "Says one food order was charged twice",
      "Chargeback filed: the buyer's statement shows two debits for one order.",
      "The invoice and the payment gateway agree on a single reference for this "
-     "Amla Juice order, and the bank settlement excerpt confirms one debit "
+     "dog food order, and the bank settlement excerpt confirms one debit "
      "cleared. The second line on the statement is an authorisation hold that "
      "reverses on its own."),
-    ("Deepika A.", "Ashwagandha Gold capsules", "monthly refill", "RG",
+    ("Deepika A.", "Meowsi Salmon &amp; Chicken Treats", "monthly refill", "RG",
      "Says the ashwagandha refill never showed up",
      "Chargeback filed: buyer says the monthly refill was never delivered.",
      "Delivery proof for the refill shipment is signed and dated, and the "
      "WhatsApp thread shows the buyer acknowledging the parcel that evening. "
      "Both are attached to this reply."),
-    ("Mohit R.", "Shilajit Resin 20g", "our store", "RD",
+    ("Mohit R.", "Snuggle Sphere Donut Bed", "our store", "RD",
      "Bank flagged a repeat charge on the shilajit order",
      "Chargeback filed: the issuing bank flagged a duplicate charge on the "
-     "Shilajit Resin order.",
+     "Donut Bed order.",
      "One payment reference maps to one settled debit on this order; the "
      "invoice and the bank excerpt agree, and no second capture exists in the "
      "settlement record."),
@@ -8724,7 +8731,7 @@ def seed_conversations() -> None:
         "WhatsApp message</b> from the day it arrived. That pair went out "
         "unchanged every time but two, and both of those were just reworded. "
         "The delivery proof on its own wins less often, especially on the "
-        "juice and ghee orders that go out cash on delivery.")
+        "food and treat orders that go out cash on delivery.")
     authored(
         "Which claims do I reword?", "Which replies do I end up rewording?",
         "The <b>charged-twice</b> ones, mostly: about one in three, and "
@@ -8964,6 +8971,8 @@ color:var(--mut)}
 .cico svg{width:18px;height:18px}
 .cico.brand{background:#fff;border:1px solid var(--hair)}
 .cico.brand img{width:22px;height:22px;object-fit:contain;border-radius:4px}
+.bizlogo{height:13px;display:block;margin-top:3px}
+.bizlogo.lg{height:20px;display:inline-block;vertical-align:middle}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
@@ -9750,7 +9759,7 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
     if prop_state(tid, "payouts_desk")["state"] == "waiting":
         chips.append("Should I pay tomorrow's 14 payments?")
     if prop_state(tid, "stock_watch")["state"] == "waiting":
-        chips.append("How long will Amla Juice last?")
+        chips.append("How long will Sara's dog food last?")
     if prop_state(tid, "cashflow_forecast")["state"] == "waiting":
         chips.append("Is Thursday still tight?")
     if esc_n:
@@ -9818,7 +9827,7 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
         cash_beat = ("Cash: Thursday looks tight, vendor day and a GST "
                      "debit collide. A payout move <b>waits on your yes</b>.")
     desk_beats = [
-        ("stock_watch", "bm", "Stock: Amla Juice has <b>6 days</b> left at "
+        ("stock_watch", "bm", "Stock: Sara's dog food has <b>6 days</b> left at "
          "this pace. A reorder draft waits on your yes."),
         ("cashflow_forecast", "flow", cash_beat),
         ("cod_guard", "send", "COD: <b>31 of 38</b> confirmed for dispatch; "
@@ -10031,10 +10040,11 @@ def _state_answer(tid: str, msg: str):
     def waiting(slug):
         return prop_state(tid, slug)["state"] == "waiting"
 
-    if "amla" in t or ("stock" in t and ("last" in t or "left" in t)):
+    if "sara" in t or "dog food" in t \
+            or ("stock" in t and ("last" in t or "left" in t)):
         w = waiting("stock_watch")
-        reply = ("<b>6 days</b> at this pace, and the sale week is what "
-                 "changed the pace. Stock Watch has the six-week reorder "
+        reply = ("<b>6 days</b> of Sara's dog food at this pace, and the sale "
+                 "week is what changed the pace. Stock Watch has the six-week reorder "
                  "drafted"
                  + (", waiting on your yes below." if w
                     else "; you have already settled it."))
