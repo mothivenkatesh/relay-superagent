@@ -6263,8 +6263,7 @@ function routineCancel(el){
   td.innerHTML = td.dataset.prev;
 }
 </script>"""
-    return (hub_bar("scheduled")
-            + hub_head("Scheduled",
+    return (hub_head("Scheduled",
                        "Work your team does on its own clock. Each run "
                        "leaves a note you can open, and nothing is ever "
                        "sent without your yes.",
@@ -6400,8 +6399,7 @@ def memory_content(tid: str, tab: str = "voice",
                 'forgotten.</div>'
                 f'<div class="hubtoolrow">{pills}{search}</div>'
                 f'{body}')
-    return (hub_bar("memory")
-            + f'<div class="hubhead"><div><h1 class="page">Knowledge</h1>'
+    return (f'<div class="hubhead"><div><h1 class="page">Knowledge</h1>'
             f'<div class="pagehint">Everything your team knows about your '
             f'business. Add to it, correct it; nothing is forgotten.</div>'
             f'</div>{search}</div>'
@@ -6682,8 +6680,7 @@ def connections_hub(tid: str, embed: bool = False) -> str:
             'oninput="hubFilter(this)"></div>'
             + sections)
     return (
-        hub_bar("connections")
-        + hub_head("Connections",
+        hub_head("Connections",
                    "Relay holds every key itself: nothing to set up, "
                    "nothing to lose. Pause stops the reading; disconnect "
                    "removes it.",
@@ -6713,7 +6710,7 @@ def seed_skills(tid: str) -> list:
     return lst
 
 
-def skills_hub(tid: str) -> str:
+def skills_hub(tid: str, embed: bool = False) -> str:
     procs = seed_skills(tid)
 
     def card(i, p):
@@ -6746,16 +6743,32 @@ def skills_hub(tid: str) -> str:
     live = [(i, p) for i, p in enumerate(procs) if p.get("mode") == "live"]
     drafts = [(i, p) for i, p in enumerate(procs)
               if p.get("mode") != "live"]
-    out = (hub_bar("skills")
-           + hub_head("Skills",
-                      "What your agents know how to do: steps they "
-                      "follow, written in your words. Nothing goes live "
-                      "until you say yes.",
-                      "Search skills",
-                      [("all", "All"), ("live", "Live"),
-                       ("draft", "Drafts")],
-                      '<a class="btn primary sm" href="/procedures/new">'
-                      '+ Create skill</a>'))
+    if embed:
+        out = ('<div class="pagehint">What your agents know how to do: '
+               'steps they follow, written in your words. Nothing goes '
+               'live until you say yes.</div>'
+               '<div class="hubtoolrow"><div class="hubpills">'
+               '<button class="hubpill on" data-f="all" '
+               'onclick="hubPill(this)">All</button>'
+               '<button class="hubpill" data-f="live" '
+               'onclick="hubPill(this)">Live</button>'
+               '<button class="hubpill" data-f="draft" '
+               'onclick="hubPill(this)">Drafts</button></div>'
+               '<span style="display:flex;gap:8px">'
+               '<input class="hubsearch" placeholder="Search skills" '
+               'oninput="hubFilter(this)">'
+               '<a class="btn primary sm" href="/procedures/new">'
+               '+ Create skill</a></span></div>')
+    else:
+        out = (hub_head("Skills",
+                        "What your agents know how to do: steps they "
+                        "follow, written in your words. Nothing goes live "
+                        "until you say yes.",
+                        "Search skills",
+                        [("all", "All"), ("live", "Live"),
+                         ("draft", "Drafts")],
+                        '<a class="btn primary sm" href="/procedures/new">'
+                        '+ Create skill</a>'))
     if live:
         out += (f'<div class="hubsec"><h2 class="sec">Live '
                 f'({len(live)})</h2><div class="hubgrid">'
@@ -6788,6 +6801,7 @@ def settings_content(tid: str, s: str = "team",
     # that job — not as a module.
     SECTIONS = [("team", "Approvers"),
                 ("connectors", "Connections"),
+                ("skills", "Skills"),
                 ("knowledge", "Knowledge"),
                 ("decisions", "Audit log"),
                 ("workspace", "Trust"),
@@ -6841,6 +6855,8 @@ def settings_content(tid: str, s: str = "team",
                  f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
         body = connections_hub(tid, embed=True)
+    elif s == "skills":
+        body = skills_hub(tid, embed=True)
     elif s == "knowledge":
         body = memory_content(tid, tab=mt, embed=True,
                               base="/settings?s=knowledge")
@@ -7370,7 +7386,10 @@ class Handler(BaseHTTPRequestHandler):
                                  ("Moved the skill <b>" + esc(p["title"])
                                   + "</b> back to draft"), "/skills")
             self.send_response(303)
-            self.send_header("Location", "/skills")
+            ref = self.headers.get("Referer") or ""
+            self.send_header("Location",
+                             "/settings?s=skills"
+                             if "settings" in ref else "/skills")
             self.end_headers()
             return
         if self.path == "/api/conn_act":
