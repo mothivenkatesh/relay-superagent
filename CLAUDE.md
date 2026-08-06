@@ -174,7 +174,20 @@ captain thinking about the next decision, not waiting.
   binaries). Ports are 5435/8790 because comarketer still owns 5434/8787
   on this machine.
 
-## Current state (2026-08-05, evening)
+## Current state (2026-08-06)
+The demo workspace is now **Heads Up For Tails** (captain-directed
+2026-08-06, overriding the invented-names rule for the WORKSPACE
+business only): the real Indian pet-care D2C brand, exact logo fetched
+from the live store and embedded as a data URI (sidebar, Settings
+workspace row, Your-store connector). Products are real HUFT-relevant
+items (Sara's Chicken & Rice Dog Food = fast mover, Sara's Peanut
+Butter = jar disputes, Meowsi treats = refills, Squeakeroo toy,
+Glitterfly wand, Snuggle Sphere Donut Bed, Sheba pack). Buyers remain
+fictional named individuals. All dispute claim texts rewritten so the
+physics hold. `BUSINESS`/`BUSINESS_TAG`/`BUSINESS_CHANNELS` +
+`HUFT_LOGO`/`HUFT_FAV` constants near the top of demo/server.py.
+
+## Previous state (2026-08-05, evening)
 The demo workspace IS one business now (D26): **Ojas Wellness**, an
 invented Indian D2C Ayurvedic brand (juices, A2 ghee, capsules, monthly
 refills; own store + Amazon + Flipkart + quick commerce; ~8 people; the
@@ -215,6 +228,10 @@ dispute content with zero GTM leftovers. Connectors still on fakes.
   (Country Chicken Co, Cure.fit, Ohsou) into fake data — and never a real
   brand for the workspace business either (Ojas Wellness is invented; it
   is Kapiva-shaped, not Kapiva).
+- Demo business exception (captain, 2026-08-06): the WORKSPACE brand is
+  the real Heads Up For Tails with its exact logo, per explicit
+  instruction. Buyers, teammates and all transaction data stay
+  fictional. The never-seed-real-Cashfree-pilots rule still stands.
 - The workspace is ONE business, not a portfolio. If a screen ever reads
   like an agency managing clients, that is a positioning bug.
 - Agent lineup and copy come from the canonical intro deck, not memory —
