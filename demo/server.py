@@ -8136,9 +8136,7 @@ def _build_confirm(tid: str, bid: str) -> str:
                  "/agents/" + slug)
     return (f'Meet <b>{d["name"]}</b>. It is on the Agents page under '
             f'<b>Built by you</b>, watching from now. Its first find will '
-            f'land in Approvals.'
-            f'<span class="rmeta"><a href="/agents/{slug}">Open '
-            f'{d["name"]} &rarr;</a></span>')
+            f'land in Approvals.')
 
 
 # ------------------------------------------------------------- conversations
@@ -8325,11 +8323,9 @@ def _polish_reply(question: str, res: dict) -> dict:
     res.pop("_tool", None)
     # One plain line of provenance: no model, no routing, no jargon.
     # just the promise that every number came from the merchant's own record.
-    go = res.pop("_go", None) or _GO_LINKS.get(tool0)
-    if go:
-        res["reply"] = (res.get("reply", "")
-                        + f'<a class="golink" href="{go[0]}">{go[1]} '
-                          f'&rarr;</a>')
+    # Chat replies carry no links (house rule: links in chat only if
+    # external). The cues beneath the reply are the way onward.
+    res.pop("_go", None)
     if tool0 != "guard":
         res["reply"] = (res.get("reply", "")
                         + '<span class="rmeta">Every number here comes '
@@ -9247,14 +9243,16 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
 
 def morning_brief_html(tid: str) -> str:
     from datetime import datetime as _dt
+    # A teaser, not the note: two lines on Home, the full brief one tap
+    # away. The founder should not read the whole morning twice.
     rows = "".join(
         f'<div class="bline"><span class="ico">{ICONS[i]}</span>'
-        f'<span>{t}</span></div>' for i, t in brief_lines(tid))
+        f'<span>{t}</span></div>' for i, t in brief_lines(tid)[:2])
     return (f'<a class="briefcard" href="/briefs/morning">'
             f'<div class="bhead"><b>Morning brief</b>'
             f'<span class="mut">{_dt.now().strftime("%a, %b %-d")} &middot; '
             f'8:00</span></div>{rows}'
-            f'<span class="bmore">From your Scheduled routine &middot; '
+            f'<span class="bmore">The rest is one tap away &middot; '
             f'read it &rarr;</span></a>')
 
 
