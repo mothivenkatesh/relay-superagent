@@ -1281,6 +1281,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
         <div class="acct-mail">{esc(email)}</div>
         <div class="acct-shop">{BUSINESS}</div>
         <a class="acct-set" href="/settings">Settings</a>
+        <a class="acct-set" href="/pricing">Plan &amp; pricing</a>
         <a class="acct-out" href="/logout">Log out</a>
       </div>
     </details>
@@ -6214,6 +6215,73 @@ if (!localStorage.getItem('relay_seen_scheduled')){
 </script>"""
 
 
+def pricing_content(tid: str) -> str:
+    """The plan page. One idea per element, nothing that needs a footnote.
+
+    The mechanics follow the agent-based model: plans are counts of agents
+    (how many AI employees do I have?), runs are the meter, packs make the
+    meter cheaper at scale. A run is a whole job, however many steps."""
+    def plan(name, price, per, who, rows, pick=False, chip=""):
+        lis = "".join(f"<li>{r}</li>" for r in rows)
+        chip_h = f'<span class="pr-chip">{chip}</span>' if chip else ""
+        return (f'<div class="pr-plan{" pick" if pick else ""}">'
+                f'<div class="pr-name">{name}{chip_h}</div>'
+                f'<div class="pr-price">{price}<span>{per}</span></div>'
+                f'<div class="pr-who">{who}</div>'
+                f'<ul class="pr-list">{lis}</ul></div>')
+    plans = (
+        plan("Free", "&#8377;0", "", "To try it out",
+             ["2 pre-built agents", "500 runs a month", "1 workspace",
+              "Community support"])
+        + plan("Starter", "&#8377;4,999", "/month", "For your first store",
+               ["5 pre-built agents", "1 agent built by you",
+                "2,000 runs a month", "Standard connections"])
+        + plan("Growth", "&#8377;19,999", "/month", "For growing brands",
+               ["20 pre-built agents", "5 agents built by you",
+                "10,000 runs a month", "All connections", "Teammates and roles"],
+               pick=True, chip="Most picked")
+        + plan("Enterprise", "Talk to us", "", "For large teams",
+               ["All 26 pre-built agents", "Unlimited agents built by you",
+                "Runs sized to you", "SSO and audit export",
+                "A person who knows your account"])
+    )
+    return f"""
+<div class="pr-page">
+<style>
+.pr-page{{max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
+.pr-page h1{{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}}
+.pr-def{{color:#6E7263;font-size:14px;margin:0 0 26px;max-width:62ch}}
+.pr-plans{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}}
+.pr-plan{{border:1px solid var(--line);border-radius:16px;background:#fff;padding:20px 18px;display:flex;flex-direction:column}}
+.pr-plan.pick{{border:1.5px solid #0B7A3E;background:linear-gradient(180deg,#F2F9EE,#fff)}}
+.pr-name{{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}}
+.pr-chip{{font-size:10px;font-weight:700;color:#0B7A3E;background:#E6F2E0;border-radius:100px;padding:2px 8px}}
+.pr-price{{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:10px}}
+.pr-price span{{font-size:12.5px;font-weight:500;color:#6E7263;margin-left:2px}}
+.pr-who{{font-size:12px;color:#6E7263;margin-top:2px;padding-bottom:12px;border-bottom:1px solid var(--line)}}
+.pr-list{{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}}
+.pr-list li{{font-size:12.5px;color:#3D4038;padding-left:18px;position:relative}}
+.pr-list li:before{{content:"✓";position:absolute;left:0;color:#0B7A3E;font-weight:700}}
+.pr-strip{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper-2);padding:14px 18px;font-size:13px;color:#3D4038}}
+.pr-strip b{{font-size:13px}}
+.pr-strip .mut{{color:#6E7263}}
+.pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
+</style>
+<h1>Plans</h1>
+<p class="pr-def">Plans are counted in agents, metered in runs.
+1 run = 1 job finished end to end: a call made, a dispute filed,
+a report built. However many steps it takes.</p>
+<div class="pr-plans">{plans}</div>
+<div class="pr-strip"><b>Past your included runs:</b> &#8377;1 per run.
+<span class="mut">Packs bring it down: 10,000 runs for &#8377;8,000 &middot;
+50,000 runs for &#8377;35,000. Every plan, pre-built or built by you,
+draws from the same pack.</span></div>
+<div class="pr-foot">Nothing billed until your first month closes.
+Every agent asks before it sends.</div>
+</div>
+"""
+
+
 def scheduled_content(tid: str) -> str:
     # The hub grammar, with the full lifecycle kept: pause, reword inline,
     # remove, add in a sentence, one-click templates, and every routine's
@@ -7162,6 +7230,12 @@ class Handler(BaseHTTPRequestHandler):
             if not sess:
                 return self._redirect("/login")
             self._html(_shell(scheduled_content(sess["tenant_id"]), "scheduled",
+                              sess["tenant_id"], sess.get("email", "")))
+        elif self.path == "/pricing":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            self._html(_shell(pricing_content(sess["tenant_id"]), "settings",
                               sess["tenant_id"], sess.get("email", "")))
         elif self.path.split("?")[0] == "/memory":
             sess = self._session()
