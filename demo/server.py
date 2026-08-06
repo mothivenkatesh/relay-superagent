@@ -2251,6 +2251,9 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
+.cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
+  align-items:center;justify-content:center}
+.cico svg{width:18px;height:18px}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
@@ -6450,19 +6453,104 @@ def decisions_content(tid):
 # key; pausing stops reads, disconnecting removes it, connecting adds.
 CONN_DEFS = [
     ("Your store", "ojaswellness.in orders and disputes"),
-    ("Amazon and Flipkart", "marketplace orders and claims"),
+    ("Amazon", "orders, claims and settlements"),
+    ("Flipkart", "orders, claims and settlements"),
     ("WhatsApp", "buyer messages, and your yeses on the go"),
-    ("Voice calls", "the callers ring buyers through this"),
+    ("Voice calls", "the callers ring buyers on Bolna and Osvi.ai"),
     ("Bank and settlements", "what landed, what was deducted"),
     ("Email", "dispute mail from the bank"),
 ]
 CONN_MORE = [
+    ("Meesho", "orders and claims from Meesho buyers"),
     ("Tally", "your books, posted automatically"),
     ("Zoho Books", "invoices tied to orders"),
     ("Shiprocket", "courier scans as dispute proof"),
     ("Instagram", "DMs from buyers who shop there"),
-    ("Quick commerce", "Blinkit and Zepto orders"),
+    ("Shopify", "your Shopify store, orders and checkout"),
+    ("Blinkit", "quick commerce orders and returns"),
+    ("Zepto", "quick commerce orders and returns"),
+    ("SFTP", "bank and ERP files, dropped and picked on schedule"),
+    ("AiSensy", "WhatsApp campaigns and broadcasts"),
+    ("Route Mobile", "SMS and RCS to buyers"),
 ]
+
+# Recognizable marks, drawn inline so the single-file demo stays
+# single-file: a white glyph on the service's colour.
+_CONN_ICONS = {
+    "Your store": ("#5266EB",
+        '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/>'
+        '<path d="M9 21v-6h6v6"/>'),
+    "Amazon": ("#FF9900",
+        '<path d="M16.5 9.4 7.55 4.24"/>'
+        '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>'
+        '<path d="M3.27 6.96 12 12.01l8.73-5.05"/><path d="M12 22.08V12"/>'),
+    "Flipkart": ("#2874F0",
+        '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>'
+        '<path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>'),
+    "WhatsApp": ("#25D366",
+        '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/>'),
+    "Voice calls": ("#0CA678",
+        '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 '
+        '19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3'
+        'a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11'
+        'L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45'
+        'c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>'),
+    "Bank and settlements": ("#475569",
+        '<path d="m3 9 9-6 9 6"/><path d="M4 9v12h16V9"/>'
+        '<path d="M8 21v-6"/><path d="M12 21v-6"/><path d="M16 21v-6"/>'),
+    "Email": ("#DB4437",
+        '<rect width="20" height="16" x="2" y="4" rx="2"/>'
+        '<path d="m22 7-10 6L2 7"/>'),
+    "Meesho": ("#F43397",
+        '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>'
+        '<path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>'),
+    "Tally": ("#2B6CB0",
+        '<line x1="12" y1="20" x2="12" y2="10"/>'
+        '<line x1="18" y1="20" x2="18" y2="4"/>'
+        '<line x1="6" y1="20" x2="6" y2="16"/>'),
+    "Zoho Books": ("#E42527",
+        '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>'
+        '<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>'),
+    "Shiprocket": ("#6B4EE6",
+        '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13'
+        '-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>'
+        '<path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2'
+        'c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>'
+        '<path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>'
+        '<path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>'),
+    "Instagram": ("#E1306C",
+        '<rect width="20" height="20" x="2" y="2" rx="5"/>'
+        '<path d="M16 11.37a4 4 0 1 1-7.914 1.174A4 4 0 0 1 16 11.37z"/>'
+        '<line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>'),
+    "Shopify": ("#96BF48",
+        '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>'
+        '<path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>'),
+    "Blinkit": ("#F0A500",
+        '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>'),
+    "Zepto": ("#7C3AED",
+        '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/>'
+        '<path d="M9 2h6"/>'),
+    "SFTP": ("#64748B",
+        '<rect width="20" height="8" x="2" y="2" rx="2"/>'
+        '<rect width="20" height="8" x="2" y="14" rx="2"/>'
+        '<line x1="6" y1="6" x2="6.01" y2="6"/>'
+        '<line x1="6" y1="18" x2="6.01" y2="18"/>'),
+    "AiSensy": ("#128C7E",
+        '<path d="m3 11 18-5v12L3 14v-3z"/>'
+        '<path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>'),
+    "Route Mobile": ("#0EA5E9",
+        '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>'),
+}
+
+
+def conn_icon(name: str) -> str:
+    color, glyph = _CONN_ICONS.get(name, ("#5266EB", ""))
+    return (f'<span class="cico" style="background:{color}">'
+            f'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" '
+            f'stroke-width="1.9" stroke-linecap="round" '
+            f'stroke-linejoin="round">{glyph}</svg></span>')
+
+
 CONN_STATE: dict = {}
 
 
@@ -6536,7 +6624,7 @@ def connections_hub(tid: str, embed: bool = False) -> str:
                     '<input type="hidden" name="act" value="connect">'
                     '<button class="btn ghost sm">+ Connect</button></form>')
             data = "available"
-        return (f'<div class="hubcard" data-hub="{data}">{_logo(n, 34)}'
+        return (f'<div class="hubcard" data-hub="{data}">{conn_icon(n)}'
                 f'<span class="hc-t"><b>{n}</b><span>{d}</span></span>'
                 f'<span class="hc-act">{chip}{acts}</span></div>')
 
@@ -7016,8 +7104,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._redirect("/login")
             from urllib.parse import parse_qs as _pq, urlparse as _up
             t = (_pq(_up(self.path).query).get("t") or ["voice"])[0]
-            self._html(_shell(memory_content(sess["tenant_id"], t), "memory",
-                              sess["tenant_id"], sess.get("email", "")))
+            return self._redirect("/settings?s=knowledge&t=" + t)
         elif self.path == "/shadow":
             sess = self._session()
             if not sess:
@@ -8799,6 +8886,9 @@ color:var(--mut)}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
+.cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
+  align-items:center;justify-content:center}
+.cico svg{width:18px;height:18px}
 .goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px 20px;margin:0 0 24px;max-width:720px}
 .goaltop{display:flex;align-items:center;justify-content:space-between;
