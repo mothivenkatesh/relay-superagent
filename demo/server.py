@@ -6297,7 +6297,9 @@ def seed_kfiles(tid: str) -> list:
     ])
 
 
-def memory_content(tid: str, tab: str = "voice") -> str:
+def memory_content(tid: str, tab: str = "voice",
+                   embed: bool = False,
+                   base: str = "/memory") -> str:
     """Knowledge, structured to grow: counts up top, tabs beneath. Every
     tab is a list that can hold hundreds of rows without changing shape."""
     led = WORLD.d.ledger
@@ -6317,11 +6319,11 @@ def memory_content(tid: str, tab: str = "voice") -> str:
     if tab not in {k for k, _, _ in TABS}:
         tab = "voice"
 
-    tiles = ('<div class="hubtoolrow"><div class="hubpills">'
-             + "".join(
+    sep = "&" if "?" in base else "?"
+    pills = ('<div class="hubpills">' + "".join(
         f'<a class="hubpill{" on" if tab == k else ""}" '
-        f'href="/memory?t={k}">{lbl} &middot; {n}</a>'
-        for k, lbl, n in TABS) + '</div></div>')
+        f'href="{base}{sep}t={k}">{lbl} &middot; {n}</a>'
+        for k, lbl, n in TABS) + '</div>')
 
     if tab == "voice":
         body = ('<div class="pagehint">Learned from the wording you '
@@ -6385,14 +6387,20 @@ def memory_content(tid: str, tab: str = "voice") -> str:
                 f'kept as notes you can read</span></span>'
                 f'<span class="st ok">every night</span></div>')
 
+    search = ('<input class="hubsearch" placeholder="Search this tab" '
+              'data-sel=".trow" oninput="hubFilter(this)">')
+    if embed:
+        return ('<div class="pagehint">Everything your team knows about '
+                'your business. Add to it, correct it; nothing is '
+                'forgotten.</div>'
+                f'<div class="hubtoolrow">{pills}{search}</div>'
+                f'{body}')
     return (hub_bar("memory")
             + f'<div class="hubhead"><div><h1 class="page">Knowledge</h1>'
             f'<div class="pagehint">Everything your team knows about your '
             f'business. Add to it, correct it; nothing is forgotten.</div>'
-            f'</div>'
-            f'<input class="hubsearch" placeholder="Search this tab" '
-            f'data-sel=".trow" oninput="hubFilter(this)"></div>'
-            f'{tiles}{body}')
+            f'</div>{search}</div>'
+            f'<div class="hubtoolrow">{pills}</div>{body}')
 
 # Every decision leaves a line: who, what, when, where to see it.
 DECISION_LOG: dict[str, list] = {}
@@ -6661,21 +6669,21 @@ TPL_ROUTINES = [
 ]
 
 
-def settings_content(tid: str, s: str = "team") -> str:
+def settings_content(tid: str, s: str = "team",
+                     mt: str = "voice") -> str:
     # Each tab is a job the founder actually comes here to do, named as
     # that job — not as a module.
-    SECTIONS = [("team", "Who can say yes"),
+    SECTIONS = [("team", "Approvers"),
                 ("connectors", "Connections"),
                 ("knowledge", "Knowledge"),
-                ("decisions", "Decisions"),
-                ("workspace", "The promises"),
-                ("data", "Your data")]
+                ("decisions", "Audit log"),
+                ("workspace", "Trust"),
+                ("data", "Export data")]
     if s not in {k for k, _ in SECTIONS}:
         s = "team"
     tabs = ('<div class="tabbar">' + "".join(
         f'<a class="{"on" if k == s else ""}" href="/settings?s={k}">{t}</a>'
-        for k, t in SECTIONS) + "</div>").replace(
-        '/settings?s=knowledge', '/memory')
+        for k, t in SECTIONS) + "</div>")
 
     if s == "team":
         body = (f'<div class="pagehint">Nothing that touches money or a '
@@ -6720,6 +6728,9 @@ def settings_content(tid: str, s: str = "team") -> str:
                  f'with Relay.</div>{relay_rows}')
     elif s == "connectors":
         body = connections_hub(tid, embed=True)
+    elif s == "knowledge":
+        body = memory_content(tid, tab=mt, embed=True,
+                              base="/settings?s=knowledge")
     elif s == "decisions":
         body = decisions_content(tid)
     elif s == "data":
@@ -6919,8 +6930,11 @@ class Handler(BaseHTTPRequestHandler):
             if not sess:
                 return self._redirect("/login")
             from urllib.parse import parse_qs as _pq, urlparse as _up
-            _sec = _pq(_up(self.path).query).get("s", ["team"])[0]
-            self._html(_shell(settings_content(sess["tenant_id"], _sec), "settings",
+            _q = _pq(_up(self.path).query)
+            _sec = _q.get("s", ["team"])[0]
+            _mt = _q.get("t", ["voice"])[0]
+            self._html(_shell(settings_content(sess["tenant_id"], _sec,
+                                               mt=_mt), "settings",
                               sess["tenant_id"], sess.get("email", "")))
         elif self.path == "/projects":
             sess = self._session()
@@ -7426,7 +7440,10 @@ class Handler(BaseHTTPRequestHandler):
                              "Added a file to Knowledge: <b>"
                              + esc(name) + "</b>", "/memory?t=files")
             self.send_response(303)
-            self.send_header("Location", "/memory?t=files")
+            ref = self.headers.get("Referer") or ""
+            self.send_header("Location",
+                             "/settings?s=knowledge&t=files"
+                             if "settings" in ref else "/memory?t=files")
             self.end_headers(); return
         if self.path == "/api/routine":
             sess = self._session()
