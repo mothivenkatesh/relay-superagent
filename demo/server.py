@@ -1263,7 +1263,6 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     </div>
     <div class="railsys">
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
-      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Knowledge</span></a>
       <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
     </div>
     <details class="acct railacct">
@@ -2713,16 +2712,6 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
 </style></head><body>
 __SIDEBAR__
 <div class="main">
-  <div class="topbar">
-    <span></span>
-    <div class="right"><details class="acct"><summary class="avatar">__INITIAL__</summary>
-      <div class="acctmenu">
-        <div class="acct-biz">__NAME__</div>
-        <div class="acct-mail">__USER__</div>
-        <div class="acct-shop">__BIZ__</div>
-        <a class="acct-out" href="/logout">Log out</a>
-      </div></details></div>
-  </div>
   <div class="content">__CONTENT__</div>
 </div>
 <script>
@@ -6660,6 +6649,7 @@ def settings_content(tid: str, s: str = "team") -> str:
     # that job — not as a module.
     SECTIONS = [("team", "Who can say yes"),
                 ("connectors", "Connections"),
+                ("knowledge", "Knowledge"),
                 ("decisions", "Decisions"),
                 ("workspace", "The promises"),
                 ("data", "Your data")]
@@ -6668,7 +6658,8 @@ def settings_content(tid: str, s: str = "team") -> str:
     tabs = ('<div class="tabbar">' + "".join(
         f'<a class="{"on" if k == s else ""}" href="/settings?s={k}">{t}</a>'
         for k, t in SECTIONS) + "</div>").replace(
-        '/settings?s=connectors', '/connections')
+        '/settings?s=connectors', '/connections').replace(
+        '/settings?s=knowledge', '/memory')
 
     if s == "team":
         body = (f'<div class="pagehint">Nothing that touches money or a '
@@ -9118,14 +9109,7 @@ background:none}
 </style></head><body>
 __SIDEBAR__
 <div class="main">
-  <div class="convhead" id="convhead"><span id="ctitle">__CONVTITLE__</span>
-    <span class="uwrap"><details class="acct"><summary class="avatar">__INITIAL__</summary>
-      <div class="acctmenu">
-        <div class="acct-biz">__NAME__</div>
-        <div class="acct-mail">__USER__</div>
-        <div class="acct-shop">__BIZ__</div>
-        <a class="acct-out" href="/logout">Log out</a>
-      </div></details></span></div>
+  <div class="convhead" id="convhead"><span id="ctitle">__CONVTITLE__</span></div>
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
       <div class="hero-mid">__ROLEPILLS__<h1>__GREET__</h1></div>
