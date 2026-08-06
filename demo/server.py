@@ -8440,6 +8440,17 @@ font-size:12px;font-weight:650;text-transform:uppercase}
 main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .thread{max-width:740px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:16px}
 .hero{margin-top:7vh}
+.ideas{max-width:560px;margin:48px auto 0;text-align:left}
+.ideas-h{font-size:13px;color:var(--mut);margin:0 0 8px 12px}
+.idea{display:flex;align-items:center;gap:14px;width:100%;border:0;
+  background:none;font:inherit;font-size:14.5px;color:var(--ink);
+  padding:10px 12px;border-radius:12px;cursor:pointer;text-align:left;
+  transition:background .12s}
+.idea:hover{background:#F2F2F6}
+.idea-ico{flex:none;width:34px;height:34px;border-radius:9px;
+  border:1px solid var(--hair);background:#fff;display:inline-flex;
+  align-items:center;justify-content:center;color:#5A5D6D}
+.idea-ico svg{width:16px;height:16px}
 .hero h1{font-size:33px;font-weight:450;color:var(--ink);letter-spacing:-.01em;
   margin-bottom:8px;text-align:center}
 .brief{text-align:center;color:var(--mut);font-size:13.5px;margin-bottom:24px}
@@ -8686,13 +8697,10 @@ __SIDEBAR__
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
       __ROLEPILLS__<h1>__GREET__</h1>
-      __MONEY__
-      <div class="brief">__BRIEF__</div>
-      __NEEDS__
-      __SAMPLE__
-      __ACTIVE__
-      <div class="tryline">Try one of these:</div>
-      <div class="hints">__CHIPS__</div>
+      <div class="ideas">
+        <div class="ideas-h">Ideas for you</div>
+        __IDEAS__
+      </div>
     </div>
   </div></main>
   <div class="composer" id="composer">
@@ -9586,6 +9594,25 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
     chips_html = "".join(
         f'<span class="hint" onclick="send(this.textContent)">{c}</span>' for c in chips)
 
+    def _idea_icon(c):
+        cl = c.lower()
+        if "yes" in cl:
+            return "tasks"
+        if "how is" in cl:
+            return "bot"
+        if "pay" in cl:
+            return "send"
+        if "amla" in cl or "stock" in cl:
+            return "folder"
+        if "thursday" in cl or "cash" in cl:
+            return "flow"
+        return "cmd"
+    ideas_html = "".join(
+        f'<button class="idea" onclick="send(this.dataset.q)" '
+        f'data-q="{esc(c)}"><span class="idea-ico">'
+        f'{ICONS[_idea_icon(c)]}</span><span>{esc(c)}</span></button>'
+        for c in chips[:3])
+
     # "Continue where you left off" is gone from Home on purpose: at this
     # simplicity level the owner needs one number, one ask, and one list.
     # Past conversations live in the sidebar, which is where you look for them.
@@ -9656,6 +9683,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__SAMPLE__", sample_html)
             .replace("__ROLEPILLS__", role_html)
             .replace("__GREET__", greet)
+            .replace("__IDEAS__", ideas_html)
             .replace("__MONEY__", money if not cid else "")
             .replace("__NEEDS__", needs if not cid else "")
             .replace("__BRIEF__", brief)
