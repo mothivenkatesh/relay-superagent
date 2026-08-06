@@ -6298,9 +6298,9 @@ def pricing_content(tid: str) -> str:
 <div class="pr-bill"><button class="on" id="prBm"
   onclick="prBill(0)">Monthly</button><button id="prBy"
   onclick="prBill(1)">Yearly <em>save 20%</em></button></div>
-<p class="pr-def">Counted in agents, metered in credits.
-<b>1 credit = &#8377;1.</b> Tokens, WhatsApp fees and voice minutes
-are inside. No separate bills.</p>
+<p class="pr-def">Priced by agents, bundled in plans,
+like hires on payroll. Metered in credits: <b>1 credit = &#8377;1</b>,
+tokens, WhatsApp fees and voice minutes inside. No separate bills.</p>
 <div class="pr-plans">{plans}</div>
 <div class="pr-strip cap"><b>Your bill never crosses your plan
 without your yes.</b> <span class="mut">Top-ups are approved like
