@@ -4325,7 +4325,7 @@ def agent_settings_content(tid: str, a: dict) -> str:
                '"textarea[name=instructions]");t.value=(t.value?'
                't.value+" ":"")+b.dataset.p;t.focus()}</script>')
     instr = (
-        '<h2 class="sec">How it works for you</h2>'
+        '<h2 class="sec">Instructions and limits</h2>'
         '<form method="post" action="/api/agent_cfg">'
         '<input type="hidden" name="slug" value="' + slug + '">'
         '<textarea class="cfgbox" name="instructions" rows="2" '
