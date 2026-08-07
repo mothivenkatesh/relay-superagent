@@ -2590,7 +2590,23 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .ctahint{display:block;font-size:11.5px;color:var(--mut);margin-top:8px;
   text-align:right}
 .tglbtn{width:34px;height:20px;border-radius:10px;background:#D9DBE4;border:0;
-  position:relative;flex:none;cursor:pointer;padding:0;box-sizing:content-box;padding:10px 6px;background-clip:content-box}
+  position:relative;flex:none;cursor:pointer;padding:0}
+.tglbtn::after{content:"";position:absolute;inset:-10px}
+.cfgsel{font:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--hair);border-radius:9px;background:#fff;min-height:40px;cursor:pointer}
+.pchips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+.pchip{font:inherit;font-size:12px;color:#3A3D4D;background:#fff;border:1px dashed var(--hair);border-radius:100px;padding:9px 14px;cursor:pointer;min-height:38px}
+.pchip:hover{border-color:#5266EB;color:#5266EB}
+.viarow{display:flex;gap:6px;align-items:center;margin-top:5px;font-size:11px}
+.viachip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--hair);border-radius:100px;padding:4px 10px;font-size:11px;color:#5A5D6D;text-decoration:none}
+.viachip.on{border-color:#BFD9BA;color:#1E7A46}
+.viachip i{width:6px;height:6px;border-radius:50%;background:#1E9E5A;display:inline-block}
+.jobmenu{position:relative}
+.jobmenu summary{list-style:none;cursor:pointer}
+.jobmenu summary::-webkit-details-marker{display:none}
+.jobmenu-d{position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:#fff;border:1px solid var(--hair);border-radius:14px;box-shadow:0 12px 32px rgba(27,31,48,.12);padding:8px;min-width:340px;display:flex;flex-direction:column;gap:2px}
+.jobopt{display:block;padding:12px 14px;border-radius:9px;font-size:13px;color:#1B1F30;text-decoration:none}
+.jobopt:hover{background:#F4F5FA}
+.jobopt.more{color:#5266EB;font-weight:600;border-top:1px solid var(--hair);margin-top:4px;border-radius:0 0 9px 9px}
 .tglbtn.on{background:var(--accent)}
 .tglbtn i{position:absolute;top:2px;left:2px;width:16px;height:16px;
   border-radius:50%;background:#fff;transition:left .12s}
@@ -4174,35 +4190,108 @@ def agent_settings_content(tid: str, a: dict) -> str:
     cfg = agent_cfg(tid, slug)
     acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
 
+    fields0 = GUARD_DEFAULTS.get(a["desk"], GUARD_DEFAULTS["analyst"])
+    QUIET_OPTS = ["9 AM to 8 PM", "10 AM to 7 PM", "11 AM to 9 PM",
+                  "Only 6 PM to 9 PM"]
+    TRIES_OPTS = ["1 try", "2 tries", "3 tries", "5 tries"]
+    ASK_OPTS = ["&#8377;500", "&#8377;1,000", "&#8377;5,000",
+                "&#8377;10,000", "&#8377;25,000", "&#8377;50,000"]
+
+    def _sel(name, opts, val):
+        if val not in opts:
+            opts = [val] + opts
+        return ('<select class="cfgsel" name="' + name + '">' + "".join(
+            '<option' + (' selected' if o == val else '') + '>' + o
+            + '</option>' for o in opts) + '</select>')
+    grows0 = ""
+    for key, label, default in fields0:
+        val = cfg["guards"].get(key, default)
+        opts = (QUIET_OPTS if key == "quiet" else
+                TRIES_OPTS if key == "tries" else ASK_OPTS)
+        grows0 += (
+            '<div class="trow slim" style="display:flex;align-items:center">'
+            '<span class="tdesc">' + label + '</span>'
+            + _sel("guard_" + key, opts, val) + '</div>')
+    SAMPLES = {
+        "calling": ["Never call before 11 AM.",
+                    "Hindi first, English if they switch.",
+                    "Offer free delivery above &#8377;999 before any discount."],
+        "support": ["Always share the courier tracking link.",
+                    "Never promise a refund date; say 3 to 5 working days.",
+                    "Escalate angry buyers to a person at once."],
+        "risk": ["Hold first orders above &#8377;3,000 from new buyers.",
+                 "Never hold repeat buyers with 3 clean orders.",
+                 "Flag, do not block, when unsure."],
+    }.get(a["desk"], ["Keep every message under 3 sentences.",
+                      "Match my tone: warm, never pushy.",
+                      "When unsure, ask me instead of guessing."])
+    chips = '<div class="pchips">' + "".join(
+        '<button type="button" class="pchip" data-p="'
+        + p.replace('"', '&quot;') + '" onclick="cfgFill(this)">'
+        + p + '</button>' for p in SAMPLES) + '</div>'
+    fill_js = ('<script>function cfgFill(b){var t=document.querySelector('
+               '"textarea[name=instructions]");t.value=(t.value?'
+               't.value+" ":"")+b.dataset.p;t.focus()}</script>')
     instr = (
-        '<h2 class="sec">Instructions</h2>'
+        '<h2 class="sec">How it works for you</h2>'
         '<form method="post" action="/api/agent_cfg">'
         '<input type="hidden" name="slug" value="' + slug + '">'
         '<textarea class="cfgbox" name="instructions" rows="2" '
         'style="width:100%;max-width:640px;resize:vertical" '
-        'placeholder="e.g. never call before 11 AM. It follows this on '
+        'placeholder="Standing instructions. It follows these on '
         'every job.">'
         + esc(cfg["instructions"]) + '</textarea>'
-        '<div style="margin-top:8px"><button class="btn primary sm">'
-        'Save</button></div></form>')
+        + chips + fill_js + grows0 +
+        '<div style="margin-top:10px"><button class="btn primary sm">'
+        'Save all</button>'
+        '<span class="ctahint" style="display:inline;margin-left:10px">'
+        'One save covers the instructions and the limits.</span>'
+        '</div></form>')
 
     reads_line = (
         '<div class="trow slim"><span class="ico">' + ICONS["book"]
         + '</span><span class="tdesc"><span class="mut">Always reads: '
         + ", ".join(acc["reads"]) + '.</span></span></div>')
+    def _via(tool_text):
+        t = tool_text.lower()
+        names = []
+        if "call" in t or "ring" in t:
+            names += ["Voice calls", "WhatsApp"]
+        elif "message" in t or "reply" in t or "whatsapp" in t:
+            names += ["WhatsApp", "Email"]
+        if "link" in t or "pay" in t or "refund" in t or "collect" in t \
+                or "saving" in t or "back" in t:
+            names.append("Cashfree")
+        if "order" in t or "cart" in t or "stock" in t:
+            names.append("Your store")
+        if not names:
+            names = ["Your store", "Cashfree"]
+        st = conn_state(tid)
+        out = ""
+        for n in dict.fromkeys(names):
+            on = st.get(n) == "on"
+            out += ('<a class="viachip' + (" on" if on else "")
+                    + '" href="/connections">'
+                    + ('<i></i>' if on else '') + n + '</a>')
+        return ('<span class="viarow"><span class="mut">via</span>'
+                + out + '</span>')
     trows = ""
     for i, d in enumerate(acc["does"]):
         off = str(i) in cfg["tools_off"]
         trows += (
-            '<div class="trow slim" style="display:flex">'
+            '<div class="trow slim toolrow" style="display:flex">'
             '<form method="post" action="/api/agent_cfg" '
             'style="display:contents">'
             '<input type="hidden" name="slug" value="' + slug + '">'
             '<input type="hidden" name="tool" value="' + str(i) + '">'
             '<button class="tglbtn ' + ("" if off else "on") + '"><i></i>'
             '</button></form>'
-            '<span class="tdesc">' + d[0].upper() + d[1:] + '</span></div>')
-    tools = ('<h2 class="sec">Tools</h2>' + trows + reads_line)
+            '<span class="tdesc">' + d[0].upper() + d[1:]
+            + _via(d) + '</span></div>')
+    tools = ('<h2 class="sec">Tools</h2>'
+             '<div class="pagehint">Switch a tool off and the agent works '
+             'without it. Each runs through your connections.</div>'
+             + trows + reads_line)
 
     mem = (
         '<h2 class="sec">Memory</h2>'
@@ -4216,23 +4305,13 @@ def agent_settings_content(tid: str, a: dict) -> str:
         '<span class="tdesc">Learns your style from what you change</span>'
         '<a class="st wait" href="/memory">what it knows &rarr;</a></div>')
 
-    fields = GUARD_DEFAULTS.get(a["desk"], GUARD_DEFAULTS["analyst"])
-    grows = ""
-    for key, label, default in fields:
-        val = cfg["guards"].get(key, default)
-        grows += (
-            '<form class="trow slim" method="post" action="/api/agent_cfg" '
-            'style="display:flex;align-items:center">'
-            '<input type="hidden" name="slug" value="' + slug + '">'
-            '<span class="tdesc">' + label + '</span>'
-            '<input class="inedit-in" style="flex:none;width:140px" '
-            'name="guard_' + key + '" value="' + esc(val) + '">'
-            '<button class="btn ghost sm">Save</button></form>')
-    guards = ('<h2 class="sec">Limits</h2>' + grows) if grows else ""
+    guards = ""
 
     checked = cfg["eval_at"]
     ev = (
-        '<h2 class="sec">Checks</h2>'
+        '<h2 class="sec">Nightly checks</h2>'
+        '<div class="pagehint">3 checks run on its work every night. '
+        'A failed check pauses the agent and tells you.</div>'
         + "".join(
             '<div class="trow slim"><span class="ico">' + ICONS["shield"]
             + '</span><span class="tdesc">' + c + '</span>'
@@ -4246,7 +4325,7 @@ def agent_settings_content(tid: str, a: dict) -> str:
         'style="margin-top:8px">'
         '<input type="hidden" name="slug" value="' + slug + '">'
         '<input type="hidden" name="run_checks" value="1">'
-        '<button class="btn ghost sm">Run now</button>'
+        '<button class="btn ghost sm">Run checks now</button>'
         + (('<span class="ctahint" style="display:inline;margin-left:8px">'
             'Last run ' + esc(checked) + '.</span>') if checked else '')
         + '</form>')
@@ -4791,6 +4870,36 @@ def trial_card(a: dict) -> str:
             f'Nothing sends without your yes.</span></div>')
 
 
+JOB_IDEAS = {
+    "calling": ["Call everyone who dropped a cart over &#8377;2,000 today",
+                "Rerun yesterday&rsquo;s failed payments before 6 PM",
+                "Confirm every COD order above &#8377;1,500 first"],
+    "support": ["Clear today&rsquo;s where-is-my-order messages",
+                "Reply to every review from this week",
+                "Draft answers for the 3 angriest buyers first"],
+    "risk": ["Re-check every refund claim from this week",
+             "Hold anything odd from new buyers during the sale",
+             "Walk me through your last 5 holds"],
+    "analyst": ["Build me a returns-by-pincode report for August",
+                "What changed in my numbers this week?",
+                "Watch this metric and tell me when it moves"],
+}
+
+
+def job_menu(a: dict) -> str:
+    """What Give-it-a-job truly means: 3 concrete jobs this agent can
+    start right now, one click each, plus the open door to chat."""
+    ideas = JOB_IDEAS.get(a["desk"], JOB_IDEAS["analyst"])
+    rows = "".join(
+        f'<a class="jobopt" href="/?say={q}">{q}</a>'
+        for q in ideas)
+    return (f'<details class="jobmenu"><summary class="btn ghost">'
+            f'Give it a job</summary><div class="jobmenu-d">{rows}'
+            f'<a class="jobopt more" href="/?say=/{esc(a["role"])} ">'
+            f'Something else&hellip; say it in chat &rarr;</a>'
+            f'</div></details>')
+
+
 def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
@@ -4949,8 +5058,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
         + (f'<span>&middot;</span><span>{a["name"]}</span>'
            if a["name"] != a["role"] else '') + '</div></div>'
         f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
-        f'<a class="btn ghost" href="/?say=/{esc(a["role"])} ">'
-        f'Give it a job</a>{action}</div></div>'
+        f'{job_menu(a)}{action}</div></div>'
         f'{agent_price_card(slug)}'
         f'{tabbar}'
         + (work_body if tab == "work"
@@ -6874,6 +6982,20 @@ def pricing_content(tid: str) -> str:
 .pr-cta{{margin-top:auto;display:flex;align-items:center;justify-content:center;min-height:44px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-align:center;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;color:#1D221F;text-decoration:none;padding:0}}
 .pr-list{{margin-bottom:16px}}
 .pr-cta.go{{background:#0B7A3E;border-color:#0B7A3E;color:#fff}}
+.pr-usage{{margin-top:16px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:18px 20px}}
+.pr-uhead{{display:flex;justify-content:space-between;align-items:baseline}}
+.pr-uhead b{{font-size:14.5px}}
+.pr-uhead .mut{{color:#6E7263;font-size:12px}}
+.pr-ubar{{height:8px;border-radius:4px;background:#EFEDE6;margin:12px 0 6px;position:relative;overflow:hidden}}
+.pr-ubar i{{position:absolute;left:0;top:0;bottom:0;background:#0B7A3E;border-radius:4px}}
+.pr-usub{{font-size:12.5px;color:#6E7263;margin-bottom:14px}}
+.pr-usub b{{color:#1D221F}}
+.pr-ucols{{display:grid;grid-template-columns:1fr 1fr;gap:22px}}
+@media (max-width:900px){{.pr-ucols{{grid-template-columns:1fr}}}}
+.pr-ut{{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#8A8D7C;margin-bottom:8px}}
+.pr-urow{{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid #F1EFE8}}
+.pr-urow b{{font-variant-numeric:tabular-nums}}
+.pr-unote{{margin-top:12px;font-size:12px;color:#8A8D7C}}
 .pr-faq{{margin-top:22px;border-top:1px solid var(--line)}}
 .pr-faq details{{border-bottom:1px solid var(--line)}}
 .pr-faq summary{{font-size:13.5px;font-weight:600;cursor:pointer;list-style-position:outside;padding:16px 2px}}
@@ -6917,6 +7039,28 @@ agent.</span></div>
   </div>
   <div class="pr-calc-buy" id="prB">&#8776; 9,000 credits of calls,
   paperwork and replies. Growth includes 25,000.</div>
+</div>
+<div class="pr-usage">
+  <div class="pr-uhead"><b>Your usage this month</b>
+  <span class="mut">Growth plan &middot; resets on the 1st</span></div>
+  <div class="pr-ubar"><i style="width:5.6%"></i></div>
+  <div class="pr-usub"><b>1,407</b> of 25,000 credits &middot; 5.6% used
+  &middot; on pace for ~4,200 this month</div>
+  <div class="pr-ucols">
+    <div class="pr-ucol"><span class="pr-ut">By kind of work</span>
+      <div class="pr-urow"><span>142 voice calls &times; 6</span><b>852</b></div>
+      <div class="pr-urow"><span>96 paperwork jobs &times; 2</span><b>192</b></div>
+      <div class="pr-urow"><span>363 replies &times; 1</span><b>363</b></div>
+    </div>
+    <div class="pr-ucol"><span class="pr-ut">By agent</span>
+      <div class="pr-urow"><span>Cart Recovery Agent</span><b>522</b></div>
+      <div class="pr-urow"><span>Disputes Agent</span><b>412</b></div>
+      <div class="pr-urow"><span>Payment Recovery Agent</span><b>348</b></div>
+      <div class="pr-urow"><span>Everyone else</span><b>125</b></div>
+    </div>
+  </div>
+  <div class="pr-unote">Every row traces to a job in History. Your bill
+  never crosses your plan without your yes.</div>
 </div>
 <div class="pr-faq">
   <details><summary>When credits run low?</summary><p>Relay asks.
