@@ -3030,7 +3030,47 @@ DESKS = [
      "changed."),
 ]
 
+# Ceded to CoWorker, the AI CFO: the think-and-report finance desks.
+# Relay keeps the agents that ACT. Data stays (teach maps, proposals);
+# they just leave the roster.
+# Krishan (CFO brief, cash), Priya (vendor payouts), Rohan (recon +
+# marketplace claims), Maya (marketing efficiency), Ankita (GST).
+CEDED_TO_COWORKER = {"three_way_recon", "settlement_insights",
+                     "cashflow_forecast", "daily_mis", "payouts_desk",
+                     "gst_compliance", "performance_marketing",
+                     "marketplace_claims"}
+
 RELAY_AGENTS = [
+    dict(slug="delivery_rescue", name="Delivery Rescue Agent", icon="chart",
+        status="roadmap", desk="support",
+        role="Delivery Rescue Agent",
+        desc="Failed deliveries fixed before they become returns: calls "
+             "the buyer, fixes the address, forces the reattempt.",
+        today="The courier marks &lsquo;customer unavailable&rsquo; and "
+              "nobody calls. The parcel rides home as RTO.",
+        replaces="the ops person chasing couriers all day"),
+    dict(slug="repeat_purchase", name="Repeat Purchase Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="Repeat Purchase Agent",
+        desc="Notices who is due to run out, and nudges before they "
+             "reorder elsewhere.",
+        today="Repeat revenue waits for the buyer to remember you.",
+        replaces="the retention marketing you never get to"),
+    dict(slug="marketplace_claims", name="Marketplace Claims Agent", icon="chart",
+        status="roadmap", desk="risk",
+        role="Marketplace Claims Agent",
+        desc="Collects what marketplaces owe you: lost shipments, damaged "
+             "returns, unpaid claims, filed on time.",
+        today="Claim windows lapse because filing is tedious paperwork.",
+        replaces="money you were owed and never collected"),
+    dict(slug="checkout_watchdog", name="Checkout Watchdog Agent", icon="chart",
+        status="roadmap", desk="risk",
+        role="Checkout Watchdog Agent",
+        desc="Tests your checkout and every payment method, every hour. "
+             "Screams first.",
+        today="A broken payment method on a sale day burns quietly "
+              "till a buyer complains.",
+        replaces="finding out from an angry customer"),
     dict(slug="instagram_shopping", name="Instagram Shopping Agent", icon="chart",
         status="roadmap", desk="calling",
         role="Instagram Shopping Agent",
@@ -5076,7 +5116,8 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
 
 
 def agents_content(tid: str, f: str = "all", q: str = "") -> str:
-    agents = RELAY_AGENTS
+    agents = [a for a in RELAY_AGENTS
+              if a["slug"] not in CEDED_TO_COWORKER]
     if f in ("active", "planned"):
         want = "live" if f == "active" else "roadmap"
         agents = [a for a in agents if a["status"] == want]
@@ -5089,19 +5130,17 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         ("Grow revenue",
          ("cart_rescue", "payment_rescue", "payment_forms",
           "instagram_shopping", "listings_opt", "subscription_dunning",
-          "ar_collection", "loan_recovery", "performance_marketing",
-          "stock_watch")),
+          "ar_collection", "loan_recovery", "stock_watch",
+          "repeat_purchase")),
         ("Prevent losses",
          ("dispute_defender", "refund_shield", "cod_guard",
-          "returns_desk", "smart_approval")),
+          "returns_desk", "smart_approval", "delivery_rescue",
+          "checkout_watchdog", "kyc_desk")),
         ("Keep customers happy",
          ("customer_support", "csat_feedback", "review_generation",
           "review_response")),
-        ("Know your money",
-         ("three_way_recon", "settlement_insights", "cashflow_forecast",
-          "daily_mis", "payouts_desk", "custom_reports")),
-        ("Stay compliant",
-         ("gst_compliance", "kyc_desk")),
+        ("Know your business",
+         ("custom_reports",)),
         ("Built by you", ("__custom__",)),
     ]
     def _needs(a):
@@ -5140,15 +5179,17 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
 
     seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
                               f'href="/agents?f={key}">{label}</a>')
-    n_all = len(RELAY_AGENTS)
-    n_on = sum(1 for a in RELAY_AGENTS
+    roster = [a for a in RELAY_AGENTS
+              if a["slug"] not in CEDED_TO_COWORKER]
+    n_all = len(roster)
+    n_on = sum(1 for a in roster
                if a["status"] == "live" or DEMO_ON.get(a["slug"]))
     led2 = WORLD.d.ledger
     truns = [r for r in led2.runs.values() if r.tenant_id == tid]
     n_yes = sum(1 for r in truns
                 if r.state is RunState.AWAITING_GATE) + props_waiting(tid)
     kept2, n_wins2, _w = recovered(tid)
-    n_live = sum(1 for a in RELAY_AGENTS if a["status"] == "live")
+    n_live = sum(1 for a in roster if a["status"] == "live")
     tiles = (
         f'<div class="stattiles">'
         f'<a class="stile" href="/agents?f=active"><b>{n_on}</b>'
@@ -6294,7 +6335,7 @@ def pricing_content(tid: str) -> str:
                pick=True, chip="Most picked",
                inc="Everything in Starter, and:", pid="prPG")
         + plan("Enterprise", "Talk to us", "", "For large teams",
-               ["All 26 agents", "Unlimited agents built by you",
+               ["All 23 agents", "Unlimited agents built by you",
                 "Credits sized to you", "Volume pricing",
                 "SSO and audit export", "Dedicated support"],
                inc="Everything in Growth, and:", cta="Talk to sales")
