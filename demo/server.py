@@ -2622,6 +2622,12 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .selrun{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
 #callbox{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
 .cselbar{display:flex;gap:12px;align-items:center;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:10px 14px;margin:0 0 10px}
+.flash{display:flex;gap:12px;align-items:center;border:1px solid #D9C79A;background:#FDF8EC;border-radius:12px;padding:12px 16px;margin:14px 0 4px;font-size:13.5px}
+.flash.ok{border-color:#BFD9BA;background:#F2F9EE}
+.flashundo{border:0;background:none;color:#5266EB;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;padding:8px 10px;margin:-8px 0}
+.setcard{border:1px solid var(--hair);background:#fff;border-radius:16px;padding:6px 22px 20px;margin:16px 0}
+.setcard h2.sec:first-child{margin-top:16px}
+.tooloff{opacity:.55}
 .addrule{display:flex;gap:8px;margin:12px 0 6px;max-width:680px}
 .addrule input{flex:1}
 .viarow{display:flex;gap:6px;align-items:center;margin-top:5px;font-size:11px}
@@ -4298,12 +4304,37 @@ def agent_cfg(tid: str, slug: str) -> dict:
         "guards": dict(seed.get("guards", {}))})
 
 
-def agent_settings_content(tid: str, a: dict) -> str:
+def agent_settings_content(tid: str, a: dict, note=("", "")) -> str:
     """Five controls, almost no words. Placeholders teach; captions are
     one line; anything constant is said once, at the bottom."""
     slug = a["slug"]
     cfg = agent_cfg(tid, slug)
     acc = DESK_ACCESS.get(a["desk"], DESK_ACCESS["analyst"])
+    did, t = note
+    FLASH = {
+        "rule_added": "Rule added. It applies from the next job.",
+        "checks_ran": "Checks ran: all 3 passed.",
+        "saved": "Saved. It applies from the next job.",
+        "file_added": "File added to its memory and to Knowledge.",
+    }
+    if did == "rule_removed":
+        import urllib.parse as _uq2
+        txt = _uq2.unquote(t)[:200]
+        undo = (('<form method="post" action="/api/agent_cfg" '
+                 'style="display:contents">'
+                 '<input type="hidden" name="slug" value="' + slug + '">'
+                 '<input type="hidden" name="add_rule" value="'
+                 + esc(txt).replace('"', '&quot;') + '">'
+                 '<button class="flashundo">Undo</button></form>')
+                if txt else '')
+        flash = ('<div class="flash">Rule removed.' + undo + '</div>')
+    elif did in FLASH:
+        flash = '<div class="flash ok">' + FLASH[did] + '</div>'
+    else:
+        flash = ""
+    status = ('<div class="pagehint">Everything here applies from its '
+              'next job. Every change lands in '
+              '<a href="/settings?s=decisions"><b>Decisions</b></a>.</div>')
 
     fields0 = GUARD_DEFAULTS.get(a["desk"], GUARD_DEFAULTS["analyst"])
     QUIET_OPTS = ["9 AM to 8 PM", "10 AM to 7 PM", "11 AM to 9 PM",
@@ -4459,7 +4490,10 @@ def agent_settings_content(tid: str, a: dict) -> str:
             '<input type="hidden" name="tool" value="' + str(i) + '">'
             '<button class="tglbtn ' + ("" if off else "on") + '"><i></i>'
             '</button></form>'
-            '<span class="tdesc">' + d[0].upper() + d[1:]
+            '<span class="tdesc' + (' tooloff' if off else '') + '">'
+            + d[0].upper() + d[1:]
+            + ('<span class="st mut" style="margin-left:8px">switched '
+               'off</span>' if off else '')
             + _via(d, i) + '</span></div>')
     tools = ('<h2 class="sec">Tools</h2>'
              '<div class="pagehint">Switch a tool off and the agent works '
@@ -4503,12 +4537,14 @@ def agent_settings_content(tid: str, a: dict) -> str:
             'Last run ' + esc(checked) + '.</span>') if checked else '')
         + '</form>')
 
-    footer = ('<div class="pagehint" style="margin-top:32px">Always true, '
-              'whatever is set here: nothing sends without your yes, and '
-              'every change lands in '
-              '<a href="/settings?s=decisions"><b>Decisions</b></a>.</div>')
+    def card(body):
+        return '<div class="setcard">' + body + '</div>'
 
-    return instr + tools + mem + guards + ev + footer
+    footer = ('<div class="pagehint" style="margin-top:24px">Always true, '
+              'whatever is set here: nothing sends without your '
+              'yes.</div>')
+    return (flash + status + card(instr) + card(tools + mem) + card(ev)
+            + footer)
 
 
 # The moat, made visible: one order record that every agent reads and
@@ -5073,7 +5109,8 @@ def job_menu(a: dict) -> str:
             f'</div></details>')
 
 
-def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
+def roster_detail_content(tid: str, a: dict, tab: str = "work",
+                          note=("", "")) -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
     rules it works under, and one button. Brief it like someone joining on
@@ -5285,7 +5322,8 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
         f'{agent_price_card(slug)}'
         f'{tabbar}'
         + (work_body if tab == "work"
-           else agent_settings_content(tid, a) if tab == "settings"
+           else agent_settings_content(tid, a, note)
+           if tab == "settings"
            else about_body))
 
 
@@ -5517,13 +5555,15 @@ def _kyc_builder(tid: str = "t1") -> str:
 
 
 def agent_detail_content(tid: str, slug: str, tab: str = "overview",
-                         item: int = 0) -> str:
+                         item: int = 0, note=("", "")) -> str:
     a = AGENT_DEFS.get(slug)
     if not a:
         roster = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
         if roster is not None:
             return roster_detail_content(
-                tid, roster, tab if tab in ("work", "about", "settings") else "work")
+                tid, roster,
+                tab if tab in ("work", "about", "settings") else "work",
+                note=note)
         return '<h1 class="page">We don&rsquo;t have anyone by that name</h1>'
     led = WORLD.d.ledger
     runs = [r for r in led.runs.values() if r.tenant_id == tid]
@@ -8245,10 +8285,12 @@ class Handler(BaseHTTPRequestHandler):
             u = _up(self.path)
             qs = _pq(u.query)
             slug = u.path.rsplit("/", 1)[-1]
+            _note = (qs.get("did", [""])[0], qs.get("t", [""])[0])
             self._html(_shell(
                 agent_detail_content(sess["tenant_id"], slug,
                                      qs.get("tab", ["overview"])[0],
-                                     int(qs.get("item", ["0"])[0] or 0)),
+                                     int(qs.get("item", ["0"])[0] or 0),
+                                     note=_note),
                 "agents", sess["tenant_id"], sess.get("email", "")))
         elif self.path == "/connections":
             sess = self._session()
@@ -8456,6 +8498,7 @@ class Handler(BaseHTTPRequestHandler):
                                      + esc(role) + "</b>: &ldquo;"
                                      + esc(txt[:60]) + "&rdquo;",
                                      "/agents/" + slug + "?tab=settings")
+                gone = ""
                 if "del_rule" in form:
                     try:
                         gone = cfg.setdefault("rules", []).pop(
@@ -8501,8 +8544,23 @@ class Handler(BaseHTTPRequestHandler):
                                  + esc(role) + "</b>: all good",
                                  "/agents/" + slug + "?tab=settings")
             _cfg_save()
+            did = ""
+            t_extra = ""
+            if "add_rule" in form:
+                did = "rule_added"
+            elif "del_rule" in form:
+                did = "rule_removed"
+                import urllib.parse as _uq
+                t_extra = _uq.quote(gone[:200]) if gone else ""
+            elif "run_checks" in form:
+                did = "checks_ran"
+            elif form:
+                did = "saved"
             self.send_response(303)
-            self.send_header("Location", "/agents/" + slug + "?tab=settings")
+            self.send_header(
+                "Location", "/agents/" + slug + "?tab=settings"
+                + ("&did=" + did if did else "")
+                + ("&t=" + t_extra if t_extra else ""))
             self.end_headers(); return
         if self.path in ("/api/agent_on", "/api/agent_off"):
             sess = self._session()
@@ -8763,8 +8821,9 @@ class Handler(BaseHTTPRequestHandler):
                              + esc(name) + "</b>", "/memory?t=files")
             self.send_response(303)
             ref = self.headers.get("Referer") or ""
-            if agent_tag if m else False:
-                loc = "/agents/" + agent_tag + "?tab=settings"
+            if (agent_tag if m else False):
+                loc = ("/agents/" + agent_tag
+                       + "?tab=settings&did=file_added")
             elif "settings" in ref:
                 loc = "/settings?s=knowledge&t=files"
             else:
