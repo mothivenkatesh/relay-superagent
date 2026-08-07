@@ -2313,6 +2313,22 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .teamfaces .aglyph svg{width:12px;height:12px}
 .teamfaces .pres{display:none}
 .teamline{font-size:12.5px;color:#8A8D7C;margin:-6px 2px 12px;max-width:72ch}
+.teamgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:6px 0 26px}
+@media (max-width:1100px){.teamgrid{grid-template-columns:repeat(2,1fr)}}
+.tcard{border:1px solid var(--hair);border-radius:16px;background:#fff;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;box-shadow:0 5px 0 -2px var(--tcb),0 10px 0 -5px var(--tcb);transition:transform .12s}
+.tcard:hover{transform:translateY(-2px)}
+.tcard.sel{border-color:var(--tc)}
+.tc-faces{display:flex;gap:6px;align-items:center}
+.tc-faces .aglyph{width:26px !important;height:26px !important;border-radius:8px}
+.tc-faces .aglyph svg{width:14px;height:14px}
+.tc-faces .pres{display:none}
+.tc-more{font-size:10.5px;color:#8A8D7C;font-weight:600}
+.tcard>b{font-size:15.5px;letter-spacing:-.01em;margin-top:2px}
+.tc-line{font-size:11.8px;color:#6E7263;line-height:1.45}
+.tc-meta{font-size:10.5px;color:#9A9D8E}
+.tc-cta{margin-top:auto;padding-top:6px;font-size:12px;font-weight:700;color:var(--tc)}
+.tclear{margin:0 0 14px;font-size:12.5px}
+.tclear a{color:#5266EB;text-decoration:none}
 .stile .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
 .stile .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
@@ -5317,20 +5333,12 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
                      f'<span class="gbar"><i style="width:{gnow}%"></i>'
                      f'<em style="left:{gtarget}%"></em></span>'
                      f'<b>{gnow}%</b></div>')
-    if a["desk"] == "custom":
-        footer = ('<div class="ac-f"><b style="color:#5B5E52">yours</b>'
-                  '<span>described in chat &middot; &#8377;999/mo</span></div>')
-    else:
-        footer = (f'<div class="ac-f"><b style="color:{fg}">{mult}x</b>'
-                  f'<span class="impbars"><i class="h"></i>'
-                  f'<i class="a" style="width:{barw}px"></i></span>'
-                  f'<span>&#8377;999/mo vs the &#8377;{hire_k}k hire</span></div>')
     return (f'<a class="agentcard2{" alive" if live else ""}" '
             f'href="/agents/{a["slug"]}">'
             f'<div class="ac-h">{agent_tile(a["slug"], live or watching, 36)}'
             f'<div class="ac-n"><b>{a["role"]}</b><span>{line}</span></div>'
             f'{chip}</div>'
-            f'{goal_zone}{footer}</a>'
+            f'{goal_zone}</a>'
             )
 
 
@@ -5384,17 +5392,7 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         if keys == ("__custom__",):
             return [a for a in agents if a["desk"] == "custom"]
         return [a for a in agents if a["slug"] in keys]
-    wpf = (f'<a class="{"on" if not g else ""}" href="/agents?f={f}">'
-           f'All ({len(agents)})</a>')
-    for _t, _k in FAMILIES:
-        _n = len(_fam_agents(_k))
-        if not _n:
-            continue
-        wpf += ('<span>|</span>'
-                f'<a class="{"on" if g == _t else ""}" '
-                f'href="/agents?f={f}&amp;g={_t.replace(" ", "+")}">'
-                f'{_t} ({_n})</a>')
-    wpf = f'<div class="wpf">{wpf}</div>'
+    wpf = ""
 
     TEAM_LINES = {
         "Plans": "Reads what every team below learns, and files your "
@@ -5422,19 +5420,44 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         n_on_fam = sum(1 for a in mine
                        if a["status"] == "live" or DEMO_ON.get(a["slug"]))
         n_need_fam = sum(1 for a in mine if _needs(a))
-        faces = "".join(agent_tile(a["slug"], True, 22) for a in mine[:6])
-        tline = TEAM_LINES.get(title, "")
         desks += (f'<div class="hubsec"><h2 class="sec fam">{title}'
-                  f'<span class="teamfaces">{faces}</span>'
                   f'<span class="st {"ok" if n_on_fam else "mut"}">'
                   f'{n_on_fam} of {len(mine)} on</span>'
                   + (f'<span class="st need2">{n_need_fam} pending</span>'
                      if n_need_fam else '')
                   + '</h2>'
-                  + (f'<div class="teamline">{tline}</div>' if tline else '')
-                  + f'<div class="hubgrid">'
+                  f'<div class="hubgrid">'
                   + "".join(_relay_agent_card(a, tid) for a in mine)
                   + '</div></div>')
+    tcards = ""
+    for _t, _k in FAMILIES:
+        _m = _fam_agents(_k)
+        if not _m:
+            continue
+        _bg, _fg = _TINT.get(_t, _TINT["custom"])
+        _onn = sum(1 for a in _m
+                   if a["status"] == "live" or DEMO_ON.get(a["slug"]))
+        _faces = "".join(agent_tile(a["slug"], True, 26) for a in _m[:5])
+        _more = (f'<span class="tc-more">+{len(_m) - 5}</span>'
+                 if len(_m) > 5 else "")
+        _sel = " sel" if g == _t else ""
+        tcards += (
+            f'<a class="tcard{_sel}" '
+            f'style="--tc:{_fg};--tcb:{_bg}" '
+            f'href="/agents?f={f}&amp;g={_t.replace(" ", "+")}">'
+            f'<span class="tc-faces">{_faces}{_more}</span>'
+            f'<b>{_t}</b>'
+            f'<span class="tc-line">{TEAM_LINES.get(_t, "")}</span>'
+            f'<span class="tc-meta">{len(_m)} '
+            f'{"agent" if len(_m) == 1 else "agents"} &middot; '
+            f'{_onn} on</span>'
+            f'<span class="tc-cta">See the team &rarr;</span></a>')
+    clear = (f'<div class="tclear"><a href="/agents?f={f}">&larr; every '
+             f'team, every agent</a></div>' if g else "")
+    teamgrid = f'<div class="teamgrid">{tcards}</div>{clear}'
+    if g:
+        desks = clear + desks
+
     if not desks:
         desks = '<div class="empty">Nothing matches.</div>'
 
@@ -5503,9 +5526,9 @@ def agents_content(tid: str, f: str = "all", q: str = "",
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span>'
-            f'{wpf}'
             f'</div>'
-            f'{desks}')
+            + ('' if g else teamgrid)
+            + f'{desks}')
 
 
 def activity_content(tid: str, f: str = "all") -> str:
