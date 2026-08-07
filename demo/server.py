@@ -2274,6 +2274,7 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .sb>span{font-size:11.5px;color:#6E7263}
 .sb i{font-style:normal;font-size:11px;color:#9A9D8E;white-space:nowrap}
 .sb.need b{color:#A9700B}
+.sb.need{background:linear-gradient(135deg,#FCF7EA,#fff)}
 .sb.hero{flex:1.6;background:linear-gradient(135deg,#F2F9EE,#fff)}
 .sb.hero b{font-size:24px;color:#0B7A3E}
 .sb.hero i{white-space:normal}
@@ -2316,7 +2317,7 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .teamfaces .aglyph svg{width:12px;height:12px}
 .teamfaces .pres{display:none}
 .teamline{font-size:12.5px;color:#8A8D7C;margin:-6px 2px 12px;max-width:72ch}
-.teamgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:18px 0 26px}
+.teamgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:18px 0 8px}
 @media (max-width:1100px){.teamgrid{grid-template-columns:repeat(2,1fr)}}
 .tcard{border:1px solid var(--hair);border-radius:16px;background:#fff;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;box-shadow:0 5px 0 -2px var(--tcb),0 10px 0 -5px var(--tcb);transition:transform .12s}
 .tcard:hover{transform:translateY(-2px)}
@@ -2334,6 +2335,18 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .tg-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0B7A3E}
 .tghead b{font-size:22px;letter-spacing:-.02em}
 .tg-sub{font-size:13.5px;color:#6E7263}
+.hireshelf{margin:28px 0 8px}
+.hire-h{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+.hire-h b{font-size:16px;letter-spacing:-.01em}
+.hire-h span{font-size:12.5px;color:#6E7263}
+.hiregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:1100px){.hiregrid{grid-template-columns:1fr}}
+.hcard{border:1.5px dashed #D9C79A;background:linear-gradient(180deg,#FDFBF3,#fff);border-radius:16px;padding:15px 16px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit}
+.hcard:hover{border-color:#A9700B}
+.hcard .why{font-size:12.5px;color:#6E7263;line-height:1.45}
+.hcard .repl{font-size:11px;color:#9A9D8E}
+.hcard .hmult{margin-left:auto;font-size:15px;font-weight:700;color:#A9700B;flex:none}
+.hcard .hcta{margin-top:auto;padding-top:4px;font-size:12.5px;font-weight:700;color:#0B7A3E}
 .tclear{margin:0 0 14px;font-size:12.5px}
 .tclear a{color:#5266EB;text-decoration:none}
 .stile .tspark,.sb .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
@@ -4711,16 +4724,16 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
                 f'<span class="go2">&rsaquo;</span></a>'
                 for i, s, stat in crew))
     elif on:
-        state = '<span class="st wait">watching: learning your business</span>'
+        state = '<span class="st wait">in trial: learning your business</span>'
         action = (f'<form method="post" action="/api/agent_off">'
                   f'<input type="hidden" name="slug" value="{a["slug"]}">'
                   f'<button class="btn ghost">Switch off</button></form>')
     else:
-        state = '<span class="st mut">not switched on</span>'
+        state = '<span class="st mut">not hired yet</span>'
         action = (f'<form method="post" action="/api/agent_on">'
                   f'<input type="hidden" name="slug" value="{a["slug"]}">'
-                  f'<button class="btn primary">Switch on</button>'
-                  f'<span class="ctahint">It only watches for the first week.</span></form>')
+                  f'<button class="btn primary">Hire</button>'
+                  f'<span class="ctahint">The first week is a trial: it only watches.</span></form>')
     story = AGENT_STORY.get(a["slug"], {})
     steps = "".join(
         f'<div class="hstep"><span class="hdot"></span>'
@@ -5324,9 +5337,9 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
     if live:
         chip = '<span class="st ok">On</span>'
     elif watching:
-        chip = '<span class="st wait">watching</span>'
+        chip = '<span class="st wait">in trial</span>'
     else:
-        chip = '<span class="st mut">Off</span>'
+        chip = '<span class="st mut">not hired</span>'
     line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
     mult, hire_k = _impact(a["slug"])
     fg = _TINT[_FACULTY.get(a["slug"], "custom")][1]
@@ -5427,9 +5440,14 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         n_on_fam = sum(1 for a in mine
                        if a["status"] == "live" or DEMO_ON.get(a["slug"]))
         n_need_fam = sum(1 for a in mine if _needs(a))
+        f_lv = sum(1 for a in mine if a["status"] == "live")
+        f_tr = sum(1 for a in mine
+                   if a["status"] != "live" and DEMO_ON.get(a["slug"]))
         desks += (f'<div class="hubsec"><h2 class="sec fam">{title}'
-                  f'<span class="st {"ok" if n_on_fam else "mut"}">'
-                  f'{n_on_fam} of {len(mine)} on</span>'
+                  + (f'<span class="st ok">{f_lv} working</span>'
+                     if f_lv else '')
+                  + (f'<span class="st wait">{f_tr} in trial</span>'
+                     if f_tr else '')
                   + (f'<span class="st need2">{n_need_fam} pending</span>'
                      if n_need_fam else '')
                   + '</h2>'
@@ -5438,12 +5456,15 @@ def agents_content(tid: str, f: str = "all", q: str = "",
                   + '</div></div>')
     tcards = ""
     for _t, _k in FAMILIES:
+        if _t in ("Plans", "Reports"):
+            continue
         _m = _fam_agents(_k)
         if not _m:
             continue
         _bg, _fg = _TINT.get(_t, _TINT["custom"])
-        _onn = sum(1 for a in _m
-                   if a["status"] == "live" or DEMO_ON.get(a["slug"]))
+        _lv = sum(1 for a in _m if a["status"] == "live")
+        _tr = sum(1 for a in _m
+                  if a["status"] != "live" and DEMO_ON.get(a["slug"]))
         _faces = "".join(agent_tile(a["slug"], True, 26) for a in _m[:5])
         _more = (f'<span class="tc-more">+{len(_m) - 5}</span>'
                  if len(_m) > 5 else "")
@@ -5455,13 +5476,47 @@ def agents_content(tid: str, f: str = "all", q: str = "",
             f'<span class="tc-faces">{_faces}{_more}</span>'
             f'<b>{_t}</b>'
             f'<span class="tc-line">{TEAM_LINES.get(_t, "")}</span>'
-            f'<span class="tc-meta">{len(_m)} '
-            f'{"agent" if len(_m) == 1 else "agents"} &middot; '
-            f'{_onn} on</span>'
+            f'<span class="tc-meta">'
+            + " &middot; ".join(
+                ([f"{_lv} working"] if _lv else [])
+                + ([f"{_tr} in trial"] if _tr else [])) + '</span>'
             f'<span class="tc-cta">See the team &rarr;</span></a>')
     clear = (f'<div class="tclear"><a href="/agents?f={f}">&larr; every '
              f'team, every agent</a></div>' if g else "")
+    # The hiring hall: 3 candidates picked from where this store leaks,
+    # argued in replace-cost terms. The multiple lives HERE, where a
+    # hiring decision is being made, not on staff cards.
+    HIRE_NEXT = [
+        ("delivery_rescue",
+         "Every RTO on your book started as a failed delivery "
+         "nobody called about."),
+        ("repeat_purchase",
+         "Dog food runs out every 6 weeks. Nobody reminds your buyers."),
+        ("checkout_watchdog",
+         "A payment method broke in sale week. A buyer told you first."),
+    ]
+    hcards = ""
+    for _sl, _why in HIRE_NEXT:
+        _a = next((x for x in RELAY_AGENTS if x["slug"] == _sl), None)
+        if _a is None or _a["status"] == "live":
+            continue
+        _mu, _hk = _impact(_sl)
+        hcards += (
+            f'<a class="hcard" href="/agents/{_sl}">'
+            f'<div class="ac-h">{agent_tile(_sl, False, 34)}'
+            f'<div class="ac-n"><b>{_a["role"]}</b></div>'
+            f'<span class="hmult">{_mu}x</span></div>'
+            f'<span class="why">{_why}</span>'
+            f'<span class="repl">&#8377;999/mo &middot; replaces '
+            f'{_a["replaces"]}</span>'
+            f'<span class="hcta">Hire &rarr;</span></a>')
+    hireshelf = (
+        f'<div class="hireshelf"><div class="hire-h"><b>Hire next</b>'
+        f'<span>Picked from your own numbers, not our brochure.</span></div>'
+        f'<div class="hiregrid">{hcards}</div></div>' if hcards else "")
+
     tghead = ('<div class="tghead">'
+
               '<span class="tg-eyebrow">One super agent</span>'
               '<b>Agent Teams</b>'
               '<span class="tg-sub">Coordinated agents working your store '
@@ -5514,8 +5569,8 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         f'<span>back for every &#8377;1 spent</span>'
         f'<i>&#8377;{inr(kept2)} kept &middot; {used_cr:,} of 25,000 '
         f'credits &middot; from the ledger</i></a>'
-        f'<a class="sb" href="/agents?f=active"><b>{n_on}</b>'
-        f'<span>agents on</span><i>{n_live} working</i></a>'
+        f'<a class="sb" href="/agents?f=active"><b>{n_live}</b>'
+        f'<span>working</span><i>{n_on - n_live} in trial</i></a>'
         f'<a class="sb need" href="/approvals"><b>{n_yes}</b>'
         f'<span>pending approval</span>'
         f'<i>&#8377;{inr(d_stake + p_stake)} riding</i></a>'
@@ -5526,8 +5581,8 @@ def agents_content(tid: str, f: str = "all", q: str = "",
     if g:
         body = (f'<div class="atoolbar">'
                 f'<span class="seg">{seg("all", "All")}'
-                f'{seg("active", "On")}'
-                f'{seg("planned", "Not on yet")}</span></div>'
+                f'{seg("active", "Working")}'
+                f'{seg("planned", "In trial")}</span></div>'
                 f'{desks}')
     else:
         live_cards = "".join(_relay_agent_card(a, tid) for a in agents
@@ -5535,7 +5590,15 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         working = (f'<h2 class="sec fam">Working now</h2>'
                    f'<div class="hubgrid">{live_cards}</div>'
                    if live_cards else '')
-        body = working + teamgrid
+        staff = [a for a in agents
+                 if a["slug"] in ("cofounder", "custom_reports")]
+        staff_row = (
+            f'<h2 class="sec fam">Staff roles'
+            f'<span class="st mut">work across every team</span></h2>'
+            f'<div class="hubgrid">'
+            + "".join(_relay_agent_card(a, tid) for a in staff)
+            + '</div>' if staff else '')
+        body = working + staff_row + teamgrid + hireshelf
     return (f'<h1 class="page">Agents</h1>'
             f'<div class="pagehint">One super agent. It plans, sells, '
             f'collects, protects, cares and reports.</div>'
