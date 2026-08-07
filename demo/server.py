@@ -2347,6 +2347,9 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .hcard .repl{font-size:11px;color:#9A9D8E}
 .hcard .hmult{margin-left:auto;font-size:15px;font-weight:700;color:#A9700B;flex:none}
 .hcard .hcta{margin-top:auto;padding-top:4px;font-size:12.5px;font-weight:700;color:#0B7A3E}
+.teamhero{border:1px solid var(--tcb);background:linear-gradient(180deg,var(--tcb),#fff 130%);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;gap:7px;margin:2px 0 18px}
+.teamhero>b{font-size:21px;letter-spacing:-.02em}
+.teamhero .tc-line{font-size:13.5px;color:#4B4E44;max-width:70ch}
 .tclear{margin:0 0 14px;font-size:12.5px}
 .tclear a{color:#5266EB;text-decoration:none}
 .stile .tspark,.sb .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
@@ -5429,31 +5432,33 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         "Built by you": "Describes a job in chat; it joins whichever "
                         "team the job belongs to.",
     }
-    desks = ""
-    for title, keys in FAMILIES:
-        if g and title != g:
-            continue
-        mine = _fam_agents(keys)
-        if not mine:
-            continue
-        mine.sort(key=lambda a: (not _needs(a), a["status"] != "live"))
-        n_on_fam = sum(1 for a in mine
-                       if a["status"] == "live" or DEMO_ON.get(a["slug"]))
-        n_need_fam = sum(1 for a in mine if _needs(a))
-        f_lv = sum(1 for a in mine if a["status"] == "live")
-        f_tr = sum(1 for a in mine
-                   if a["status"] != "live" and DEMO_ON.get(a["slug"]))
-        desks += (f'<div class="hubsec"><h2 class="sec fam">{title}'
-                  + (f'<span class="st ok">{f_lv} working</span>'
-                     if f_lv else '')
-                  + (f'<span class="st wait">{f_tr} in trial</span>'
-                     if f_tr else '')
-                  + (f'<span class="st need2">{n_need_fam} pending</span>'
-                     if n_need_fam else '')
-                  + '</h2>'
-                  f'<div class="hubgrid">'
-                  + "".join(_relay_agent_card(a, tid) for a in mine)
-                  + '</div></div>')
+    # A team's room: breadcrumb back to the office, the team hero in
+    # its own colour, then members presented by employment. No filters:
+    # a department of 8 does not need a query language.
+    team_view = ""
+    if g:
+        _famk = next((k for t, k in FAMILIES if t == g), None)
+        _members = _fam_agents(_famk) if _famk else []
+        _members.sort(key=lambda a: (a["status"] != "live",
+                                     not _needs(a)))
+        _wk = [a for a in _members if a["status"] == "live"]
+        _tr2 = [a for a in _members if a["status"] != "live"]
+        _bg2, _fg2 = _TINT.get(g, _TINT["custom"])
+        _faces2 = "".join(agent_tile(a["slug"], True, 26)
+                          for a in _members[:8])
+        team_view = (
+            f'<div class="tclear"><a href="/agents">&larr; Back to the '
+            f'office</a></div>'
+            f'<div class="teamhero" style="--tc:{_fg2};--tcb:{_bg2}">'
+            f'<span class="tc-faces">{_faces2}</span>'
+            f'<b>{g}</b>'
+            f'<span class="tc-line">{TEAM_LINES.get(g, "")}</span></div>'
+            + (f'<h2 class="sec fam">Working</h2><div class="hubgrid">'
+               + "".join(_relay_agent_card(a, tid) for a in _wk)
+               + '</div>' if _wk else '')
+            + (f'<h2 class="sec fam">In trial</h2><div class="hubgrid">'
+               + "".join(_relay_agent_card(a, tid) for a in _tr2)
+               + '</div>' if _tr2 else ''))
     tcards = ""
     for _t, _k in FAMILIES:
         if _t in ("Plans", "Reports"):
@@ -5522,11 +5527,7 @@ def agents_content(tid: str, f: str = "all", q: str = "",
               '<span class="tg-sub">Coordinated agents working your store '
               'together, hand-off by hand-off.</span></div>')
     teamgrid = f'{tghead}<div class="teamgrid">{tcards}</div>{clear}'
-    if g:
-        desks = clear + desks
 
-    if not desks:
-        desks = '<div class="empty">Nothing matches.</div>'
 
     seg = lambda key, label: (
         f'<a class="{"on" if f == key else ""}" '
@@ -5569,7 +5570,7 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         f'<span>back for every &#8377;1 spent</span>'
         f'<i>&#8377;{inr(kept2)} kept &middot; {used_cr:,} of 25,000 '
         f'credits &middot; from the ledger</i></a>'
-        f'<a class="sb" href="/agents?f=active"><b>{n_live}</b>'
+        f'<a class="sb" href="/agents"><b>{n_live}</b>'
         f'<span>working</span><i>{n_on - n_live} in trial</i></a>'
         f'<a class="sb need" href="/approvals"><b>{n_yes}</b>'
         f'<span>pending approval</span>'
@@ -5579,11 +5580,7 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         f'<span class="tspark">{sbars}</span></a>'
         f'</div>')
     if g:
-        body = (f'<div class="atoolbar">'
-                f'<span class="seg">{seg("all", "All")}'
-                f'{seg("active", "Working")}'
-                f'{seg("planned", "In trial")}</span></div>'
-                f'{desks}')
+        body = team_view
     else:
         live_cards = "".join(_relay_agent_card(a, tid) for a in agents
                              if a["status"] == "live")
