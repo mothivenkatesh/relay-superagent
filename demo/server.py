@@ -2257,6 +2257,15 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   flex:none}
 .hubsec h2.sec{margin-top:20px}
 a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
+.aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
+.aglyph .pres{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;border:2px solid #fff}
+.aglyph .pres.on{background:#1E9E5A}
+.aglyph .pres.off{background:#C2C5D2}
+.apc{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border:1px solid var(--hair);border-radius:12px;background:#fff;padding:10px 16px;margin:12px 0 4px;font-size:13px}
+.apc b{font-size:17px;letter-spacing:-.01em}
+.apc-p{color:#1D221F;font-weight:600}
+.apc-r{color:#5B5E52}
+.apc-c{color:#8A8D7C;margin-left:auto}
 a.agentcard .hc-t b{font-size:14.5px}
 a.agentcard .hc-t span{font-size:12.5px}
 a.agentcard:hover{border-color:#B9CDB4}
@@ -4693,13 +4702,15 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
               + '</div>')
     return (
         f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
-        f'{avatar(slug, 44, on)}'
+        f'{agent_tile(slug, on, 44)}'
         f'<div><h1>{a["role"]}</h1>'
-        f'<div class="meta">{state}<span>&middot;</span>'
-        f'<span>{a["name"]}</span></div></div>'
+        f'<div class="meta">{state}'
+        + (f'<span>&middot;</span><span>{a["name"]}</span>'
+           if a["name"] != a["role"] else '') + '</div></div>'
         f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
         f'<a class="btn ghost" href="/?say=/{esc(a["role"])} ">'
         f'Give it a job</a>{action}</div></div>'
+        f'{agent_price_card(slug)}'
         f'{tabbar}'
         + (work_body if tab == "work"
            else agent_settings_content(tid, a) if tab == "settings"
@@ -4961,7 +4972,8 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
             f'<span>&middot;</span><span>{len(runs)} jobs done</span>'
             f'<span>&middot;</span><span>you had to fix {fmt_pct(corr)}</span></div></div>'
             f'<form method="post" action="/api/sample" style="margin-left:auto">'
-            f'<button class="btn ghost">Try a sample</button></form></div>')
+            f'<button class="btn ghost">Try a sample</button></form></div>'
+            + agent_price_card(slug))
 
     if tab == "access":
         items = ([("Can read: " + r, "It can read this. " + a["scope"], True) for r in a["reads"]]
@@ -5095,6 +5107,83 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     return head + tabbar + body
 
 
+
+# ---- The service tiles: one purposeful glyph per agent, colored by ----
+# ---- faculty, the way a super app draws its services. Keep the     ----
+# ---- faculty map in sync with FAMILIES in agents_content.          ----
+AGENT_GLYPHS = {
+    "cart_rescue": '<circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.2 11.5H18l2-8H6"/>',
+    "payment_rescue": '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/>',
+    "instagram_shopping": '<path d="M6 8h12l1 12H5L6 8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
+    "listings_opt": '<path d="M5 20v-6M11 20V9M17 20V7"/><path d="m14 7 3-3 3 3"/>',
+    "stock_watch": '<path d="M13 3 5 14h6l-1 7 8-11h-6l1-7z"/>',
+    "repeat_purchase": '<path d="M4 9a8 8 0 0 1 13.6-3.4L20 8M20 15a8 8 0 0 1-13.6 3.4L4 16"/><path d="M20 4v4h-4M4 20v-4h4"/>',
+    "subscription_dunning": '<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M4 10.5h16M8.5 3v5M15.5 3v5"/>',
+    "payment_forms": '<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V3z"/><path d="M9.5 8.5h5M9.5 12.5h5"/>',
+    "ar_collection": '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="m3 8.5 9 5.5 9-5.5"/>',
+    "loan_recovery": '<circle cx="12" cy="12" r="9"/><path d="M9 8h6M9 11h6M10 8c3.2 0 3.2 3 0 3l4.2 5"/>',
+    "dispute_defender": '<path d="m12 3 7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="m9 12 2 2 4-4.5"/>',
+    "refund_shield": '<path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.3"/>',
+    "cod_guard": '<path d="m4 8 8-4 8 4v9l-8 4-8-4V8z"/><path d="m9.5 12 2 2 3.5-3.5"/>',
+    "returns_desk": '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
+    "delivery_rescue": '<path d="M2 7h11v9H2zM13 10h5l3 3v3h-8"/><circle cx="6.5" cy="18.5" r="1.6"/><circle cx="16.5" cy="18.5" r="1.6"/>',
+    "checkout_watchdog": '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/>',
+    "kyc_desk": '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.7" cy="10.8" r="1.9"/><path d="M6.2 15.8c.5-1.7 4.5-1.7 5 0M14 9.5h4.5M14 13h4.5"/>',
+    "smart_approval": '<path d="m3 13.5 4.5 4.5L16.5 8"/><path d="m13.5 16 2 2L23 9.5"/>',
+    "customer_support": '<path d="M4.5 13a7.5 7.5 0 0 1 15 0"/><rect x="3" y="13" width="4" height="6" rx="1.6"/><rect x="17" y="13" width="4" height="6" rx="1.6"/><path d="M19.5 19a4 4 0 0 1-3.8 2.4H13.5"/>',
+    "csat_feedback": '<circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5c1 1.4 2.3 2 3.5 2s2.5-.6 3.5-2"/>',
+    "review_generation": '<path d="m12 3.5 2.6 5.4 6 .8-4.4 4.1 1.1 5.9-5.3-2.9-5.3 2.9 1.1-5.9L3.4 9.7l6-.8L12 3.5z"/>',
+    "review_response": '<path d="M4 5.5h16V16H9.5L4 20V5.5z"/><path d="M8.5 10.8h7"/>',
+    "custom_reports": '<path d="M4 20h16M7.5 20v-7M12 20V6M16.5 20v-4.5"/>',
+    "__default__": '<path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21M6 6l3.5 3.5M14.5 14.5 18 18M18 6l-3.5 3.5M9.5 14.5 6 18"/>',
+}
+_FACULTY = {}
+for _f, _slugs in [
+    ("Sells", ("cart_rescue", "payment_rescue", "instagram_shopping",
+               "listings_opt", "stock_watch", "repeat_purchase",
+               "subscription_dunning")),
+    ("Collects", ("payment_forms", "ar_collection", "loan_recovery")),
+    ("Protects", ("dispute_defender", "refund_shield", "cod_guard",
+                  "returns_desk", "delivery_rescue", "checkout_watchdog",
+                  "kyc_desk", "smart_approval")),
+    ("Cares", ("customer_support", "csat_feedback", "review_generation",
+               "review_response")),
+    ("Reports", ("custom_reports",)),
+]:
+    for _sl in _slugs:
+        _FACULTY[_sl] = _f
+_TINT = {
+    "Sells": ("#E5F3E1", "#0B7A3E"),
+    "Collects": ("#FBEED3", "#A9700B"),
+    "Protects": ("#FBE5E5", "#C2374B"),
+    "Cares": ("#ECE7FA", "#6741D9"),
+    "Reports": ("#E1EDFA", "#2563EB"),
+    "custom": ("#F1F0EA", "#5B5E52"),
+}
+
+
+def agent_tile(slug: str, on: bool = True, size: int = 40) -> str:
+    bg, fg = _TINT[_FACULTY.get(slug, "custom")]
+    g = AGENT_GLYPHS.get(slug, AGENT_GLYPHS["__default__"])
+    px = int(size * 0.55)
+    return (f'<span class="aglyph" style="width:{size}px;height:{size}px;'
+            f'background:{bg};color:{fg}">'
+            f'<svg width="{px}" height="{px}" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+            f'stroke-linejoin="round">{g}</svg>'
+            f'<i class="pres {"on" if on else "off"}"></i></span>')
+
+
+def agent_price_card(slug: str) -> str:
+    r = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
+    repl = r["replaces"] if r else "a hire you never made"
+    return ('<div class="apc">'
+            '<span class="apc-p"><b>&#8377;999</b>/month, in your plan</span>'
+            f'<span class="apc-r">Replaces {repl}.</span>'
+            '<span class="apc-c">Runs spend credits: reply 1 &middot; '
+            'paperwork 2 &middot; call 6</span></div>')
+
+
 def _relay_agent_card(a: dict, tid: str = "t1") -> str:
     """One agent, one hub card: face, role, one line, status. The same
     grammar as Connections, so the whole workspace reads as one system.
@@ -5109,7 +5198,7 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
         chip = '<span class="st mut">Off</span>'
     line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
     return (f'<a class="hubcard agentcard" href="/agents/{a["slug"]}">'
-            f'{avatar(a["slug"], 34, live or watching)}'
+            f'{agent_tile(a["slug"], live or watching, 40)}'
             f'<span class="hc-t"><b>{a["role"]}</b><span>{line}</span></span>'
             f'<span class="hc-act">{chip}</span></a>'
             )
