@@ -2266,6 +2266,17 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .fdots em{font-style:normal;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#6E7263}
 .fdots .fd{width:8px;height:8px;border-radius:3px;display:inline-block}
 .stile .mut2{display:block;color:#9A9D8E;font-size:11px;margin-top:2px}
+.statbar{display:flex;border:1px solid var(--hair);border-radius:16px;background:#fff;margin:0 0 14px;overflow:hidden}
+.sb{flex:1;padding:13px 18px;border-left:1px solid var(--hair);display:flex;flex-direction:column;gap:1px;text-decoration:none;color:inherit;min-width:0}
+.sb:first-child{border-left:0}
+.sb:hover{background:#FAFAF6}
+.sb b{font-size:20px;letter-spacing:-.02em}
+.sb>span{font-size:11.5px;color:#6E7263}
+.sb i{font-style:normal;font-size:11px;color:#9A9D8E;white-space:nowrap}
+.sb.need b{color:#A9700B}
+.sb .tspark{margin-top:4px;height:14px}
+.sb .tspark i{width:4px}
+@media (max-width:900px){.statbar{flex-wrap:wrap}.sb{flex:1 1 33%;border-top:1px solid var(--hair)}}
 .roi{border:1.5px solid #0B7A3E;background:linear-gradient(135deg,#0E3A26,#17532F);color:#F4F1EA;border-radius:18px;padding:16px 24px;display:flex;align-items:center;gap:20px;margin:2px 0 16px}
 .roi>b{font-size:38px;letter-spacing:-.03em;color:#CEF993;flex:none}
 .roi-l{display:flex;flex-direction:column;gap:2px}
@@ -5365,15 +5376,6 @@ def agents_content(tid: str, f: str = "all", q: str = "",
                 if r.state is RunState.AWAITING_GATE) + props_waiting(tid)
     kept2, n_wins2, _w = recovered(tid)
     n_live = sum(1 for a in roster if a["status"] == "live")
-    # Faculty dots: the roster's colour code, repeated as a legend.
-    fam_counts = []
-    for _t, _k in FAMILIES:
-        _n2 = len(_fam_agents(_k))
-        if _n2:
-            fam_counts.append((_TINT.get(_t, _TINT["custom"])[1], _n2))
-    fdots = "".join(
-        f'<em><span class="fd" style="background:{c}"></span>{n}</em>'
-        for c, n in fam_counts)
     # What is riding on the pending yeses, same math as the home queue.
     d_stake = sum(price_of(r.order_id) for r in truns
                   if r.state is RunState.AWAITING_GATE)
@@ -5402,24 +5404,19 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         f'<div class="roi-m">counted from the ledger,<br>'
         f'not our averages</div></div>')
     tiles = (
-        f'<div class="stattiles">'
-        f'<a class="stile" href="/agents?f=active"><b>{n_on}</b>'
-        f'<span>Agents on</span><i>{n_live} working &middot; '
-        f'{n_on - n_live} watching</i>'
-        f'<span class="fdots">{fdots}</span></a>'
-        f'<a class="stile need" href="/approvals"><b>{n_yes}</b>'
-        f'<span>Pending approval</span>'
-        f'<i>&#8377;{inr(d_stake + p_stake)} riding on them</i>'
-        f'<i class="mut2">replies, holds, payouts</i></a>'
-        f'<a class="stile" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
-        f'<span>Kept for you</span><i>{n_wins2} disputes won &middot; {_w}</i>'
-        f'<i class="mut2">counted from the ledger</i></a>'
-        f'<a class="stile" href="/impact"><b>{len(truns)}</b>'
-        f'<span>Jobs done</span><i>every one in History</i>'
+        f'<div class="statbar">'
+        f'<a class="sb" href="/agents?f=active"><b>{n_on}</b>'
+        f'<span>agents on</span><i>{n_live} working</i></a>'
+        f'<a class="sb need" href="/approvals"><b>{n_yes}</b>'
+        f'<span>pending approval</span>'
+        f'<i>&#8377;{inr(d_stake + p_stake)} riding</i></a>'
+        f'<a class="sb" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
+        f'<span>kept for you</span><i>{n_wins2} disputes won</i></a>'
+        f'<a class="sb" href="/impact"><b>{len(truns)}</b>'
+        f'<span>jobs done</span>'
         f'<span class="tspark">{sbars}</span></a>'
-        f'<a class="stile" href="/pricing"><b>{used_cr:,}</b>'
-        f'<span>Credits used</span><i>of 25,000 &middot; Growth plan</i>'
-        f'<i class="mut2">&#8377;1 a credit</i></a>'
+        f'<a class="sb" href="/pricing"><b>{used_cr:,}</b>'
+        f'<span>credits used</span><i>of 25,000 &middot; &#8377;1 each</i></a>'
         f'</div>')
     return (f'<h1 class="page">Agents</h1>'
             f'<div class="pagehint">One super agent. It plans, sells, '
