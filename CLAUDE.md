@@ -246,3 +246,5 @@ dispute content with zero GTM leftovers. Connectors still on fakes.
   animation end-states; real browsers finish fill:both.
 
 - **Fitts pass is a standing gate (2026-08-07).** Any UI change ships only after the tap-target audit: render every affected route, measure every `a`, `button`, `summary` (and sliders), and fix anything under ~38px tall (32px tolerated only when wider than 200px). Patterns already in place: fixed square buttons at 38-40px, pills with 10-11px vertical padding, toggles keep their look via content-box padding, small inline links get `display:inline-block;padding:10px 6px;margin:-10px -6px`. The audit snippet lives in the session notes; re-run it after touching any template.
+
+- **Design system is law (2026-08-07).** Dropdowns, selects, inputs and card chrome follow docs/design-system.md and the DESIGN SYSTEM block in demo/server.py's CSS. New UI uses `ds-*` classes; never style a new menu ad hoc. If a component needs something the spec lacks, extend the spec first.

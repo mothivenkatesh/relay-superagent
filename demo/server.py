@@ -2607,6 +2607,33 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .jobopt{display:block;padding:12px 14px;border-radius:9px;font-size:13px;color:#1B1F30;text-decoration:none}
 .jobopt:hover{background:#F4F5FA}
 .jobopt.more{color:#5266EB;font-weight:600;border-top:1px solid var(--hair);margin-top:4px;border-radius:0 0 9px 9px}
+
+/* ================= DESIGN SYSTEM =================
+   Tokens + named components. New UI MUST use ds-* classes;
+   the legacy selectors listed after each ds-* class are aliases
+   kept until their markup migrates. Spec: docs/design-system.md */
+:root{--ds-hair:var(--hair,#E8E9EF);--ds-radius-card:16px;
+  --ds-radius-control:10px;--ds-radius-menu:12px;--ds-radius-option:8px;
+  --ds-menu-shadow:0 12px 32px rgba(27,31,48,.12);
+  --ds-hover:#F4F5FA;--ds-focus:#C9D2F5;--ds-accent:#5266EB;
+  --ds-target:40px}
+/* -- DS Dropdown: panel -- */
+.ds-menu,
+.menu,.acctmenu,.ammenu,.jobmenu-d,.tmenu,.mpop{border:1px solid var(--ds-hair) !important;border-radius:var(--ds-radius-menu) !important;box-shadow:var(--ds-menu-shadow) !important;background:#fff !important;padding:8px !important}
+/* -- DS Dropdown: option row -- */
+.ds-option,
+.menu .mopt,.acctmenu a,.ammenu button,.jobopt,.tmenu-it{border-radius:var(--ds-radius-option);padding:12px 14px;font-size:13px;line-height:1.4;min-height:var(--ds-target);display:flex;align-items:center;gap:10px}
+.ds-option:hover,
+.menu .mopt:hover,.acctmenu a:hover,.ammenu button:hover,.jobopt:hover,.tmenu-it:hover{background:var(--ds-hover)}
+.ds-option.danger,.acct-out{color:#B3372B}
+/* -- DS Select -- */
+select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px solid var(--hair);border-radius:10px;background:#fff;min-height:40px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%238A8D9C%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+/* -- DS Input -- */
+.inedit-in,.cfgbox,.hubsearch,.jfind{font:inherit;font-size:13.5px;border:1px solid var(--hair);border-radius:10px;background:#fff;padding:10px 14px;min-height:40px}
+.inedit-in:focus,.cfgbox:focus,.hubsearch:focus,.jfind:focus{outline:2px solid #C9D2F5;border-color:#5266EB}
+/* -- DS Card chrome -- */
+.hubcard,.agentcard2,.tcard,.hcard,.apc,.lifecyc,.teamhero,.statbar,.lastrun{border-radius:16px}
+.hubcard,.agentcard2,.hcard,.apc,.lifecyc,.statbar,.lastrun{border-color:var(--hair)}
 .tglbtn.on{background:var(--accent)}
 .tglbtn i{position:absolute;top:2px;left:2px;width:16px;height:16px;
   border-radius:50%;background:#fff;transition:left .12s}
@@ -6955,7 +6982,7 @@ def pricing_content(tid: str) -> str:
     return f"""
 <div class="pr-page">
 <style>
-.pr-page{{--line:#E4E1D8;max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
+.pr-page{{--line:var(--hair,#E4E1D8);max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
 .pr-page h1{{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}}
 .pr-def{{color:#6E7263;font-size:14px;margin:0 0 26px;max-width:62ch}}
 .pr-plans{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}}
