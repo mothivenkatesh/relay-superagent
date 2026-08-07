@@ -2350,6 +2350,18 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .teamhero{border:1px solid var(--tcb);background:linear-gradient(180deg,var(--tcb),#fff 130%);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;gap:7px;margin:2px 0 18px}
 .teamhero>b{font-size:21px;letter-spacing:-.02em}
 .teamhero .tc-line{font-size:13.5px;color:#4B4E44;max-width:70ch}
+.lifecyc{display:flex;flex-direction:column;gap:9px;border:1px solid var(--hair);background:#fff;border-radius:14px;padding:14px 18px;margin:0 0 18px}
+.lc-steps{display:flex;align-items:center}
+.lc-step{display:flex;align-items:center;gap:7px;flex:none}
+.lc-dot{width:22px;height:22px;border-radius:50%;border:2px solid #D5D2C8;background:#fff;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.lc-step.done .lc-dot{background:#1E9E5A;border-color:#1E9E5A}
+.lc-step.cur .lc-dot{border-color:#0B7A3E}
+.lc-step>span:last-child{font-size:11.5px;color:#8A8D7C;white-space:nowrap}
+.lc-step.cur>span:last-child{color:#1D221F;font-weight:700}
+.lc-line{flex:1;height:2px;background:#EFEDE6;margin:0 10px;min-width:14px;border-radius:1px}
+.lc-line.done{background:#1E9E5A}
+.lc-sub{font-size:12.5px;color:#6E7263}
+@media (max-width:900px){.lc-step>span:last-child{display:none}.lc-step.cur>span:last-child{display:inline}}
 .tclear{margin:0 0 16px;font-size:13px}
 .tclear a{display:inline-flex;align-items:center;min-height:42px;padding:0 18px;gap:7px;color:#1D221F;font-weight:600;text-decoration:none;background:#fff;border:1px solid var(--hair);border-radius:100px}
 .tclear a:hover{border-color:#B9CDB4;background:#FAFAF6}
@@ -4685,6 +4697,97 @@ def goal_mini(tid: str, slug: str) -> str:
             f'<b>{now}%</b> of {g["target"]}%</div>')
 
 
+TRIAL_NOTES = {
+    "delivery_rescue": [
+        "Watched 62 deliveries; 9 failed, and nobody called any of them.",
+        "4 of the 9 addresses look fixable from the order notes.",
+        "2 couriers mark &lsquo;attempted&rsquo; at suspicious hours."],
+    "repeat_purchase": [
+        "Mapped 214 buyers to a refill rhythm from their order history.",
+        "31 are due to run out in the next 10 days.",
+        "9 buyers are 2 weeks past their usual reorder and quiet."],
+    "checkout_watchdog": [
+        "Ran 168 checkout probes across every payment method.",
+        "1 wallet failed twice on Tuesday night, then recovered.",
+        "Your slowest checkout hour is 21:00, right at buyer peak."],
+    "cofounder": [
+        "Read every team&rsquo;s memory: 61 lessons banked so far.",
+        "3 patterns repeat across teams; drafting proposals from them.",
+        "First proposal lands with your Friday approvals."],
+    "customer_support": [
+        "Read 312 buyer messages from the record.",
+        "7 of 10 ask where-is-my-order; the answer exists for 9 of 10.",
+        "Drafting reply styles in your brand voice."],
+    "review_generation": [
+        "Found 48 delivered, happy orders with no review yet.",
+        "Timed the ask: 2 days after delivery works best for you.",
+        "Draft nudges ready for your yes when the trial closes."],
+}
+
+
+def _trial_day(slug: str) -> int:
+    return 2 + _hashlib.sha256(slug.encode()).digest()[1] % 5
+
+
+def lifecycle_strip(a: dict, tid: str) -> str:
+    """The employment arc, always visible: where this teammate is on the
+    journey from hired to trusted, and what happens next."""
+    slug = a["slug"]
+    live = a["status"] == "live"
+    watching = not live and DEMO_ON.get(slug, False)
+    waiting_prop = (slug in PROPS_DEF
+                    and prop_state(tid, slug)["state"] == "waiting")
+    if live:
+        cur = 3
+        clean = 3 + _hashlib.sha256(slug.encode()).digest()[2] % 15
+        sub = (f"{clean} of 20 clean yeses. At 20, small sends go out "
+               f"on their own.")
+    elif watching and waiting_prop:
+        cur = 2
+        sub = "Its first finished call waits on your yes."
+    elif watching:
+        d = _trial_day(slug)
+        cur = 1
+        sub = (f"Day {d} of 7. It only watches; first proposals when "
+               f"the trial week closes.")
+    else:
+        cur = 0
+        sub = "Hire it and the first week is a watching trial."
+    stages = ["Hired", "Learning", "First proposals", "Working", "Trusted"]
+    parts = ""
+    for i, label in enumerate(stages):
+        cls = "done" if i < cur else ("cur" if i == cur else "")
+        mark = "&#10003;" if i < cur else ""
+        parts += (f'<span class="lc-step {cls}">'
+                  f'<span class="lc-dot">{mark}</span>'
+                  f'<span>{label}</span></span>')
+        if i < len(stages) - 1:
+            parts += f'<span class="lc-line{" done" if i < cur else ""}"></span>'
+    return (f'<div class="lifecyc"><div class="lc-steps">{parts}</div>'
+            f'<div class="lc-sub">{sub}</div></div>')
+
+
+def trial_card(a: dict) -> str:
+    """What the trial has actually produced, agent by agent. Replaces the
+    one-size note that made every trial page read the same."""
+    slug = a["slug"]
+    d = _trial_day(slug)
+    notes = TRIAL_NOTES.get(slug, [
+        f"Watching quietly since day 1; today is day {d}.",
+        "Writing what it learns into the shared memory.",
+        "Nothing sent, nothing touched: trial rules."])
+    rows = "".join(
+        f'<div class="trow slim" style="display:flex">'
+        f'<span class="ico">{ICONS["book"]}</span>'
+        f'<span class="tdesc">{n}</span></div>' for n in notes)
+    return (f'<h2 class="sec">Trial so far</h2>{rows}'
+            f'<div class="trow slim" style="display:flex">'
+            f'<span class="ico">{ICONS["moon"]}</span>'
+            f'<span class="tdesc"><b>What happens next:</b> when the week '
+            f'closes, its first proposals land in your approvals. '
+            f'Nothing sends without your yes.</span></div>')
+
+
 def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
     """One page per roster agent, wired or not. The not-yet ones read like
     a hire you could make today: what the job is, what it would touch, the
@@ -4803,8 +4906,12 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
             f'brief</b> every day, before you sit down.</span>'
             f'<a class="st wait" href="/briefs/morning">read today&rsquo;s '
             f'&rarr;</a></div>')
-    work_body = (goal_block(tid, slug)
-                 + latest_run_html(tid, slug) + prop_sec + cases_sec
+    in_trial = a["status"] != "live" and DEMO_ON.get(slug, False)
+    run_or_trial = (trial_card(a) if in_trial
+                    else latest_run_html(tid, slug))
+    work_body = (lifecycle_strip(a, tid)
+                 + goal_block(tid, slug)
+                 + run_or_trial + prop_sec + cases_sec
                  + report_sec
                  + (_kyc_builder(tid) if slug == "kyc_desk" else ""))
 
