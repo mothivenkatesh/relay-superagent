@@ -802,7 +802,7 @@ WORK_CSS = """
 .quietrow .rlabel{color:var(--mut);font-weight:400}
 .quietrow:hover .rlabel{color:var(--ink,#1B1F30)}
 .qword{flex:none;font-size:10.5px;color:#B9BCC7}
-.conv{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:8px;
+.conv{display:flex;align-items:center;gap:8px;padding:10px 10px;border-radius:8px;
 font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
 .conv .ctitle{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1033,7 +1033,7 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 
 # One button system for every surface (decisions: consistency over variety).
 BTN_CSS = """
-.btn{font:inherit;font-size:13px;font-weight:500;border-radius:9px;padding:8px 16px;
+.btn{font:inherit;font-size:13px;font-weight:500;border-radius:9px;padding:10px 18px;min-height:40px;
   border:1px solid transparent;cursor:pointer;
   transition:background .12s,border-color .12s,color .12s}
 .btn.primary{background:var(--accent,#5266EB);color:#fff}
@@ -2164,7 +2164,7 @@ font-size:13px;display:grid;place-items:center}
 font-size:12px;color:var(--ink);background:#fff;white-space:nowrap}
 .pro{margin-left:auto;background:#21232E;color:#fff;font-size:10.5px;font-weight:600;
 border-radius:6px;padding:2px 8px}
-.nav{display:flex;align-items:center;gap:12px;padding:8px 8px;border-radius:8px;
+.nav{display:flex;align-items:center;gap:12px;padding:11px 10px;min-height:40px;border-radius:8px;
 color:var(--text);font-size:13.5px;margin-bottom:1px}
 .nav svg{width:16px;height:16px;color:#6A6D7D;flex:none}
 .nav:hover{background:#F0F0F5}
@@ -2201,7 +2201,7 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .acct-mail{color:var(--mut);padding:0 12px;font-size:12.5px}
 .acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:12px;
   border-bottom:1px solid var(--hair);margin-bottom:4px}
-.acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
+.acct-out{display:block;padding:12px 14px;border-radius:8px;color:#B3372B;
   font-size:13.5px;text-decoration:none}
 .acct-out:hover{background:#FBF1EF}
 .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;
@@ -2219,7 +2219,7 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .railme > svg{width:15px;height:15px;color:var(--mut);flex:none}
 .railacct .acctmenu{top:auto;bottom:calc(100% + 8px);left:0;right:0;
   min-width:0}
-.acct-set{display:block;padding:8px 12px;border-radius:8px;
+.acct-set{display:block;padding:12px 14px;border-radius:8px;
   color:var(--ink);font-size:13.5px}
 .acct-set:hover{background:#F5F5F8}
 .hubtabs{display:flex;gap:24px;border-bottom:1px solid var(--hair);
@@ -2350,8 +2350,9 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .teamhero{border:1px solid var(--tcb);background:linear-gradient(180deg,var(--tcb),#fff 130%);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;gap:7px;margin:2px 0 18px}
 .teamhero>b{font-size:21px;letter-spacing:-.02em}
 .teamhero .tc-line{font-size:13.5px;color:#4B4E44;max-width:70ch}
-.tclear{margin:0 0 14px;font-size:12.5px}
-.tclear a{color:#5266EB;text-decoration:none}
+.tclear{margin:0 0 16px;font-size:13px}
+.tclear a{display:inline-flex;align-items:center;min-height:42px;padding:0 18px;gap:7px;color:#1D221F;font-weight:600;text-decoration:none;background:#fff;border:1px solid var(--hair);border-radius:100px}
+.tclear a:hover{border-color:#B9CDB4;background:#FAFAF6}
 .stile .tspark,.sb .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
 .stile .tspark i,.sb .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
@@ -2663,7 +2664,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:8px 8px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:16px 0 24px}
-.tabbar a{padding:8px 16px;font-size:13.5px;font-weight:500;color:var(--mut);
+.tabbar a{padding:13px 18px;font-size:13.5px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabbar a.on{color:var(--accent);border-bottom-color:var(--accent)}
 .tabbar a:hover{color:var(--ink)}
@@ -6756,21 +6757,23 @@ def pricing_content(tid: str) -> str:
 .pr-strip.cap{{border-color:#0B7A3E;background:#F2F9EE}}
 .pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
 .pr-bill{{display:inline-flex;border:1px solid var(--line);border-radius:100px;background:#fff;padding:3px;margin:2px 0 18px}}
-.pr-bill button{{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;color:#6E7263;border-radius:100px;padding:6px 14px;cursor:pointer}}
+.pr-bill button{{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;color:#6E7263;border-radius:100px;padding:12px 20px;min-height:42px;cursor:pointer}}
 .pr-bill button.on{{background:#0B7A3E;color:#fff}}
 .pr-bill em{{font-style:normal;opacity:.75;font-size:11px}}
 .pr-inc{{font-size:11.5px;font-weight:600;color:#0B7A3E;margin-top:12px}}
-.pr-cta{{margin-top:auto;display:block;height:38px;line-height:36px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-align:center;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;color:#1D221F;text-decoration:none;padding:0}}
+.pr-cta{{margin-top:auto;display:flex;align-items:center;justify-content:center;min-height:44px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-align:center;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;color:#1D221F;text-decoration:none;padding:0}}
 .pr-list{{margin-bottom:16px}}
 .pr-cta.go{{background:#0B7A3E;border-color:#0B7A3E;color:#fff}}
 .pr-faq{{margin-top:22px;border-top:1px solid var(--line)}}
-.pr-faq details{{border-bottom:1px solid var(--line);padding:12px 2px}}
-.pr-faq summary{{font-size:13.5px;font-weight:600;cursor:pointer;list-style-position:outside}}
+.pr-faq details{{border-bottom:1px solid var(--line)}}
+.pr-faq summary{{font-size:13.5px;font-weight:600;cursor:pointer;list-style-position:outside;padding:16px 2px}}
+.pr-faq details p{{padding:0 2px 16px}}
+.pr-faq summary:hover{{color:#0B7A3E}}
 .pr-faq p{{font-size:13px;color:#6E7263;margin:8px 0 0;max-width:70ch}}
 .pr-calc{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:18px 20px}}
 .pr-calc-head b{{font-size:13.5px}}
 .pr-calc-head .mut{{color:#6E7263;font-size:12.5px;margin-left:8px}}
-.pr-calc input[type=range]{{width:100%;margin:16px 0 10px;accent-color:#0B7A3E}}
+.pr-calc input[type=range]{{width:100%;margin:12px 0 8px;accent-color:#0B7A3E;height:36px;cursor:pointer}}
 .pr-calc-row{{display:flex;justify-content:space-between;align-items:baseline}}
 .pr-calc-n b{{font-size:22px;letter-spacing:-.02em}}
 .pr-calc-n span{{font-size:12px;color:#6E7263;margin-left:6px}}
