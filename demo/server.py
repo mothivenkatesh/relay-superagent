@@ -70,19 +70,19 @@ UNLINKED_CHANNEL_ID = "m_ojas_marketplace_unlinked"
 # only: the buyer never touches the engine, the ledger or the SQL.
 CUSTOMERS: dict[str, tuple[str, str, str]] = {
     "order_1":  ("Priya S.",   "Sara's Peanut Butter for Dogs", "our store"),
-    "order_2":  ("Rahul M.",   "Meowsi Salmon &amp; Chicken Treats", "monthly refill"),
+    "order_2":  ("Rahul M.",   "Meowsi Salmon & Chicken Treats", "monthly refill"),
     "order_3":  ("Anjali K.",  "Sheba Tuna Cat Food (12 pack)", "Amazon"),
     "order_4":  ("Vikram R.",  "Snuggle Sphere Donut Bed",   "our store"),
-    "order_5":  ("Sneha D.",   "Sara's Chicken &amp; Rice Dog Food", "monthly refill"),
+    "order_5":  ("Sneha D.",   "Sara's Chicken & Rice Dog Food", "monthly refill"),
     "order_6":  ("Farhan A.",  "Meowsi Power Bites Cat Treats", "Flipkart"),
     "order_7":  ("Meera J.",   "Squeakeroo Mouse Toy (Pack of 2)", "quick commerce"),
     "order_9":  ("Karthik V.", "Meowsi Crunchies Party Pack", "Amazon"),
     "order_10": ("Divya P.",   "Glitterfly Wand Toy",        "our store"),
-    "order_11": ("Arun N.",    "Meowsi Salmon &amp; Chicken Treats", "monthly refill"),
+    "order_11": ("Arun N.",    "Meowsi Salmon & Chicken Treats", "monthly refill"),
     "order_12": ("Ritu B.",    "Sara's Peanut Butter for Dogs", "Flipkart"),
     "order_13": ("Sameer T.",  "Snuggle Sphere Donut Bed",   "our store"),
     "order_14": ("Nandini G.", "Sheba Tuna Cat Food (12 pack)", "quick commerce"),
-    "order_15": ("Harsh V.",   "Sara's Chicken &amp; Rice Dog Food", "Amazon"),
+    "order_15": ("Harsh V.",   "Sara's Chicken & Rice Dog Food", "Amazon"),
     "order_16": ("Ishita R.",  "Meowsi Power Bites Cat Treats", "our store"),
     "order_17": ("Gaurav S.",  "Squeakeroo Mouse Toy (Pack of 2)", "our store"),
     "order_18": ("Pooja M.",   "Meowsi Crunchies Party Pack", "monthly refill"),
@@ -1564,10 +1564,10 @@ def ledger_row(r) -> str:
 
 SKU_PRICE = {                                # paise, display only
     "Sara's Peanut Butter for Dogs": 124_900,
-    "Meowsi Salmon &amp; Chicken Treats": 89_900,
+    "Meowsi Salmon & Chicken Treats": 89_900,
     "Sheba Tuna Cat Food (12 pack)": 49_900,
     "Snuggle Sphere Donut Bed": 189_900,
-    "Sara's Chicken &amp; Rice Dog Food": 44_900,
+    "Sara's Chicken & Rice Dog Food": 44_900,
     "Meowsi Power Bites Cat Treats": 39_900,
     "Squeakeroo Mouse Toy (Pack of 2)": 54_900,
     "Meowsi Crunchies Party Pack": 74_900,
@@ -2610,6 +2610,20 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .pchips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
 .pchip{font:inherit;font-size:12px;color:#3A3D4D;background:#fff;border:1px dashed var(--hair);border-radius:100px;padding:9px 14px;cursor:pointer;min-height:38px}
 .pchip:hover{border-color:#5266EB;color:#5266EB}
+.rulelist{display:flex;flex-direction:column;gap:8px;max-width:680px}
+.rule-row{display:flex;align-items:center;gap:10px;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:12px 14px;font-size:13.5px}
+.rule-row>span{flex:1}
+.rulex{border:0;background:none;color:var(--mut);cursor:pointer;width:38px;height:38px;border-radius:8px;flex:none;font-size:13px}
+.rulex:hover{background:#FBE5E5;color:#C2374B}
+.dgrid td{padding:11px 14px;border-bottom:1px solid #F0F0F4}
+.dgrid td.cbx,.dgrid th.cbx{width:40px;text-align:center}
+.dgrid td a{color:#1B1F30;font-weight:600;text-decoration:none}
+.dgrid td a:hover{color:#5266EB}
+.selrun{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
+#callbox{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
+.cselbar{display:flex;gap:12px;align-items:center;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:10px 14px;margin:0 0 10px}
+.addrule{display:flex;gap:8px;margin:12px 0 6px;max-width:680px}
+.addrule input{flex:1}
 .viarow{display:flex;gap:6px;align-items:center;margin-top:5px;font-size:11px}
 .viachip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--hair);border-radius:100px;padding:4px 10px;font-size:11px;color:#5A5D6D;text-decoration:none}
 .viachip.on{border-color:#BFD9BA;color:#1E7A46}
@@ -3995,7 +4009,7 @@ AGENT_DAYS = {
         ("2:12 PM", "Buyer paid in one step. The books already know.", "paid")],
     "stock_watch": [
         ("9:00 AM", "Counted every channel: store, Amazon, Flipkart, quick commerce.", ""),
-        ("9:01 AM", "Sara's Chicken &amp; Rice: 6 days left at this pace. The supplier needs 10.", "warned"),
+        ("9:01 AM", "Sara's Chicken & Rice: 6 days left at this pace. The supplier needs 10.", "warned"),
         ("9:02 AM", "Drafted the reorder. It goes nowhere until your yes.", "your yes")],
     "refund_shield": [
         ("4:40 PM", "Refund claim: &ldquo;bottle arrived broken&rdquo;, &#8377;1,249.", ""),
@@ -4244,34 +4258,43 @@ GUARD_DEFAULTS = {
 # empty on an agent that has been on the job since March.
 AGENT_SEED = {
     "dispute_defender": dict(
-        instructions="Answer every dispute at least 24 hours before the "
-        "bank&rsquo;s deadline. Lead with the delivery proof, then the "
-        "buyer&rsquo;s own messages. Never promise a refund inside a "
-        "reply. Answer in the buyer&rsquo;s language.",
-        guards={"ask_above": "&#8377;1,000"}),
+        rules=["Answer every dispute at least 24 hours before the "
+               "bank\u2019s deadline.",
+               "Lead with the delivery proof, then the buyer\u2019s "
+               "own messages.",
+               "Never promise a refund inside a reply.",
+               "Answer in the buyer\u2019s language."],
+        guards={"ask_above": "\u20b91,000"}),
     "cart_rescue": dict(
-        instructions="Hindi first, English if they switch. Offer free "
-        "delivery above &#8377;999 before any discount. Never call the "
-        "same buyer twice in a day; the second nudge goes on WhatsApp.",
+        rules=["Hindi first, English if they switch.",
+               "Offer free delivery above \u20b9999 before any "
+               "discount.",
+               "Never call the same buyer twice in a day; the second "
+               "nudge goes on WhatsApp."],
         guards={"quiet": "11 AM to 9 PM", "tries": "2 tries"}),
     "payment_rescue": dict(
-        instructions="Wait 20 minutes after a failed payment; most fix "
-        "themselves. Call once, then send the fresh link on WhatsApp; SMS it if unread in an hour. "
-        "Never read out the failure reason unless the buyer asks.",
+        rules=["Wait 20 minutes after a failed payment; most fix "
+               "themselves.",
+               "Call once, then send the fresh link on WhatsApp; SMS "
+               "it if unread in an hour.",
+               "Never read out the failure reason unless the buyer "
+               "asks."],
         guards={"quiet": "10 AM to 7 PM", "tries": "3 tries"}),
     "cod_sentry": dict(
-        instructions="Sale weeks only. Hold anything over &#8377;3,000 "
-        "from a first-time buyer; release the moment the number checks "
-        "out. When in doubt, hold and ask.",
-        guards={"ask_above": "&#8377;3,000"}),
+        rules=["Sale weeks only.",
+               "Hold anything over \u20b93,000 from a first-time "
+               "buyer; release the moment the number checks out.",
+               "When in doubt, hold and ask."],
+        guards={"ask_above": "\u20b93,000"}),
 }
+
 
 
 def agent_cfg(tid: str, slug: str) -> dict:
     seed = AGENT_SEED.get(slug, {})
     return AGENT_CFG.setdefault(tid, {}).setdefault(slug, {
-        "instructions": seed.get("instructions", ""), "learn": True,
-        "eval_at": "", "tools_off": [],
+        "instructions": "", "rules": list(seed.get("rules", [])),
+        "learn": True, "eval_at": "", "tools_off": [],
         "guards": dict(seed.get("guards", {}))})
 
 
@@ -4301,9 +4324,14 @@ def agent_settings_content(tid: str, a: dict) -> str:
         opts = (QUIET_OPTS if key == "quiet" else
                 TRIES_OPTS if key == "tries" else ASK_OPTS)
         grows0 += (
-            '<div class="trow slim" style="display:flex;align-items:center">'
+            '<form class="trow slim" method="post" '
+            'action="/api/agent_cfg" '
+            'style="display:flex;align-items:center">'
+            '<input type="hidden" name="slug" value="' + slug + '">'
             '<span class="tdesc">' + label + '</span>'
-            + _sel("guard_" + key, opts, val) + '</div>')
+            + _sel("guard_" + key, opts, val).replace(
+                '<select ', '<select onchange="this.form.submit()" ')
+            + '</form>')
     SAMPLES = {
         "calling": ["Never call before 11 AM.",
                     "Hindi first, English if they switch.",
@@ -4317,28 +4345,58 @@ def agent_settings_content(tid: str, a: dict) -> str:
     }.get(a["desk"], ["Keep every message under 3 sentences.",
                       "Match my tone: warm, never pushy.",
                       "When unsure, ask me instead of guessing."])
-    chips = '<div class="pchips">' + "".join(
-        '<button type="button" class="pchip" data-p="'
-        + p.replace('"', '&quot;') + '" onclick="cfgFill(this)">'
-        + p + '</button>' for p in SAMPLES) + '</div>'
-    fill_js = ('<script>function cfgFill(b){var t=document.querySelector('
-               '"textarea[name=instructions]");t.value=(t.value?'
-               't.value+" ":"")+b.dataset.p;t.focus()}</script>')
-    instr = (
-        '<h2 class="sec">Instructions and limits</h2>'
-        '<form method="post" action="/api/agent_cfg">'
+    rules = cfg.setdefault(
+        "rules", list(AGENT_SEED.get(slug, {}).get("rules", [])))
+    rule_rows = "".join(
+        '<div class="rule-row"><span>' + esc(r) + '</span>'
+        '<form method="post" action="/api/agent_cfg" '
+        'style="display:contents">'
         '<input type="hidden" name="slug" value="' + slug + '">'
-        '<textarea class="cfgbox" name="instructions" rows="2" '
-        'style="width:100%;max-width:640px;resize:vertical" '
-        'placeholder="Standing instructions. It follows these on '
-        'every job.">'
-        + esc(cfg["instructions"]) + '</textarea>'
-        + chips + fill_js + grows0 +
-        '<div style="margin-top:10px"><button class="btn primary sm">'
-        'Save all</button>'
-        '<span class="ctahint" style="display:inline;margin-left:10px">'
-        'One save covers the instructions and the limits.</span>'
-        '</div></form>')
+        '<input type="hidden" name="del_rule" value="' + str(j) + '">'
+        '<button class="rulex" title="Remove this rule">&#10005;</button>'
+        '</form></div>'
+        for j, r in enumerate(rules))
+    add_row = (
+        '<form class="addrule" method="post" action="/api/agent_cfg">'
+        '<input type="hidden" name="slug" value="' + slug + '">'
+        '<input class="inedit-in" name="add_rule" '
+        'placeholder="Add a rule, in plain words" maxlength="200">'
+        '<button class="btn primary sm">Add rule</button></form>')
+    chip_rows = '<div class="pchips">' + "".join(
+        '<form method="post" action="/api/agent_cfg" '
+        'style="display:contents">'
+        '<input type="hidden" name="slug" value="' + slug + '">'
+        '<button class="pchip" name="add_rule" value="'
+        + p.replace('"', '&quot;') + '">+ ' + p + '</button></form>'
+        for p in SAMPLES if p not in rules) + '</div>'
+    my_files = [f for f in seed_kfiles(tid) if f.get("agent") == slug]
+    file_rows = "".join(
+        '<div class="trow slim" style="display:flex">'
+        '<span class="ico">' + ICONS["book"] + '</span>'
+        '<span class="tdesc"><b>' + esc(f["name"]) + '</b> '
+        '<span class="mut">' + f["size"] + ' &middot; added ' + f["when"]
+        + ' &middot; read into its memory</span></span></div>'
+        for f in my_files)
+    ctx_files = (
+        '<h2 class="sec">Context files</h2>'
+        '<div class="pagehint">Upload the documents this agent should '
+        'know: policies, price lists, scripts. They land in its memory '
+        'and in Knowledge.</div>'
+        + file_rows +
+        '<form class="addrule" method="post" '
+        'action="/api/file_upload?agent=' + slug + '" '
+        'enctype="multipart/form-data">'
+        '<input class="inedit-in" type="file" name="f" required>'
+        '<button class="btn primary sm">Add to its memory</button>'
+        '</form>')
+    instr = (
+        '<h2 class="sec">Rules it follows on every job</h2>'
+        '<div class="rulelist">' + rule_rows + '</div>'
+        + add_row + chip_rows
+        + (('<h2 class="sec">Limits</h2>'
+            '<div class="pagehint">Changes apply the moment you pick '
+            'them.</div>' + grows0) if grows0 else '')
+        + ctx_files)
 
     reads_line = (
         '<div class="trow slim"><span class="ico">' + ICONS["book"]
@@ -4685,7 +4743,7 @@ AGENT_GOALS = {
         how="Fast-moving products in stock, out of the ten that sell "
             "most. Counted daily.",
         actions=[
-            ("Spotted Sara's Chicken &amp; Rice down to 6 days at this pace",
+            ("Spotted Sara's Chicken & Rice down to 6 days at this pace",
              "caught early"),
             ("Drafted the reorder for six weeks of cover",
              "pending approval"),
@@ -5105,24 +5163,74 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work") -> str:
                     f'</h2>{prop_card(tid, slug)}')
     cases_sec = ""
     if slug == "dispute_defender":
+        led2 = WORLD.d.ledger
+        waitrun = {}
+        for r in led2.runs.values():
+            if (r.tenant_id == tid and r.order_id
+                    and r.state is RunState.AWAITING_GATE):
+                waitrun.setdefault(r.order_id, r.run_id)
+        cs = sorted(rail_cases(tid), key=lambda c: c["key"] != "need")
+        FILTS = [("all", "All"), ("need", "Pending approval"),
+                 ("work", "Working"), ("done", "Done")]
+        pills2 = "".join(
+            f'<button class="fpill{" " if k != "all" else ""}'
+            f'{"" if k == "all" else "off"}" data-cf="{k}" '
+            f'onclick="cfilt(this)">{lbl}</button>'
+            for k, lbl in FILTS)
+        rows2 = ""
+        for c in cs:
+            who = esc(c["label"].partition(" · ")[0])
+            what = esc(c["label"].partition(" · ")[2])
+            rid = waitrun.get(c["order"], "")
+            box = (f'<input type="checkbox" class="selrun" value="{rid}" '
+                   f'onchange="csel()">' if rid else "")
+            rows2 += (
+                f'<tr data-k="{c["key"]}">'
+                f'<td class="cbx">{box}</td>'
+                f'<td><a href="/cases/{esc(c["order"])}">{who}</a></td>'
+                f'<td>{what}</td>'
+                f'<td><span class="cdot {c["key"]}"></span> {c["word"]}</td>'
+                f'<td class="num">{c["last"].strftime("%-d %b")}</td></tr>')
         cases_sec = (
             '<h2 class="sec">Its cases</h2>'
-            '<div class="pagehint">The ones waiting on your yes come '
-            'first.</div><div class="caselist">'
-            + "".join(
-                f'<a class="rail{" unread" if c["key"] == "need" else ""}" '
-                f'href="/cases/{esc(c["order"])}">'
-                f'{_logo(c["label"].partition(" · ")[0], 30)}'
-                f'<span class="rbody"><span class="rtop"><span class="rname">'
-                f'{esc(c["label"].partition(" · ")[0])}</span>'
-                f'<span class="rwhen">{c["last"].strftime("%b %-d")}</span>'
-                f'</span><span class="rsub"><span class="rprev">'
-                f'{esc(c["label"].partition(" · ")[2])} &middot; {c["word"]}'
-                f'</span><span class="cdot {c["key"]}"></span></span>'
-                f'</span></a>'
-                for c in sorted(rail_cases(tid),
-                                key=lambda c: c["key"] != "need"))
-            + '</div>')
+            '<div class="pagehint">Tick the waiting ones and say yes in '
+            'one go. Every yes works from WhatsApp or Slack too.</div>'
+            f'<div class="fpills" style="display:flex;gap:8px;'
+            f'flex-wrap:wrap;margin:0 0 10px">{pills2}</div>'
+            '<div class="cselbar" id="cselbar" hidden>'
+            '<b id="cselcount"></b>'
+            '<button class="btn primary sm" onclick="cyes(this)">'
+            'Say yes to these</button></div>'
+            '<div class="dgridwrap"><table class="dgrid">'
+            '<thead><tr>'
+            '<th class="cbx"><input type="checkbox" id="callbox" '
+            'onchange="callall(this)"></th>'
+            '<th>Buyer</th><th>Product</th><th>Status</th>'
+            '<th class="num">Last touched</th>'
+            '</tr></thead><tbody id="ctbody">' + rows2
+            + '</tbody></table></div>'
+            '<script>'
+            'function cfilt(b){var k=b.dataset.cf;'
+            'document.querySelectorAll("[data-cf]").forEach(function(x){'
+            'x.classList.toggle("off",x!==b)});'
+            'document.querySelectorAll("#ctbody tr").forEach(function(tr){'
+            'tr.style.display=(k=="all"||tr.dataset.k==k)?"":"none"})}'
+            'function csel(){var n=document.querySelectorAll('
+            '"#ctbody .selrun:checked").length;'
+            'var bar=document.getElementById("cselbar");bar.hidden=!n;'
+            'document.getElementById("cselcount").textContent='
+            'n+" selected"}'
+            'function callall(b){document.querySelectorAll('
+            '"#ctbody .selrun").forEach(function(c){c.checked=b.checked});'
+            'csel()}'
+            'function cyes(btn){var ids=[...document.querySelectorAll('
+            '"#ctbody .selrun:checked")].map(function(c){return c.value});'
+            'if(!ids.length)return;btn.textContent="Sending\u2026";'
+            'fetch("/act/bulk",{method:"POST",'
+            'body:new URLSearchParams({runs:ids.join(","),'
+            'action:"approve",why:""})}).then(function(){'
+            'location.reload()})}'
+            '</script>')
     report_sec = ""
     if slug in REPORT_AGENTS:
         report_sec = (
@@ -8340,6 +8448,24 @@ class Handler(BaseHTTPRequestHandler):
                 me = (sess.get("email") or "you").split("@")[0]
                 role = next(x["role"] for x in RELAY_AGENTS
                             if x["slug"] == slug)
+                if "add_rule" in form:
+                    txt = form["add_rule"][0].strip()[:200]
+                    if txt:
+                        cfg.setdefault("rules", []).append(txt)
+                        log_decision(tid, me, "Added a rule for <b>"
+                                     + esc(role) + "</b>: &ldquo;"
+                                     + esc(txt[:60]) + "&rdquo;",
+                                     "/agents/" + slug + "?tab=settings")
+                if "del_rule" in form:
+                    try:
+                        gone = cfg.setdefault("rules", []).pop(
+                            int(form["del_rule"][0]))
+                        log_decision(tid, me, "Removed a rule from <b>"
+                                     + esc(role) + "</b>: &ldquo;"
+                                     + esc(gone[:60]) + "&rdquo;",
+                                     "/agents/" + slug + "?tab=settings")
+                    except (ValueError, IndexError):
+                        pass
                 if "instructions" in form:
                     cfg["instructions"] = form["instructions"][0].strip()[:400]
                     log_decision(tid, me, "Set standing instructions for "
@@ -8607,7 +8733,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(303)
             self.send_header("Location", "/scheduled")
             self.end_headers(); return
-        if self.path == "/api/file_upload":
+        if self.path.split("?")[0] == "/api/file_upload":
             sess = self._session()
             if not sess:
                 self.send_response(403); self.end_headers(); return
@@ -8621,19 +8747,29 @@ class Handler(BaseHTTPRequestHandler):
                 size = (f"{kb} KB" if kb < 1024
                         else f"{kb / 1024:.1f} MB")
                 from datetime import datetime as _dt
+                from urllib.parse import parse_qs as _pq2, urlparse as _up2
+                agent_tag = (_pq2(_up2(self.path).query).get("agent")
+                             or [""])[0]
+                a_role = next((x["role"] for x in RELAY_AGENTS
+                               if x["slug"] == agent_tag), "")
                 seed_kfiles(sess["tenant_id"]).append(dict(
-                    name=name, size=size,
+                    name=name, size=size, agent=agent_tag,
                     when=_dt.now().strftime("%-d %b"),
-                    used="Not cited yet; readable to the whole team"))
+                    used=("Context for " + a_role) if a_role
+                    else "Not cited yet; readable to the whole team"))
                 log_decision(sess["tenant_id"],
                              (sess.get("email") or "you").split("@")[0],
                              "Added a file to Knowledge: <b>"
                              + esc(name) + "</b>", "/memory?t=files")
             self.send_response(303)
             ref = self.headers.get("Referer") or ""
-            self.send_header("Location",
-                             "/settings?s=knowledge&t=files"
-                             if "settings" in ref else "/memory?t=files")
+            if agent_tag if m else False:
+                loc = "/agents/" + agent_tag + "?tab=settings"
+            elif "settings" in ref:
+                loc = "/settings?s=knowledge&t=files"
+            else:
+                loc = "/memory?t=files"
+            self.send_header("Location", loc)
             self.end_headers(); return
         if self.path == "/api/routine":
             sess = self._session()
@@ -9380,14 +9516,14 @@ _SAMPLE_SCENARIOS = [
      "on file two days before this dispute was filed, and the WhatsApp thread "
      "carries the buyer's own delivery-day confirmation. Both documents are "
      "attached to this reply."),
-    ("Jatin M.", "Sara's Chicken &amp; Rice Dog Food", "Amazon", "RD",
+    ("Jatin M.", "Sara's Chicken & Rice Dog Food", "Amazon", "RD",
      "Says one food order was charged twice",
      "Chargeback filed: the buyer's statement shows two debits for one order.",
      "The invoice and the payment gateway agree on a single reference for this "
      "dog food order, and the bank settlement excerpt confirms one debit "
      "cleared. The second line on the statement is an authorisation hold that "
      "reverses on its own."),
-    ("Deepika A.", "Meowsi Salmon &amp; Chicken Treats", "monthly refill", "RG",
+    ("Deepika A.", "Meowsi Salmon & Chicken Treats", "monthly refill", "RG",
      "Says the ashwagandha refill never showed up",
      "Chargeback filed: buyer says the monthly refill was never delivered.",
      "Delivery proof for the refill shipment is signed and dated, and the "
