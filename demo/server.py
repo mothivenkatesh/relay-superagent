@@ -2256,6 +2256,11 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
+a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
+a.agentcard .hc-t b{font-size:14.5px}
+a.agentcard .hc-t span{font-size:12.5px}
+a.agentcard:hover{border-color:#B9CDB4}
+.agentcard .hc-t span{white-space:normal;line-height:1.35}
 .hubcard.sched{flex-direction:column;align-items:stretch;gap:8px}
 .schedhead{display:flex;align-items:center;justify-content:space-between;
   gap:12px}
@@ -3026,10 +3031,82 @@ DESKS = [
 ]
 
 RELAY_AGENTS = [
+    dict(slug="instagram_shopping", name="Instagram Shopping Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="Instagram Shopping Agent",
+        desc="Turns DMs into orders. Replies, carts and payment links, inside Instagram.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="listings_opt", name="Listings Optimization Agent", icon="chart",
+        status="roadmap", desk="analyst",
+        role="Listings Optimization Agent",
+        desc="Listings that rank and convert, kept fresh on every marketplace.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="subscription_dunning", name="Subscription Dunning Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="Subscription Dunning Agent",
+        desc="Saves failing subscriptions before they cancel.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="ar_collection", name="AR Collection Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="AR Collection Agent",
+        desc="Chases invoices till they clear, politely and on schedule.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="loan_recovery", name="Loan Recovery Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="Loan Recovery Agent",
+        desc="Recovers bounced EMIs, politely.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="custom_reports", name="Custom Reports Agent", icon="chart",
+        status="roadmap", desk="analyst",
+        role="Custom Reports Agent",
+        desc="Any report, asked for in words.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="customer_support", name="Customer Support Agent", icon="chart",
+        status="roadmap", desk="support",
+        role="Customer Support Agent",
+        desc="Answers where-is-my-order, instantly, on every channel.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="csat_feedback", name="CSAT &amp; Feedback Agent", icon="chart",
+        status="roadmap", desk="support",
+        role="CSAT &amp; Feedback Agent",
+        desc="Asks every buyer how it went, and hears the answer.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="review_generation", name="Review Generation Agent", icon="chart",
+        status="roadmap", desk="support",
+        role="Review Generation Agent",
+        desc="Turns happy buyers into reviews.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="review_response", name="Review Response Agent", icon="chart",
+        status="roadmap", desk="support",
+        role="Review Response Agent",
+        desc="Replies to every review, in your voice.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="performance_marketing", name="Performance Marketing Agent", icon="chart",
+        status="roadmap", desk="analyst",
+        role="Performance Marketing Agent",
+        desc="Reads margin, not just ROAS.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
+    dict(slug="smart_approval", name="Smart Approval Agent", icon="chart",
+        status="roadmap", desk="risk",
+        role="Smart Approval Agent",
+        desc="Learns which yeses to spare you.",
+        today="Someone does this by hand today, or nobody does.",
+        replaces="a job you would otherwise hire for"),
     # --- Your accounts manager -------------------------------------------
     dict(slug="three_way_recon", name="3-Way Reconciliation", icon="ledger",
         status="roadmap", desk="accounts",
-        role="Reconciliation Officer",
+        role="Reconciliation Agent",
         desc="Matches every order to the payout to the bank credit. Tells "
              "you what didn&rsquo;t tie.",
         today="Someone ties out lines by hand every day. Tools get to about "
@@ -3037,7 +3114,7 @@ RELAY_AGENTS = [
         replaces="an accounts executive tying out the bank, &#8377;20&ndash;30k a month"),
     dict(slug="settlement_insights", name="Settlement Insights", icon="chart",
         status="roadmap", desk="accounts",
-        role="Settlement Analyst",
+        role="Settlement Agent",
         desc="Tells you what&rsquo;s landing, when, what was deducted, and "
              "what&rsquo;s stuck.",
         today="You find out what you were actually paid by opening a "
@@ -3045,7 +3122,7 @@ RELAY_AGENTS = [
         replaces="the part of the accounts job spent reading statements"),
     dict(slug="cashflow_forecast", name="Cashflow Forecast", icon="flow",
         status="roadmap", desk="accounts",
-        role="Cashflow Planner",
+        role="Cashflow Agent",
         desc="Tells you what cash lands this week, what is already spoken "
              "for, and when it gets tight.",
         today="You find out you are short in the week you are short. The "
@@ -3053,7 +3130,7 @@ RELAY_AGENTS = [
         replaces="the finance person who keeps the cash sheet, &#8377;25&ndash;40k a month"),
     dict(slug="payouts_desk", name="Payouts Desk", icon="send",
         status="roadmap", desk="accounts",
-        role="Payouts Clerk",
+        role="Payouts Agent",
         desc="Pays vendors, staff and refunds on time, each in the way they "
              "want to be paid.",
         today="Payment day is one person with a bank tab open, copying "
@@ -3061,7 +3138,7 @@ RELAY_AGENTS = [
         replaces="the accounts payable clerk, &#8377;20&ndash;28k a month"),
     dict(slug="payment_forms", name="Payment Forms", icon="pen",
         status="roadmap", desk="accounts",
-        role="Billing Executive",
+        role="Billing Agent",
         desc="Builds a payment form on the fly for anything that isn&rsquo;t "
              "normal checkout: a bulk order, a part advance, a "
              "subscription mandate: with any verification the rules "
@@ -3074,7 +3151,7 @@ RELAY_AGENTS = [
     # --- Your inventory manager ------------------------------------------
     dict(slug="stock_watch", name="Stock Watch", icon="folder",
         status="roadmap", desk="inventory",
-        role="Inventory Controller",
+        role="Quick Commerce Agent",
         desc="Watches stock across every channel, warns you before you run "
              "out, and stops you selling what you don&rsquo;t have.",
         today="You oversell on one channel and sit on dead stock in "
@@ -3084,14 +3161,14 @@ RELAY_AGENTS = [
     # --- Your risk manager -----------------------------------------------
     dict(slug="refund_shield", name="Refund Shield", icon="moon",
         status="roadmap", desk="risk",
-        role="Refund Risk Officer",
+        role="Refund Risk Agent",
         desc="Checks every refund claim for fraud before you pay it.",
         today="Claims get paid before anyone looks, because looking at every "
               "claim costs more than the fraud does.",
         replaces="a fraud reviewer you almost certainly never hired"),
     dict(slug="gst_compliance", name="GST &amp; Compliance", icon="funnel",
         status="roadmap", desk="risk",
-        role="Compliance Officer",
+        role="Compliance Agent",
         desc="Keeps GST, TDS and e-invoices tied to real orders, and flags "
              "what won&rsquo;t match before you file.",
         today="Your CA asks for the file on the 18th. Someone spends two "
@@ -3099,7 +3176,7 @@ RELAY_AGENTS = [
         replaces="the monthly compliance scramble your CA bills you for"),
     dict(slug="kyc_desk", name="KYC Desk", icon="lock",
         status="roadmap", desk="risk",
-        role="KYC Verifier",
+        role="KYC Agent",
         desc="Screens a buyer in seconds, runs the standard checks, escalates "
              "to a deeper review when the risk calls for it, and blocks mule "
              "accounts before any money moves.",
@@ -3111,7 +3188,7 @@ RELAY_AGENTS = [
     # --- Your support manager --------------------------------------------
     dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
         status="live", desk="support",
-        role="Disputes Officer",
+        role="Disputes Agent",
         desc="Gathers the proof, writes the reply, and files it before the "
              "deadline.",
         today="Proof sits across your store, the courier and your inbox. By "
@@ -3119,7 +3196,7 @@ RELAY_AGENTS = [
         replaces="the support executive who chases proof, &#8377;18&ndash;25k a month"),
     dict(slug="returns_desk", name="Returns Desk", icon="baton",
         status="roadmap", desk="support",
-        role="Returns Coordinator",
+        role="Returns Agent",
         desc="Follows every return from pickup to restock, and releases the "
              "refund once the goods are actually back.",
         today="Refunds go out before the item returns, or the customer "
@@ -3129,7 +3206,7 @@ RELAY_AGENTS = [
     # --- Your telecaller --------------------------------------------------
     dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
         status="live", desk="calling",
-        role="Cart Recovery Caller",
+        role="Cart Recovery Agent",
         desc="Calls buyers who left without paying and sends them a payment "
              "link.",
         today="A WhatsApp blast gets a fraction back. Nobody can call 400 "
@@ -3137,7 +3214,7 @@ RELAY_AGENTS = [
         replaces="a telecaller, &#8377;15&ndash;22k a month"),
     dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
         status="live", desk="calling",
-        role="Payment Recovery Caller",
+        role="Payment Recovery Agent",
         desc="Reads why a payment failed, waits a few minutes, then calls "
              "and sends a fresh link.",
         today="A failed UPI payment is just a lost order. Nobody reads a "
@@ -3145,7 +3222,7 @@ RELAY_AGENTS = [
         replaces="a telecaller, &#8377;15&ndash;22k a month"),
     dict(slug="cod_guard", name="COD Guard", icon="note",
         status="roadmap", desk="calling",
-        role="COD Confirmation Caller",
+        role="COD Confirmation Agent",
         desc="Confirms COD orders before dispatch and blocks addresses that "
              "keep failing.",
         today="Someone works the COD list every morning. COD is half your "
@@ -3154,7 +3231,7 @@ RELAY_AGENTS = [
     # --- Your MIS analyst -------------------------------------------------
     dict(slug="daily_mis", name="Daily MIS", icon="book",
         status="roadmap", desk="analyst",
-        role="MIS Analyst",
+        role="Morning Brief Agent",
         desc="Sends you the numbers that matter each morning, and flags what "
              "changed and why.",
         today="Someone rebuilds the MIS sheet every morning. It tells you "
@@ -4979,52 +5056,23 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 
 
 def _relay_agent_card(a: dict, tid: str = "t1") -> str:
-    """A wired agent earns the full card. Everything else is one calm row.
-    role, one line, Off: that opens to its page. The founder scanning this
-    at 9 PM sees at a glance what is working and is not asked to read
-    fourteen pitches (Hick: the pitch lives one click away, not here)."""
+    """One agent, one hub card: face, role, one line, status. The same
+    grammar as Connections, so the whole workspace reads as one system.
+    The pitch, the goal and the horizon live one click away."""
     live = a["status"] == "live"
     watching = not live and DEMO_ON.get(a["slug"], False)
     if live:
-        since, n = _working_since(tid)
-        if a["slug"] in ("cart_rescue", "payment_rescue"):
-            pstate = prop_state(tid, a["slug"])["state"]
-            horizon = ("Tonight&rsquo;s list waits on your yes"
-                       if pstate == "waiting" else
-                       "Calling now" if pstate == "approved" else
-                       "Next list this evening")
-            horizon = f'<div class="hzn on">{horizon}</div>'
-            switch = '<span class="st ok">On</span>'
-            inner = (f'<div class="aname" style="margin-bottom:8px;'
-                     f'flex-wrap:wrap;row-gap:8px">'
-                     f'{avatar(a["slug"], 34, True)}'
-                     f'<b style="font-size:15px">{a["role"]}</b>'
-                     f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
-                     f'<div style="margin:4px 0 8px">{a["desc"]}</div>'
-                     f'{goal_mini(tid, a["slug"])}'
-                     f'{horizon}')
-            return (f'<a class="arow2" style="display:block;padding:16px" '
-                    f'href="/agents/{a["slug"]}">{inner}</a>')
-        horizon = (f'{n} disputes checked since {since}' if since
-                   else "Switched on")
-        inner = (f'<div class="aname" style="margin-bottom:8px;flex-wrap:wrap;'
-                 f'row-gap:8px">'
-                 f'{avatar(a["slug"], 34, True)}'
-                 f'<b style="font-size:15px">{a["role"]}</b>'
-                 f'<span class="st ok" style="margin-left:auto;flex:none">On</span></div>'
-                 f'<div style="margin:2px 0 8px">{a["desc"]}</div>'
-                 f'{goal_mini(tid, a["slug"])}'
-                 f'<div class="hzn on">{horizon}</div>')
-        return (f'<a class="arow2" style="display:block;padding:16px" '
-                f'href="/agents/{a["slug"]}">{inner}</a>')
-    stat = ('<span class="st wait" style="flex:none">watching</span>' if watching
-            else '<span class="st mut" style="flex:none">Off</span>')
+        chip = '<span class="st ok">On</span>'
+    elif watching:
+        chip = '<span class="st wait">watching</span>'
+    else:
+        chip = '<span class="st mut">Off</span>'
     line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
-    return (f'<a class="arow2 slimcard" href="/agents/{a["slug"]}">'
-            f'{avatar(a["slug"], 28, watching)}'
-            f'<b>{a["role"]}</b>'
-            f'<span class="mut slimdesc">{line}</span>'
-            f'{stat}<span class="go2">&rsaquo;</span></a>')
+    return (f'<a class="hubcard agentcard" href="/agents/{a["slug"]}">'
+            f'{avatar(a["slug"], 34, live or watching)}'
+            f'<span class="hc-t"><b>{a["role"]}</b><span>{line}</span></span>'
+            f'<span class="hc-act">{chip}</span></a>'
+            )
 
 
 def agents_content(tid: str, f: str = "all", q: str = "") -> str:
@@ -5039,13 +5087,19 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     # agent does FOR the business, in the language of the P&L.
     FAMILIES = [
         ("Grow revenue",
-         ("cart_rescue", "payment_rescue", "payment_forms")),
+         ("cart_rescue", "payment_rescue", "payment_forms",
+          "instagram_shopping", "listings_opt", "subscription_dunning",
+          "ar_collection", "loan_recovery", "performance_marketing",
+          "stock_watch")),
         ("Prevent losses",
          ("dispute_defender", "refund_shield", "cod_guard",
-          "returns_desk", "stock_watch")),
+          "returns_desk", "smart_approval")),
+        ("Keep customers happy",
+         ("customer_support", "csat_feedback", "review_generation",
+          "review_response")),
         ("Know your money",
          ("three_way_recon", "settlement_insights", "cashflow_forecast",
-          "daily_mis", "payouts_desk")),
+          "daily_mis", "payouts_desk", "custom_reports")),
         ("Stay compliant",
          ("gst_compliance", "kyc_desk")),
         ("Built by you", ("__custom__",)),
@@ -5072,14 +5126,15 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         n_on_fam = sum(1 for a in mine
                        if a["status"] == "live" or DEMO_ON.get(a["slug"]))
         n_need_fam = sum(1 for a in mine if _needs(a))
-        desks += (f'<h2 class="sec fam">{title}'
+        desks += (f'<div class="hubsec"><h2 class="sec fam">{title}'
                   f'<span class="st {"ok" if n_on_fam else "mut"}">'
                   f'{n_on_fam} of {len(mine)} on</span>'
                   + (f'<span class="st need2">{n_need_fam} pending</span>'
                      if n_need_fam else '')
                   + '</h2>'
-                  f'<div class="atable" style="grid-template-columns:1fr">'
-                  + "".join(_relay_agent_card(a, tid) for a in mine) + '</div>')
+                  f'<div class="hubgrid">'
+                  + "".join(_relay_agent_card(a, tid) for a in mine)
+                  + '</div></div>')
     if not desks:
         desks = '<div class="empty">Nothing matches.</div>'
 
@@ -5108,10 +5163,6 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         f'</div>')
     return (f'<h1 class="page">Agents</h1>'
             f'{tiles}'
-            f'<div class="onemem">{ICONS["book"]}<span><b>One memory, '
-            f'fifteen hands.</b></span>'
-            f'<a href="/memory?t=teach">see what they teach each other '
-            f'&rarr;</a></div>'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span></div>'
@@ -9127,6 +9178,9 @@ color:var(--mut)}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
+a.agentcard{text-decoration:none;color:inherit;cursor:pointer}
+a.agentcard:hover{border-color:#B9CDB4}
+.agentcard .hc-t span{white-space:normal;line-height:1.35}
 .hubcard.sched{flex-direction:column;align-items:stretch;gap:8px}
 .schedhead{display:flex;align-items:center;justify-content:space-between;
   gap:12px}
