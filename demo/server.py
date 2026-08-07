@@ -2274,9 +2274,12 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .sb>span{font-size:11.5px;color:#6E7263}
 .sb i{font-style:normal;font-size:11px;color:#9A9D8E;white-space:nowrap}
 .sb.need b{color:#A9700B}
-.sb .tspark{margin-top:4px;height:14px}
+.sb.hero{flex:1.6;background:linear-gradient(135deg,#F2F9EE,#fff)}
+.sb.hero b{font-size:24px;color:#0B7A3E}
+.sb.hero i{white-space:normal}
+.sb .tspark{margin-top:6px;height:16px}
 .sb .tspark i{width:4px}
-@media (max-width:900px){.statbar{flex-wrap:wrap}.sb{flex:1 1 33%;border-top:1px solid var(--hair)}}
+@media (max-width:900px){.statbar{flex-wrap:wrap}.sb{flex:1 1 33%;border-top:1px solid var(--hair)}.sb.hero{flex:1 1 100%;border-left:0;border-top:0}}
 .roi{border:1.5px solid #0B7A3E;background:linear-gradient(135deg,#0E3A26,#17532F);color:#F4F1EA;border-radius:18px;padding:16px 24px;display:flex;align-items:center;gap:20px;margin:2px 0 16px}
 .roi>b{font-size:38px;letter-spacing:-.03em;color:#CEF993;flex:none}
 .roi-l{display:flex;flex-direction:column;gap:2px}
@@ -2313,7 +2316,7 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .teamfaces .aglyph svg{width:12px;height:12px}
 .teamfaces .pres{display:none}
 .teamline{font-size:12.5px;color:#8A8D7C;margin:-6px 2px 12px;max-width:72ch}
-.teamgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:6px 0 26px}
+.teamgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:18px 0 26px}
 @media (max-width:1100px){.teamgrid{grid-template-columns:repeat(2,1fr)}}
 .tcard{border:1px solid var(--hair);border-radius:16px;background:#fff;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;box-shadow:0 5px 0 -2px var(--tcb),0 10px 0 -5px var(--tcb);transition:transform .12s}
 .tcard:hover{transform:translateY(-2px)}
@@ -2327,10 +2330,14 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .tc-line{font-size:11.8px;color:#6E7263;line-height:1.45}
 .tc-meta{font-size:10.5px;color:#9A9D8E}
 .tc-cta{margin-top:auto;padding-top:6px;font-size:12px;font-weight:700;color:var(--tc)}
+.tghead{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;margin:30px 0 4px}
+.tg-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0B7A3E}
+.tghead b{font-size:22px;letter-spacing:-.02em}
+.tg-sub{font-size:13.5px;color:#6E7263}
 .tclear{margin:0 0 14px;font-size:12.5px}
 .tclear a{color:#5266EB;text-decoration:none}
-.stile .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
-.stile .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
+.stile .tspark,.sb .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
+.stile .tspark i,.sb .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
 .aglyph .pres{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;border:2px solid #fff}
 .aglyph .pres.on{background:#1E9E5A}
@@ -5454,7 +5461,12 @@ def agents_content(tid: str, f: str = "all", q: str = "",
             f'<span class="tc-cta">See the team &rarr;</span></a>')
     clear = (f'<div class="tclear"><a href="/agents?f={f}">&larr; every '
              f'team, every agent</a></div>' if g else "")
-    teamgrid = f'<div class="teamgrid">{tcards}</div>{clear}'
+    tghead = ('<div class="tghead">'
+              '<span class="tg-eyebrow">One super agent</span>'
+              '<b>Agent Teams</b>'
+              '<span class="tg-sub">Coordinated agents working your store '
+              'together, hand-off by hand-off.</span></div>')
+    teamgrid = f'{tghead}<div class="teamgrid">{tcards}</div>{clear}'
     if g:
         desks = clear + desks
 
@@ -5495,40 +5507,40 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         for c in _sc)
     used_cr = len(truns) * 41 + 218
     roi = (kept2 / 100) / used_cr if used_cr else 0
-    roi_strip = (
-        f'<div class="roi"><b>&#8377;{roi:.1f}</b>'
-        f'<div class="roi-l"><span>came back for every &#8377;1 of '
-        f'credits spent</span>'
-        f'<span class="mut3">&#8377;{inr(kept2)} kept &middot; '
-        f'{used_cr:,} credits spent</span></div>'
-        f'<div class="roi-m">counted from the ledger,<br>'
-        f'not our averages</div></div>')
     tiles = (
         f'<div class="statbar">'
+        f'<a class="sb hero" href="/briefs/morning">'
+        f'<b>&#8377;{roi:.1f}</b>'
+        f'<span>back for every &#8377;1 spent</span>'
+        f'<i>&#8377;{inr(kept2)} kept &middot; {used_cr:,} of 25,000 '
+        f'credits &middot; from the ledger</i></a>'
         f'<a class="sb" href="/agents?f=active"><b>{n_on}</b>'
         f'<span>agents on</span><i>{n_live} working</i></a>'
         f'<a class="sb need" href="/approvals"><b>{n_yes}</b>'
         f'<span>pending approval</span>'
         f'<i>&#8377;{inr(d_stake + p_stake)} riding</i></a>'
-        f'<a class="sb" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
-        f'<span>kept for you</span><i>{n_wins2} disputes won</i></a>'
         f'<a class="sb" href="/impact"><b>{len(truns)}</b>'
         f'<span>jobs done</span>'
         f'<span class="tspark">{sbars}</span></a>'
-        f'<a class="sb" href="/pricing"><b>{used_cr:,}</b>'
-        f'<span>credits used</span><i>of 25,000 &middot; &#8377;1 each</i></a>'
         f'</div>')
+    if g:
+        body = (f'<div class="atoolbar">'
+                f'<span class="seg">{seg("all", "All")}'
+                f'{seg("active", "On")}'
+                f'{seg("planned", "Not on yet")}</span></div>'
+                f'{desks}')
+    else:
+        live_cards = "".join(_relay_agent_card(a, tid) for a in agents
+                             if a["status"] == "live")
+        working = (f'<h2 class="sec fam">Working now</h2>'
+                   f'<div class="hubgrid">{live_cards}</div>'
+                   if live_cards else '')
+        body = working + teamgrid
     return (f'<h1 class="page">Agents</h1>'
             f'<div class="pagehint">One super agent. It plans, sells, '
             f'collects, protects, cares and reports.</div>'
-            f'{roi_strip}'
             f'{tiles}'
-            f'<div class="atoolbar">'
-            f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
-            f'{seg("planned", "Not on yet")}</span>'
-            f'</div>'
-            + ('' if g else teamgrid)
-            + f'{desks}')
+            f'{body}')
 
 
 def activity_content(tid: str, f: str = "all") -> str:
