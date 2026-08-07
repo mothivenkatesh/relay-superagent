@@ -2257,7 +2257,7 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   flex:none}
 .hubsec h2.sec{margin-top:20px}
 a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
-.wpf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin:14px 2px 2px}
+.wpf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin:0}
 .wpf a{text-decoration:none;color:#5266EB}
 .wpf a:hover{text-decoration:underline}
 .wpf a.on{color:#1D221F;font-weight:700}
@@ -2266,6 +2266,21 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .fdots em{font-style:normal;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#6E7263}
 .fdots .fd{width:8px;height:8px;border-radius:3px;display:inline-block}
 .stile .mut2{display:block;color:#9A9D8E;font-size:11px;margin-top:2px}
+.roi{border:1.5px solid #0B7A3E;background:linear-gradient(135deg,#0E3A26,#17532F);color:#F4F1EA;border-radius:18px;padding:16px 24px;display:flex;align-items:center;gap:20px;margin:2px 0 16px}
+.roi>b{font-size:38px;letter-spacing:-.03em;color:#CEF993;flex:none}
+.roi-l{display:flex;flex-direction:column;gap:2px}
+.roi-l span{font-size:13.5px}
+.roi-l .mut3{font-size:12px;opacity:.72}
+.roi-m{margin-left:auto;text-align:right;font-size:11.5px;opacity:.75;line-height:1.5}
+.imp{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;margin-left:8px}
+.imp b{font-size:16.5px;letter-spacing:-.01em}
+.impbars{display:flex;flex-direction:column;gap:2px;width:46px}
+.impbars i{height:4px;border-radius:2px;display:block}
+.impbars .h{background:#DEDBD1;width:100%}
+.impbars .a{background:currentColor}
+.imp .lbl{font-size:9.5px;color:#8A8D7C;white-space:nowrap}
+.agentcard.alive{border-color:#BFD9BA;background:linear-gradient(180deg,#FBFDF9,#fff)}
+.agentcard .hc-t>div{margin-top:6px}
 .stile .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
 .stile .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
@@ -2385,7 +2400,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .st.wait{background:var(--accent-soft);color:#4553C8}
 .st.mut{background:#EFEFF3;color:#6A6D7D}
 .empty{color:var(--mut);padding:16px 2px;font-size:13.5px}
-.atoolbar{display:flex;gap:12px;margin:4px 0 16px}
+.atoolbar{display:flex;gap:16px;margin:4px 0 16px;align-items:center;flex-wrap:wrap}
 .atoolbar .search-in{flex:1;max-width:420px;display:flex;gap:8px;align-items:center;
   background:#fff;border:1px solid var(--hair);border-radius:10px;padding:8px 12px}
 .atoolbar .search-in svg{width:15px;height:15px;color:var(--mut)}
@@ -5196,6 +5211,20 @@ def agent_tile(slug: str, on: bool = True, size: int = 40) -> str:
             f'<i class="pres {"on" if on else "off"}"></i></span>')
 
 
+def _impact(slug: str) -> tuple[int, int]:
+    """(multiple, hire-cost-in-k) from the agent's replaces line.
+    The honest anchor: what the human costs vs Rs 999."""
+    import re as _re2
+    r = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
+    m = _re2.search(r'&#8377;(\d+)\s*(?:&ndash;|\u2013|-)\s*(\d+)k',
+                    r["replaces"] if r else "")
+    if m:
+        mid = (int(m.group(1)) + int(m.group(2))) / 2
+    else:
+        mid = 15
+    return max(2, round(mid * 1000 / 999)), round(mid)
+
+
 def agent_price_card(slug: str) -> str:
     r = next((x for x in RELAY_AGENTS if x["slug"] == slug), None)
     repl = r["replaces"] if r else "a hire you never made"
@@ -5219,10 +5248,20 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
     else:
         chip = '<span class="st mut">Off</span>'
     line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
-    return (f'<a class="hubcard agentcard" href="/agents/{a["slug"]}">'
+    mult, hire_k = _impact(a["slug"])
+    fg = _TINT[_FACULTY.get(a["slug"], "custom")][1]
+    barw = max(3, round(46 * 999 / (hire_k * 1000)))
+    imp = (f'<span class="imp" style="color:{fg}"><b>{mult}x</b>'
+           f'<span class="impbars"><i class="h"></i>'
+           f'<i class="a" style="width:{barw}px"></i></span>'
+           f'<span class="lbl">&#8377;999 vs &#8377;{hire_k}k hire</span></span>')
+    goal = goal_mini(tid, a["slug"]) if live else ""
+    return (f'<a class="hubcard agentcard{" alive" if live else ""}" '
+            f'href="/agents/{a["slug"]}">'
             f'{agent_tile(a["slug"], live or watching, 40)}'
-            f'<span class="hc-t"><b>{a["role"]}</b><span>{line}</span></span>'
-            f'<span class="hc-act">{chip}</span></a>'
+            f'<span class="hc-t"><b>{a["role"]}</b><span>{line}</span>'
+            f'{goal}</span>'
+            f'{imp}<span class="hc-act">{chip}</span></a>'
             )
 
 
@@ -5353,6 +5392,15 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         f'<i style="height:{max(3, round(20 * c / _mx))}px"></i>'
         for c in _sc)
     used_cr = len(truns) * 41 + 218
+    roi = (kept2 / 100) / used_cr if used_cr else 0
+    roi_strip = (
+        f'<div class="roi"><b>&#8377;{roi:.1f}</b>'
+        f'<div class="roi-l"><span>came back for every &#8377;1 of '
+        f'credits spent</span>'
+        f'<span class="mut3">&#8377;{inr(kept2)} kept &middot; '
+        f'{used_cr:,} credits spent</span></div>'
+        f'<div class="roi-m">counted from the ledger,<br>'
+        f'not our averages</div></div>')
     tiles = (
         f'<div class="stattiles">'
         f'<a class="stile" href="/agents?f=active"><b>{n_on}</b>'
@@ -5376,11 +5424,13 @@ def agents_content(tid: str, f: str = "all", q: str = "",
     return (f'<h1 class="page">Agents</h1>'
             f'<div class="pagehint">One super agent. It plans, sells, '
             f'collects, protects, cares and reports.</div>'
+            f'{roi_strip}'
             f'{tiles}'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
-            f'{seg("planned", "Not on yet")}</span></div>'
+            f'{seg("planned", "Not on yet")}</span>'
             f'{wpf}'
+            f'</div>'
             f'{desks}')
 
 
