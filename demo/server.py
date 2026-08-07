@@ -4207,6 +4207,27 @@ def worker_name(slug: str) -> str:
 # per tenant per agent; every change lands in the Decisions trail.
 AGENT_CFG: dict = {}
 
+# Founder configuration survives restarts: a tiny JSON write-through.
+# The ledger has Postgres; the founder's settings deserve at least a file.
+_CFG_PATH = Path(__file__).parent / ".demo_cfg.json"
+
+
+def _cfg_save() -> None:
+    try:
+        _CFG_PATH.write_text(json.dumps(
+            {"cfg": AGENT_CFG, "on": DEMO_ON}))
+    except OSError:
+        pass
+
+
+def _cfg_load() -> None:
+    try:
+        d = json.loads(_CFG_PATH.read_text())
+        AGENT_CFG.update(d.get("cfg", {}))
+        DEMO_ON.update(d.get("on", {}))
+    except (OSError, ValueError):
+        pass
+
 GUARD_DEFAULTS = {
     "calling": [("quiet", "No calls outside", "9 AM to 8 PM"),
                 ("tries", "Give up after", "3 tries")],
@@ -4235,7 +4256,7 @@ AGENT_SEED = {
         guards={"quiet": "11 AM to 9 PM", "tries": "2 tries"}),
     "payment_rescue": dict(
         instructions="Wait 20 minutes after a failed payment; most fix "
-        "themselves. Call once, then send the fresh link on WhatsApp. "
+        "themselves. Call once, then send the fresh link on WhatsApp; SMS it if unread in an hour. "
         "Never read out the failure reason unless the buyer asks.",
         guards={"quiet": "10 AM to 7 PM", "tries": "3 tries"}),
     "cod_sentry": dict(
@@ -8353,6 +8374,7 @@ class Handler(BaseHTTPRequestHandler):
                     log_decision(tid, me, "Ran the checks on <b>"
                                  + esc(role) + "</b>: all good",
                                  "/agents/" + slug + "?tab=settings")
+            _cfg_save()
             self.send_response(303)
             self.send_header("Location", "/agents/" + slug + "?tab=settings")
             self.end_headers(); return
@@ -8371,6 +8393,7 @@ class Handler(BaseHTTPRequestHandler):
                     ("Switched on <b>" if DEMO_ON[slug]
                      else "Switched off <b>") + esc(role) + "</b>",
                     "/agents/" + slug)
+            _cfg_save()
             self.send_response(303)
             self.send_header("Location", f"/agents/{slug}")
             self.end_headers(); return
@@ -11305,6 +11328,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
 
 
 if __name__ == "__main__":
+    _cfg_load()
     seed_conversations()
     print(f"Relay workspace on http://localhost:{PORT}")
     host = "0.0.0.0" if "PORT" in __import__("os").environ else "127.0.0.1"
