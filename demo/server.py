@@ -3268,6 +3268,30 @@ RELAY_AGENTS = [
              "reorder elsewhere.",
         today="Repeat revenue waits for the buyer to remember you.",
         replaces="the retention marketing you never get to"),
+    dict(slug="loyalty", name="Loyalty Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="Loyalty Agent",
+        desc="One loyalty balance across every brand and channel you run. "
+             "Points earned anywhere, spent anywhere.",
+        today="Every brand runs its own points. A buyer loyal to one is "
+              "a stranger to the rest.",
+        replaces="the loyalty program that never left the planning doc"),
+    dict(slug="store_credit", name="Store Credit Agent", icon="chart",
+        status="roadmap", desk="risk",
+        role="Store Credit Agent",
+        desc="Turns refunds into store credit and gift vouchers that come "
+             "back as orders, online and at the counter.",
+        today="Every refund leaves as cash. None of it comes back as "
+              "a next order.",
+        replaces="refunds that walk out the door for good"),
+    dict(slug="emi_cohort", name="EMI Cohort Agent", icon="chart",
+        status="roadmap", desk="calling",
+        role="EMI Cohort Agent",
+        desc="Reads payment history to spot buyers good for a merchant-side "
+             "EMI, and routes the offer for your yes.",
+        today="High-intent buyers stall at the full price. Nobody offers "
+              "them a split.",
+        replaces="the conversions lost at the price step"),
     dict(slug="marketplace_claims", name="Marketplace Claims Agent", icon="chart",
         status="roadmap", desk="risk",
         role="Marketplace Claims Agent",
@@ -4162,6 +4186,21 @@ AGENT_STORY = {
         steps=[("Check", "every claim against the order and delivery"),
                ("Score", "what looks wrong, and why"),
                ("Hold", "the doubtful ones for your call")]),
+    "loyalty": dict(
+        outcome="One loyalty balance that keeps buyers in the family",
+        steps=[("Track", "points across every brand and channel"),
+               ("Spot", "who is close to a reward, and who is drifting"),
+               ("Nudge", "with the reward, before they leave for good")]),
+    "store_credit": dict(
+        outcome="Refunds that come back as orders",
+        steps=[("Offer", "credit or a voucher before cash leaves"),
+               ("Issue", "one balance, good online and at the counter"),
+               ("Watch", "credit turn into the next order")]),
+    "emi_cohort": dict(
+        outcome="High-value carts that convert on a split",
+        steps=[("Read", "payment history for EMI-ready buyers"),
+               ("Tag", "the cohort, with the risk math shown"),
+               ("Route", "the offer, for your yes first")]),
     "gst_compliance": dict(
         outcome="Filing-ready books, no month-end scramble",
         steps=[("Tie", "GST, TDS and e-invoices to real orders"),
@@ -4448,6 +4487,9 @@ def agent_settings_content(tid: str, a: dict, note=("", "")) -> str:
         "customer_support": [["WhatsApp", "Email"], ["Your store"]],
         "refund_shield": [["Cashfree", "Your store"], ["Cashfree"]],
         "kyc_desk": [["Cashfree"], ["Your store"]],
+        "loyalty": [["Your store", "WhatsApp"], ["Cashfree"]],
+        "store_credit": [["Cashfree", "Your store"], ["WhatsApp", "Email"]],
+        "emi_cohort": [["Cashfree"], ["WhatsApp", "Email"]],
     }
 
     def _via(tool_text, idx=None):
@@ -4581,6 +4623,19 @@ AGENT_LINKS = {
         gives=[("dispute_defender", "claim patterns and reused photos")],
         uses=[("returns_desk", "the warehouse seal check"),
               ("cod_guard", "the address history")]),
+    "loyalty": dict(
+        gives=[("repeat_purchase", "who is close to a reward, worth a nudge"),
+               ("cofounder", "which brand keeps whose buyers")],
+        uses=[("customer_support", "who just had a bad week"),
+              ("store_credit", "credit balances waiting to be spent")]),
+    "store_credit": dict(
+        gives=[("refund_shield", "a refusal that can still feel fair"),
+               ("loyalty", "balances worth reminding buyers about")],
+        uses=[("returns_desk", "which refunds are cleared to issue")]),
+    "emi_cohort": dict(
+        gives=[("cart_rescue", "who to call with a split offer")],
+        uses=[("payment_rescue", "who stalls at the price step"),
+              ("loyalty", "who has earned trust across brands")]),
     "gst_compliance": dict(
         gives=[("daily_mis", "what the filing changed")],
         uses=[("three_way_recon", "numbers already tied out")]),
@@ -4852,6 +4907,35 @@ AGENT_GOALS = {
              "pending approval"),
             ("Cleared 9 honest refunds untouched; nobody good was "
              "slowed", "clean")]),
+    "loyalty": dict(
+        goal="Bring 3 of 10 buyers back through a second brand",
+        target=30, now=22,
+        how="Buyers who ordered from another of your brands within 90 "
+            "days of earning a reward, out of buyers rewarded.",
+        actions=[
+            ("Nudged 14 buyers one order from a reward", "sent"),
+            ("Flagged 6 top buyers gone quiet for 30 days",
+             "pending approval"),
+            ("Mapped points from 3 systems into one balance", "done")]),
+    "store_credit": dict(
+        goal="Keep 4 of 10 refunds in the store as credit",
+        target=40, now=31,
+        how="Refunds taken as credit or voucher instead of cash, out of "
+            "refunds where credit was offered.",
+        actions=[
+            ("Offered credit on 12 refunds; 5 took it", "done"),
+            ("Issued 2 vouchers spendable at the counter too", "done"),
+            ("Queued a reminder for &#8377;4,200 of idle credit",
+             "pending approval")]),
+    "emi_cohort": dict(
+        goal="Convert 2 of 10 stalled high-value carts on EMI",
+        target=20, now=14,
+        how="Carts above &#8377;8,000 that converted after a split offer, "
+            "out of stalled carts offered one.",
+        actions=[
+            ("Tagged 76 buyers who clear the EMI bar", "done"),
+            ("Routed 9 split offers for your yes", "pending approval"),
+            ("Held 2 borderline buyers out of the cohort", "clean")]),
     "returns_desk": dict(
         goal="Refund only after the goods are back", target=100, now=100,
         how="Refunds released after the return passed its photo check, "
@@ -4998,6 +5082,18 @@ TRIAL_NOTES = {
         "Watched 62 deliveries; 9 failed, and nobody called any of them.",
         "4 of the 9 addresses look fixable from the order notes.",
         "2 couriers mark &lsquo;attempted&rsquo; at suspicious hours."],
+    "loyalty": [
+        "Mapped buyers who shop 2 of your brands: 118 of 4,206.",
+        "61 are one order away from a reward they do not know exists.",
+        "Your best buyer this month holds points in 3 separate places."],
+    "store_credit": [
+        "Read 40 refunds from the record; 12 buyers would have taken credit.",
+        "&#8377;18,340 left as cash this month and never came back.",
+        "One credit balance would work online and at the counter."],
+    "emi_cohort": [
+        "Read 90 days of payment history; 76 buyers clear the EMI bar.",
+        "31 of them stalled on carts above &#8377;8,000 this month.",
+        "A split offer at the right moment converts 2 of 10."],
     "repeat_purchase": [
         "Mapped 214 buyers to a refill rhythm from their order history.",
         "31 are due to run out in the next 10 days.",
@@ -5772,6 +5868,9 @@ AGENT_GLYPHS = {
     "review_generation": '<path d="m12 3.5 2.6 5.4 6 .8-4.4 4.1 1.1 5.9-5.3-2.9-5.3 2.9 1.1-5.9L3.4 9.7l6-.8L12 3.5z"/>',
     "review_response": '<path d="M4 5.5h16V16H9.5L4 20V5.5z"/><path d="M8.5 10.8h7"/>',
     "custom_reports": '<path d="M4 20h16M7.5 20v-7M12 20V6M16.5 20v-4.5"/>',
+    "loyalty": '<circle cx="12" cy="9.5" r="5.5"/><path d="m9 14.2-1.6 6.3 4.6-2.5 4.6 2.5L15 14.2"/>',
+    "store_credit": '<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M4 13.5h16M12 9v11"/><path d="M12 9c-3.8 0-4.8-1.5-4.8-2.8a1.9 1.9 0 0 1 3.8-.5L12 9zm0 0c3.8 0 4.8-1.5 4.8-2.8a1.9 1.9 0 0 0-3.8-.5L12 9z"/>',
+    "emi_cohort": '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.2h3"/>',
     "__default__": '<path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21M6 6l3.5 3.5M14.5 14.5 18 18M18 6l-3.5 3.5M9.5 14.5 6 18"/>',
 }
 _FACULTY = {}
@@ -5779,11 +5878,11 @@ for _f, _slugs in [
     ("Plans", ("cofounder",)),
     ("Sells", ("cart_rescue", "payment_rescue", "instagram_shopping",
                "listings_opt", "stock_watch", "repeat_purchase",
-               "subscription_dunning")),
+               "subscription_dunning", "loyalty", "emi_cohort")),
     ("Collects", ("payment_forms", "ar_collection", "loan_recovery")),
     ("Protects", ("dispute_defender", "refund_shield", "cod_guard",
                   "returns_desk", "delivery_rescue", "checkout_watchdog",
-                  "kyc_desk", "smart_approval")),
+                  "kyc_desk", "smart_approval", "store_credit")),
     ("Cares", ("customer_support", "csat_feedback", "review_generation",
                "review_response")),
     ("Reports", ("custom_reports",)),
@@ -5891,13 +5990,13 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         ("Sells",
          ("cart_rescue", "payment_rescue", "instagram_shopping",
           "listings_opt", "stock_watch", "repeat_purchase",
-          "subscription_dunning")),
+          "subscription_dunning", "loyalty", "emi_cohort")),
         ("Collects",
          ("payment_forms", "ar_collection", "loan_recovery")),
         ("Protects",
          ("dispute_defender", "refund_shield", "cod_guard",
           "returns_desk", "delivery_rescue", "checkout_watchdog",
-          "kyc_desk", "smart_approval")),
+          "kyc_desk", "smart_approval", "store_credit")),
         ("Cares",
          ("customer_support", "csat_feedback", "review_generation",
           "review_response")),
@@ -5931,7 +6030,7 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         "Collects": "Invoices, EMIs and odd payments, chased by one "
                     "collections desk with one tone.",
         "Protects": "One risk memory: a bad pincode caught by the COD "
-                    "agent teaches all 8 the same hour.",
+                    "agent teaches all 9 the same hour.",
         "Cares": "Support hears it, CSAT measures it, the review agents "
                  "turn it public.",
         "Reports": "Everything the teams above did, asked for in words.",
@@ -7234,7 +7333,7 @@ def pricing_content(tid: str) -> str:
                pick=True, chip="Most picked",
                inc="Everything in Starter, and:", pid="prPG")
         + plan("Enterprise", "Talk to us", "", "For large teams",
-               ["All 24 agents", "Unlimited agents built by you",
+               ["All 27 agents", "Unlimited agents built by you",
                 "Credits sized to you", "Volume pricing",
                 "SSO and audit export", "Dedicated support"],
                inc="Everything in Growth, and:", cta="Talk to sales")
