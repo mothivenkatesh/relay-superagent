@@ -2257,6 +2257,17 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   flex:none}
 .hubsec h2.sec{margin-top:20px}
 a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
+.wpf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin:14px 2px 2px}
+.wpf a{text-decoration:none;color:#5266EB}
+.wpf a:hover{text-decoration:underline}
+.wpf a.on{color:#1D221F;font-weight:700}
+.wpf span{color:#D5D2C8}
+.stile .fdots{display:flex;gap:8px;margin-top:9px;align-items:center}
+.fdots em{font-style:normal;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#6E7263}
+.fdots .fd{width:8px;height:8px;border-radius:3px;display:inline-block}
+.stile .mut2{display:block;color:#9A9D8E;font-size:11px;margin-top:2px}
+.stile .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
+.stile .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
 .aglyph .pres{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;border:2px solid #fff}
 .aglyph .pres.on{background:#1E9E5A}
@@ -3050,6 +3061,14 @@ CEDED_TO_COWORKER = {"three_way_recon", "settlement_insights",
                      "marketplace_claims"}
 
 RELAY_AGENTS = [
+    dict(slug="cofounder", name="Cofounder Agent", icon="chart",
+        status="roadmap", desk="analyst",
+        role="Cofounder Agent",
+        desc="Connects what every agent learns into your next move, and "
+             "files it as a proposal for your yes.",
+        today="The patterns sit across 24 heads and 5 dashboards; "
+              "nobody joins them.",
+        replaces="the cofounder you cannot afford yet"),
     dict(slug="delivery_rescue", name="Delivery Rescue Agent", icon="chart",
         status="roadmap", desk="support",
         role="Delivery Rescue Agent",
@@ -5112,6 +5131,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 # ---- faculty, the way a super app draws its services. Keep the     ----
 # ---- faculty map in sync with FAMILIES in agents_content.          ----
 AGENT_GLYPHS = {
+    "cofounder": '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2z"/>',
     "cart_rescue": '<circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.2 11.5H18l2-8H6"/>',
     "payment_rescue": '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/>',
     "instagram_shopping": '<path d="M6 8h12l1 12H5L6 8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
@@ -5139,6 +5159,7 @@ AGENT_GLYPHS = {
 }
 _FACULTY = {}
 for _f, _slugs in [
+    ("Plans", ("cofounder",)),
     ("Sells", ("cart_rescue", "payment_rescue", "instagram_shopping",
                "listings_opt", "stock_watch", "repeat_purchase",
                "subscription_dunning")),
@@ -5153,6 +5174,7 @@ for _f, _slugs in [
     for _sl in _slugs:
         _FACULTY[_sl] = _f
 _TINT = {
+    "Plans": ("#DDF0EE", "#0F766E"),
     "Sells": ("#E5F3E1", "#0B7A3E"),
     "Collects": ("#FBEED3", "#A9700B"),
     "Protects": ("#FBE5E5", "#C2374B"),
@@ -5204,7 +5226,8 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
             )
 
 
-def agents_content(tid: str, f: str = "all", q: str = "") -> str:
+def agents_content(tid: str, f: str = "all", q: str = "",
+                   g: str = "") -> str:
     agents = [a for a in RELAY_AGENTS
               if a["slug"] not in CEDED_TO_COWORKER]
     if f in ("active", "planned"):
@@ -5218,6 +5241,8 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     # One super agent, read as faculties: what it does, in one verb
     # each, the way a super app names its tabs.
     FAMILIES = [
+        ("Plans",
+         ("cofounder",)),
         ("Sells",
          ("cart_rescue", "payment_rescue", "instagram_shopping",
           "listings_opt", "stock_watch", "repeat_purchase",
@@ -5245,12 +5270,29 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         return (sl in PROPS_DEF
                 and prop_state(tid, sl)["state"] == "waiting")
 
+    # The nostalgic filter row: group links with counts, pipe-separated,
+    # the way the WordPress plugins page has always done it.
+    def _fam_agents(keys):
+        if keys == ("__custom__",):
+            return [a for a in agents if a["desk"] == "custom"]
+        return [a for a in agents if a["slug"] in keys]
+    wpf = (f'<a class="{"on" if not g else ""}" href="/agents?f={f}">'
+           f'All ({len(agents)})</a>')
+    for _t, _k in FAMILIES:
+        _n = len(_fam_agents(_k))
+        if not _n:
+            continue
+        wpf += ('<span>|</span>'
+                f'<a class="{"on" if g == _t else ""}" '
+                f'href="/agents?f={f}&amp;g={_t.replace(" ", "+")}">'
+                f'{_t} ({_n})</a>')
+    wpf = f'<div class="wpf">{wpf}</div>'
+
     desks = ""
     for title, keys in FAMILIES:
-        if keys == ("__custom__",):
-            mine = [a for a in agents if a["desk"] == "custom"]
-        else:
-            mine = [a for a in agents if a["slug"] in keys]
+        if g and title != g:
+            continue
+        mine = _fam_agents(keys)
         if not mine:
             continue
         mine.sort(key=lambda a: (not _needs(a), a["status"] != "live"))
@@ -5269,8 +5311,10 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
     if not desks:
         desks = '<div class="empty">Nothing matches.</div>'
 
-    seg = lambda key, label: (f'<a class="{"on" if f == key else ""}" '
-                              f'href="/agents?f={key}">{label}</a>')
+    seg = lambda key, label: (
+        f'<a class="{"on" if f == key else ""}" '
+        f'href="/agents?f={key}'
+        + (f'&amp;g={g.replace(" ", "+")}' if g else '') + f'">{label}</a>')
     roster = [a for a in RELAY_AGENTS
               if a["slug"] not in CEDED_TO_COWORKER]
     n_all = len(roster)
@@ -5282,25 +5326,61 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
                 if r.state is RunState.AWAITING_GATE) + props_waiting(tid)
     kept2, n_wins2, _w = recovered(tid)
     n_live = sum(1 for a in roster if a["status"] == "live")
+    # Faculty dots: the roster's colour code, repeated as a legend.
+    fam_counts = []
+    for _t, _k in FAMILIES:
+        _n2 = len(_fam_agents(_k))
+        if _n2:
+            fam_counts.append((_TINT.get(_t, _TINT["custom"])[1], _n2))
+    fdots = "".join(
+        f'<em><span class="fd" style="background:{c}"></span>{n}</em>'
+        for c, n in fam_counts)
+    # What is riding on the pending yeses, same math as the home queue.
+    d_stake = sum(price_of(r.order_id) for r in truns
+                  if r.state is RunState.AWAITING_GATE)
+    p_stake = sum(PROPS_DEF[sl].get("stake_n", 0) for sl in PROPS_DEF
+                  if prop_state(tid, sl)["state"] == "waiting") * 100
+    # 14-day pulse across every agent's runs.
+    from datetime import datetime as _dt2
+    _today = _dt2.utcnow().date()
+    _sc = [0] * 14
+    for r in truns:
+        _dlt = (_today - r.occurred_at.date()).days
+        if 0 <= _dlt < 14:
+            _sc[13 - _dlt] += 1
+    _mx = max(_sc) or 1
+    sbars = "".join(
+        f'<i style="height:{max(3, round(20 * c / _mx))}px"></i>'
+        for c in _sc)
+    used_cr = len(truns) * 41 + 218
     tiles = (
         f'<div class="stattiles">'
         f'<a class="stile" href="/agents?f=active"><b>{n_on}</b>'
         f'<span>Agents on</span><i>{n_live} working &middot; '
-        f'{n_on - n_live} watching</i></a>'
+        f'{n_on - n_live} watching</i>'
+        f'<span class="fdots">{fdots}</span></a>'
         f'<a class="stile need" href="/approvals"><b>{n_yes}</b>'
-        f'<span>Pending approval</span></a>'
+        f'<span>Pending approval</span>'
+        f'<i>&#8377;{inr(d_stake + p_stake)} riding on them</i>'
+        f'<i class="mut2">replies, holds, payouts</i></a>'
         f'<a class="stile" href="/briefs/morning"><b>&#8377;{inr(kept2)}</b>'
-        f'<span>Kept for you</span><i>{n_wins2} disputes won</i></a>'
+        f'<span>Kept for you</span><i>{n_wins2} disputes won &middot; {_w}</i>'
+        f'<i class="mut2">counted from the ledger</i></a>'
         f'<a class="stile" href="/impact"><b>{len(truns)}</b>'
-        f'<span>Jobs done</span></a>'
+        f'<span>Jobs done</span><i>every one in History</i>'
+        f'<span class="tspark">{sbars}</span></a>'
+        f'<a class="stile" href="/pricing"><b>{used_cr:,}</b>'
+        f'<span>Credits used</span><i>of 25,000 &middot; Growth plan</i>'
+        f'<i class="mut2">&#8377;1 a credit</i></a>'
         f'</div>')
     return (f'<h1 class="page">Agents</h1>'
-            f'<div class="pagehint">One super agent. It sells, collects, '
-            f'protects, cares and reports.</div>'
+            f'<div class="pagehint">One super agent. It plans, sells, '
+            f'collects, protects, cares and reports.</div>'
             f'{tiles}'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
             f'{seg("planned", "Not on yet")}</span></div>'
+            f'{wpf}'
             f'{desks}')
 
 
@@ -6429,7 +6509,7 @@ def pricing_content(tid: str) -> str:
                pick=True, chip="Most picked",
                inc="Everything in Starter, and:", pid="prPG")
         + plan("Enterprise", "Talk to us", "", "For large teams",
-               ["All 23 agents", "Unlimited agents built by you",
+               ["All 24 agents", "Unlimited agents built by you",
                 "Credits sized to you", "Volume pricing",
                 "SSO and audit export", "Dedicated support"],
                inc="Everything in Growth, and:", cta="Talk to sales")
@@ -7490,8 +7570,11 @@ class Handler(BaseHTTPRequestHandler):
             if not sess:
                 return self._redirect("/login")
             from urllib.parse import parse_qs as _pq, urlparse as _up
-            f = _pq(_up(self.path).query).get("f", ["all"])[0]
-            self._html(_shell(agents_content(sess["tenant_id"], f), "agents",
+            _q = _pq(_up(self.path).query)
+            f = _q.get("f", ["all"])[0]
+            g = _q.get("g", [""])[0]
+            self._html(_shell(agents_content(sess["tenant_id"], f, g=g),
+                              "agents",
                               sess["tenant_id"], sess.get("email", "")))
         elif self.path.startswith("/briefs/"):
             sess = self._session()
