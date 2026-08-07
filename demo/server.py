@@ -4218,10 +4218,40 @@ GUARD_DEFAULTS = {
 }
 
 
+# The operating procedure each working agent starts with: real
+# standing instructions and limits, so a settings page never opens
+# empty on an agent that has been on the job since March.
+AGENT_SEED = {
+    "dispute_defender": dict(
+        instructions="Answer every dispute at least 24 hours before the "
+        "bank&rsquo;s deadline. Lead with the delivery proof, then the "
+        "buyer&rsquo;s own messages. Never promise a refund inside a "
+        "reply. Answer in the buyer&rsquo;s language.",
+        guards={"ask_above": "&#8377;1,000"}),
+    "cart_rescue": dict(
+        instructions="Hindi first, English if they switch. Offer free "
+        "delivery above &#8377;999 before any discount. Never call the "
+        "same buyer twice in a day; the second nudge goes on WhatsApp.",
+        guards={"quiet": "11 AM to 9 PM", "tries": "2 tries"}),
+    "payment_rescue": dict(
+        instructions="Wait 20 minutes after a failed payment; most fix "
+        "themselves. Call once, then send the fresh link on WhatsApp. "
+        "Never read out the failure reason unless the buyer asks.",
+        guards={"quiet": "10 AM to 7 PM", "tries": "3 tries"}),
+    "cod_sentry": dict(
+        instructions="Sale weeks only. Hold anything over &#8377;3,000 "
+        "from a first-time buyer; release the moment the number checks "
+        "out. When in doubt, hold and ask.",
+        guards={"ask_above": "&#8377;3,000"}),
+}
+
+
 def agent_cfg(tid: str, slug: str) -> dict:
+    seed = AGENT_SEED.get(slug, {})
     return AGENT_CFG.setdefault(tid, {}).setdefault(slug, {
-        "instructions": "", "learn": True, "eval_at": "", "tools_off": [],
-        "guards": {}})
+        "instructions": seed.get("instructions", ""), "learn": True,
+        "eval_at": "", "tools_off": [],
+        "guards": dict(seed.get("guards", {}))})
 
 
 def agent_settings_content(tid: str, a: dict) -> str:
@@ -4293,7 +4323,30 @@ def agent_settings_content(tid: str, a: dict) -> str:
         '<div class="trow slim"><span class="ico">' + ICONS["book"]
         + '</span><span class="tdesc"><span class="mut">Always reads: '
         + ", ".join(acc["reads"]) + '.</span></span></div>')
-    def _via(tool_text):
+    TOOL_CONN = {
+        "dispute_defender": [["Cashfree", "Email"],
+                             ["Cashfree", "Bank and settlements"]],
+        "cart_rescue": [["Voice calls", "WhatsApp"],
+                        ["Cashfree", "Your store"]],
+        "payment_rescue": [["Voice calls", "WhatsApp"], ["Cashfree"]],
+        "cod_guard": [["Voice calls", "WhatsApp"], ["Your store"]],
+        "customer_support": [["WhatsApp", "Email"], ["Your store"]],
+        "refund_shield": [["Cashfree", "Your store"], ["Cashfree"]],
+        "kyc_desk": [["Cashfree"], ["Your store"]],
+    }
+
+    def _via(tool_text, idx=None):
+        mapped = TOOL_CONN.get(slug)
+        if mapped is not None and idx is not None and idx < len(mapped):
+            st = conn_state(tid)
+            out = ""
+            for n in mapped[idx]:
+                on = st.get(n) == "on"
+                out += ('<a class="viachip' + (" on" if on else "")
+                        + '" href="/connections">'
+                        + ('<i></i>' if on else '') + n + '</a>')
+            return ('<span class="viarow"><span class="mut">via</span>'
+                    + out + '</span>')
         t = tool_text.lower()
         names = []
         if "call" in t or "ring" in t:
@@ -4328,7 +4381,7 @@ def agent_settings_content(tid: str, a: dict) -> str:
             '<button class="tglbtn ' + ("" if off else "on") + '"><i></i>'
             '</button></form>'
             '<span class="tdesc">' + d[0].upper() + d[1:]
-            + _via(d) + '</span></div>')
+            + _via(d, i) + '</span></div>')
     tools = ('<h2 class="sec">Tools</h2>'
              '<div class="pagehint">Switch a tool off and the agent works '
              'without it. Each runs through your connections.</div>'
