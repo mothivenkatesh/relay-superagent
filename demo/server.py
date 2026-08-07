@@ -2621,7 +2621,12 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .dgrid td a:hover{color:#5266EB}
 .selrun{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
 #callbox{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
-.cselbar{display:flex;gap:12px;align-items:center;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:10px 14px;margin:0 0 10px}
+.cselbar{display:flex;gap:12px;align-items:center;border:1px solid #BFD9BA;background:#F2F9EE;border-radius:12px;padding:10px 14px;margin:12px 0 10px;position:sticky;top:10px;z-index:6}
+.casefseg{display:inline-flex;margin:2px 0 6px}
+.casefseg a{cursor:pointer}
+.dgrid tbody tr:hover{background:#FAFAF6}
+.dgrid tbody tr.pickable{cursor:pointer}
+.dgrid tbody tr.pickable:hover{background:#F2F6FB}
 .flash{display:flex;gap:12px;align-items:center;border:1px solid #D9C79A;background:#FDF8EC;border-radius:12px;padding:12px 16px;margin:14px 0 4px;font-size:13.5px}
 .flash.ok{border-color:#BFD9BA;background:#F2F9EE}
 .flashundo{border:0;background:none;color:#5266EB;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;padding:8px 10px;margin:-8px 0}
@@ -5207,37 +5212,44 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
                     and r.state is RunState.AWAITING_GATE):
                 waitrun.setdefault(r.order_id, r.run_id)
         cs = sorted(rail_cases(tid), key=lambda c: c["key"] != "need")
+        n_by = {"all": len(cs)}
+        for c in cs:
+            n_by[c["key"]] = n_by.get(c["key"], 0) + 1
         FILTS = [("all", "All"), ("need", "Pending approval"),
                  ("work", "Working"), ("done", "Done")]
         pills2 = "".join(
-            f'<button class="fpill{" " if k != "all" else ""}'
-            f'{"" if k == "all" else "off"}" data-cf="{k}" '
-            f'onclick="cfilt(this)">{lbl}</button>'
-            for k, lbl in FILTS)
+            f'<a class="{"on" if k == "all" else ""}" data-cf="{k}" '
+            f'onclick="cfilt(this)">{lbl} ({n_by.get(k, 0)})</a>'
+            for k, lbl in FILTS if n_by.get(k))
         rows2 = ""
         for c in cs:
             who = esc(c["label"].partition(" · ")[0])
             what = esc(c["label"].partition(" · ")[2])
             rid = waitrun.get(c["order"], "")
+            amt = price_of(c["order"]) // 100
             box = (f'<input type="checkbox" class="selrun" value="{rid}" '
-                   f'onchange="csel()">' if rid else "")
+                   f'data-amt="{amt}" onchange="csel()">' if rid else "")
             rows2 += (
-                f'<tr data-k="{c["key"]}">'
+                f'<tr data-k="{c["key"]}"'
+                + (' class="pickable" onclick="crow(event,this)"'
+                   if rid else '') + '>'
                 f'<td class="cbx">{box}</td>'
                 f'<td><a href="/cases/{esc(c["order"])}">{who}</a></td>'
                 f'<td>{what}</td>'
                 f'<td><span class="cdot {c["key"]}"></span> {c["word"]}</td>'
                 f'<td class="num">{c["last"].strftime("%-d %b")}</td></tr>')
         cases_sec = (
-            '<h2 class="sec">Its cases</h2>'
-            '<div class="pagehint">Tick the waiting ones and say yes in '
-            'one go. Every yes works from WhatsApp or Slack too.</div>'
-            f'<div class="fpills" style="display:flex;gap:8px;'
-            f'flex-wrap:wrap;margin:0 0 10px">{pills2}</div>'
+            f'<h2 class="sec">Its cases'
+            f'<span class="st mut">{len(cs)}</span></h2>'
+            f'<span class="seg casefseg">{pills2}</span>'
             '<div class="cselbar" id="cselbar" hidden>'
             '<b id="cselcount"></b>'
+            '<span id="cselamt" class="mut"></span>'
             '<button class="btn primary sm" onclick="cyes(this)">'
-            'Say yes to these</button></div>'
+            'Say yes to these</button>'
+            '<button class="btn ghost sm" onclick="cclear()">Clear</button>'
+            '<span class="mut" style="font-size:12px;margin-left:auto">'
+            'your yes works from WhatsApp or Slack too</span></div>'
             '<div class="dgridwrap"><table class="dgrid">'
             '<thead><tr>'
             '<th class="cbx"><input type="checkbox" id="callbox" '
@@ -5252,11 +5264,23 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
             'x.classList.toggle("off",x!==b)});'
             'document.querySelectorAll("#ctbody tr").forEach(function(tr){'
             'tr.style.display=(k=="all"||tr.dataset.k==k)?"":"none"})}'
-            'function csel(){var n=document.querySelectorAll('
-            '"#ctbody .selrun:checked").length;'
+            'function crow(ev,tr){if(ev.target.tagName=="A"||'
+            'ev.target.tagName=="INPUT")return;'
+            'var c=tr.querySelector(".selrun");'
+            'if(c){c.checked=!c.checked;csel()}}'
+            'function cclear(){document.querySelectorAll('
+            '"#ctbody .selrun:checked").forEach(function(c){'
+            'c.checked=false});'
+            'document.getElementById("callbox").checked=false;csel()}'
+            'function csel(){var cs2=[...document.querySelectorAll('
+            '"#ctbody .selrun:checked")];var n=cs2.length;'
+            'var amt=cs2.reduce(function(a,c){'
+            'return a+(+c.dataset.amt||0)},0);'
             'var bar=document.getElementById("cselbar");bar.hidden=!n;'
             'document.getElementById("cselcount").textContent='
-            'n+" selected"}'
+            'n+" selected";'
+            'document.getElementById("cselamt").textContent='
+            '"\u20B9"+amt.toLocaleString("en-IN")+" riding on them"}'
             'function callall(b){document.querySelectorAll('
             '"#ctbody .selrun").forEach(function(c){c.checked=b.checked});'
             'csel()}'
