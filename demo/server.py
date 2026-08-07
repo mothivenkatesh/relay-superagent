@@ -5126,20 +5126,23 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
 
     # Grouped by the founder's objective, not our org chart: what each
     # agent does FOR the business, in the language of the P&L.
+    # One super agent, read as faculties: what it does, in one verb
+    # each, the way a super app names its tabs.
     FAMILIES = [
-        ("Grow revenue",
-         ("cart_rescue", "payment_rescue", "payment_forms",
-          "instagram_shopping", "listings_opt", "subscription_dunning",
-          "ar_collection", "loan_recovery", "stock_watch",
-          "repeat_purchase")),
-        ("Prevent losses",
+        ("Sells",
+         ("cart_rescue", "payment_rescue", "instagram_shopping",
+          "listings_opt", "stock_watch", "repeat_purchase",
+          "subscription_dunning")),
+        ("Collects",
+         ("payment_forms", "ar_collection", "loan_recovery")),
+        ("Protects",
          ("dispute_defender", "refund_shield", "cod_guard",
-          "returns_desk", "smart_approval", "delivery_rescue",
-          "checkout_watchdog", "kyc_desk")),
-        ("Keep customers happy",
+          "returns_desk", "delivery_rescue", "checkout_watchdog",
+          "kyc_desk", "smart_approval")),
+        ("Cares",
          ("customer_support", "csat_feedback", "review_generation",
           "review_response")),
-        ("Know your business",
+        ("Reports",
          ("custom_reports",)),
         ("Built by you", ("__custom__",)),
     ]
@@ -5203,6 +5206,8 @@ def agents_content(tid: str, f: str = "all", q: str = "") -> str:
         f'<span>Jobs done</span></a>'
         f'</div>')
     return (f'<h1 class="page">Agents</h1>'
+            f'<div class="pagehint">One super agent. It sells, collects, '
+            f'protects, cares and reports.</div>'
             f'{tiles}'
             f'<div class="atoolbar">'
             f'<span class="seg">{seg("all", "All")}{seg("active", "On")}'
