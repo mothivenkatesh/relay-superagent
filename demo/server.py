@@ -756,6 +756,8 @@ WORK_CSS = """
 .compose:hover{background:#E3E5EE;color:var(--ink,#1B1F30)}
 .compose svg{width:15px;height:15px}
 .navblock{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid #ECECF1}
+.navblock.grp{border-bottom:none;padding-bottom:2px;margin-bottom:2px}
+.navlabel{font-size:12px;font-weight:600;letter-spacing:.03em;color:#9A9FA6;padding:10px 10px 4px}
 .navbtn{width:100%;border:0;background:none;font:inherit;cursor:pointer;
   text-align:left}
 .railsearch{margin:0 4px 8px;padding:8px 12px;font:inherit;font-size:13px;
@@ -1256,8 +1258,19 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
       <span class="bname"><b>Relay</b><img class="bizlogo" src="{HUFT_LOGO}" alt="{BUSINESS}"></span></div>
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
-      <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New</span></a>
+      <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New chat</span></a>
+    </div>
+    <div class="navlabel">Analyze</div>
+    <div class="navblock grp">
+      <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["chart"]}<span>Insights</span></a>
+      <a class="nav" href="/approvals">{ICONS["tasks"]}<span>Review</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
+    </div>
+    <div class="navlabel">Build</div>
+    <div class="navblock grp">
+      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["pen"]}<span>Agent Builder</span></a>
+      <a class="nav" href="/skills">{ICONS["flow"]}<span>Playbooks</span></a>
+      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Knowledge</span></a>
     </div>
 
 
@@ -1267,7 +1280,6 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     </div>
     <div class="railsys">
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
-      <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["ledger"]}<span>History</span></a>
     </div>
     <details class="acct railacct">
       <summary class="railme">
