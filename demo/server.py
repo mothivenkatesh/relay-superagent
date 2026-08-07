@@ -2290,8 +2290,29 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .impbars .h{background:#DEDBD1;width:100%}
 .impbars .a{background:currentColor}
 .imp .lbl{font-size:9.5px;color:#8A8D7C;white-space:nowrap}
-.agentcard.alive{border-color:#BFD9BA;background:linear-gradient(180deg,#FBFDF9,#fff)}
-.agentcard .hc-t>div{margin-top:6px}
+.agentcard2{display:flex;flex-direction:column;gap:10px;border:1px solid var(--hair);background:#fff;border-radius:14px;padding:14px 16px;text-decoration:none;color:inherit;min-width:0}
+.agentcard2:hover{border-color:#B9CDB4}
+.agentcard2.alive{border-color:#BFD9BA;background:linear-gradient(180deg,#FBFDF9,#fff)}
+.ac-h{display:flex;gap:12px;align-items:flex-start}
+.ac-h .st{flex:none;margin-left:auto}
+.ac-n{min-width:0;flex:1}
+.ac-n b{display:block;font-size:14.5px;letter-spacing:-.01em;line-height:1.3}
+.ac-n span{display:block;font-size:12.5px;color:#6E7263;line-height:1.45;margin-top:2px}
+.ac-goal{display:flex;align-items:center;gap:10px;font-size:11.5px}
+.ac-goal .gl{color:#6E7263;flex:none;white-space:nowrap}
+.ac-goal b{flex:none;font-size:12px}
+.gbar{position:relative;flex:1;height:6px;border-radius:3px;background:#EFEDE6;min-width:60px}
+.gbar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#1E9E5A}
+.gbar em{position:absolute;top:-2px;bottom:-2px;width:2px;background:#B4B09F;border-radius:1px}
+.ac-f{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid #F1EFE8;font-size:11px;color:#8A8D7C;white-space:nowrap;overflow:hidden}
+.ac-f b{font-size:13.5px;flex:none}
+.ac-f .impbars{width:34px;flex:none}
+.teamfaces{display:inline-flex;margin:0 2px 0 6px;vertical-align:middle}
+.teamfaces .aglyph{width:22px !important;height:22px !important;border-radius:7px;outline:2px solid #FAFAF6;margin-left:-7px}
+.teamfaces .aglyph:first-child{margin-left:0}
+.teamfaces .aglyph svg{width:12px;height:12px}
+.teamfaces .pres{display:none}
+.teamline{font-size:12.5px;color:#8A8D7C;margin:-6px 2px 12px;max-width:72ch}
 .stile .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
 .stile .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
@@ -4577,6 +4598,31 @@ def goal_block(tid: str, slug: str) -> str:
         + '</div>')
 
 
+def goal_stats(tid: str, slug: str):
+    """(short label, now pct, target pct) for the card's progress bar."""
+    g = AGENT_GOALS.get(slug)
+    if not g:
+        return None
+    now = g.get("now", 0)
+    if slug == "dispute_defender":
+        led = WORLD.d.ledger
+        won = lost = 0
+        for r in led.runs.values():
+            if r.tenant_id != tid:
+                continue
+            out = led.outcome_for(r.run_id)
+            if out and out.outcome_value:
+                won, lost = ((won + 1, lost)
+                             if out.outcome_value.get("won")
+                             else (won, lost + 1))
+        now = (100 * won // (won + lost)) if (won + lost) else 0
+    import re as _re3
+    m = _re3.search(r"(\d+) of every (\d+)", g["goal"])
+    label = (f'{m.group(1)} of {m.group(2)} {g["goal"].split()[-1]}'
+             if m else g["goal"])
+    return label, now, g["target"]
+
+
 def goal_mini(tid: str, slug: str) -> str:
     """One quiet line on the roster card: the claim and where it stands."""
     g = AGENT_GOALS.get(slug)
@@ -5261,18 +5307,30 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
     line = AGENT_STORY.get(a["slug"], {}).get("outcome", a["desc"])
     mult, hire_k = _impact(a["slug"])
     fg = _TINT[_FACULTY.get(a["slug"], "custom")][1]
-    barw = max(3, round(46 * 999 / (hire_k * 1000)))
-    imp = (f'<span class="imp" style="color:{fg}"><b>{mult}x</b>'
-           f'<span class="impbars"><i class="h"></i>'
-           f'<i class="a" style="width:{barw}px"></i></span>'
-           f'<span class="lbl">&#8377;999 vs &#8377;{hire_k}k hire</span></span>')
-    goal = goal_mini(tid, a["slug"]) if live else ""
-    return (f'<a class="hubcard agentcard{" alive" if live else ""}" '
+    barw = max(3, round(34 * 999 / (hire_k * 1000)))
+    goal_zone = ""
+    gs = goal_stats(tid, a["slug"]) if live else None
+    if gs:
+        glabel, gnow, gtarget = gs
+        goal_zone = (f'<div class="ac-goal">'
+                     f'<span class="gl">{glabel.lower()}</span>'
+                     f'<span class="gbar"><i style="width:{gnow}%"></i>'
+                     f'<em style="left:{gtarget}%"></em></span>'
+                     f'<b>{gnow}%</b></div>')
+    if a["desk"] == "custom":
+        footer = ('<div class="ac-f"><b style="color:#5B5E52">yours</b>'
+                  '<span>described in chat &middot; &#8377;999/mo</span></div>')
+    else:
+        footer = (f'<div class="ac-f"><b style="color:{fg}">{mult}x</b>'
+                  f'<span class="impbars"><i class="h"></i>'
+                  f'<i class="a" style="width:{barw}px"></i></span>'
+                  f'<span>&#8377;999/mo vs the &#8377;{hire_k}k hire</span></div>')
+    return (f'<a class="agentcard2{" alive" if live else ""}" '
             f'href="/agents/{a["slug"]}">'
-            f'{agent_tile(a["slug"], live or watching, 40)}'
-            f'<span class="hc-t"><b>{a["role"]}</b><span>{line}</span>'
-            f'{goal}</span>'
-            f'{imp}<span class="hc-act">{chip}</span></a>'
+            f'<div class="ac-h">{agent_tile(a["slug"], live or watching, 36)}'
+            f'<div class="ac-n"><b>{a["role"]}</b><span>{line}</span></div>'
+            f'{chip}</div>'
+            f'{goal_zone}{footer}</a>'
             )
 
 
@@ -5338,6 +5396,21 @@ def agents_content(tid: str, f: str = "all", q: str = "",
                 f'{_t} ({_n})</a>')
     wpf = f'<div class="wpf">{wpf}</div>'
 
+    TEAM_LINES = {
+        "Plans": "Reads what every team below learns, and files your "
+                 "next move for a yes.",
+        "Sells": "One chain: the cart agent saves the sale, the payment "
+                 "agent revives it, the repeat agent brings the buyer back.",
+        "Collects": "Invoices, EMIs and odd payments, chased by one "
+                    "collections desk with one tone.",
+        "Protects": "One risk memory: a bad pincode caught by the COD "
+                    "agent teaches all 8 the same hour.",
+        "Cares": "Support hears it, CSAT measures it, the review agents "
+                 "turn it public.",
+        "Reports": "Everything the teams above did, asked for in words.",
+        "Built by you": "Describes a job in chat; it joins whichever "
+                        "team the job belongs to.",
+    }
     desks = ""
     for title, keys in FAMILIES:
         if g and title != g:
@@ -5349,13 +5422,17 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         n_on_fam = sum(1 for a in mine
                        if a["status"] == "live" or DEMO_ON.get(a["slug"]))
         n_need_fam = sum(1 for a in mine if _needs(a))
+        faces = "".join(agent_tile(a["slug"], True, 22) for a in mine[:6])
+        tline = TEAM_LINES.get(title, "")
         desks += (f'<div class="hubsec"><h2 class="sec fam">{title}'
+                  f'<span class="teamfaces">{faces}</span>'
                   f'<span class="st {"ok" if n_on_fam else "mut"}">'
                   f'{n_on_fam} of {len(mine)} on</span>'
                   + (f'<span class="st need2">{n_need_fam} pending</span>'
                      if n_need_fam else '')
                   + '</h2>'
-                  f'<div class="hubgrid">'
+                  + (f'<div class="teamline">{tline}</div>' if tline else '')
+                  + f'<div class="hubgrid">'
                   + "".join(_relay_agent_card(a, tid) for a in mine)
                   + '</div></div>')
     if not desks:
