@@ -825,7 +825,7 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .qyes{color:#177245}
 .qacts{display:flex;gap:8px;align-items:center;flex:none}
 .qmore{border:0;background:none;color:var(--mut);cursor:pointer;
-  width:28px;height:28px;border-radius:8px;display:inline-flex;
+  width:38px;height:38px;border-radius:8px;display:inline-flex;
   align-items:center;justify-content:center;transition:transform .15s}
 .qmore svg{width:16px;height:16px}
 .qmore:hover{background:#F0F0F5}
@@ -1046,7 +1046,7 @@ BTN_CSS = """
 .btn.sm{padding:4px 12px;font-size:12.5px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:focus-visible{outline:2px solid #98A5F0;outline-offset:2px}
-.sendbtn{width:36px;height:36px;border-radius:50%;border:none;background:var(--pill,#EEEFF2);
+.sendbtn{width:40px;height:40px;border-radius:50%;border:none;background:var(--pill,#EEEFF2);
   color:#5A5D6D;cursor:pointer;display:grid;place-items:center;flex:none;
   transition:background .12s,color .12s}
 .sendbtn svg{width:15px;height:15px}
@@ -2224,7 +2224,7 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .acct-set:hover{background:#F5F5F8}
 .hubtabs{display:flex;gap:24px;border-bottom:1px solid var(--hair);
   margin:0 0 24px}
-.hubtabs a{padding:0 0 10px;font-size:13.5px;font-weight:500;
+.hubtabs a{padding:10px 6px 12px;font-size:13.5px;font-weight:500;
   color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
 .hubtabs a.on{color:var(--ink);border-color:var(--ink)}
 .hubhead{display:flex;align-items:flex-start;justify-content:space-between;
@@ -2237,8 +2237,8 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   margin:0 0 12px}
 .hubpills{display:flex;gap:8px}
 .hubpill{border:1px solid var(--hair);background:#fff;border-radius:999px;
-  padding:6px 14px;font:inherit;font-size:12.5px;font-weight:500;
-  color:var(--ink);cursor:pointer;transition:background .12s}
+  padding:10px 16px;font:inherit;font-size:12.5px;font-weight:500;
+  color:var(--ink);cursor:pointer;transition:background .12s;min-height:40px}
 .hubpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .hubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
   margin:0 0 8px}
@@ -2363,6 +2363,9 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .lc-sub{font-size:12.5px;color:#6E7263}
 @media (max-width:900px){.lc-step>span:last-child{display:none}.lc-step.cur>span:last-child{display:inline}}
 .tclear{margin:0 0 16px;font-size:13px}
+.trow a,.schedfoot a,.lastrun a,.brief a,.hzn a,.qsub a,.qrow a,.onemem a,
+.tdesc a,.report a,.pagehint a,.mut a,p.mut a,.bfoot a,.jexport a,
+.gridcount a{display:inline-block;padding:10px 6px;margin:-10px -6px}
 .tclear a{display:inline-flex;align-items:center;min-height:42px;padding:0 18px;gap:7px;color:#1D221F;font-weight:600;text-decoration:none;background:#fff;border:1px solid var(--hair);border-radius:100px}
 .tclear a:hover{border-color:#B9CDB4;background:#FAFAF6}
 .stile .tspark,.sb .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
@@ -2433,7 +2436,7 @@ h1.page + .pagehint{margin-top:-8px}
   font-size:13.5px;margin-bottom:16px}
 .impactline b{font-weight:650}
 .pills{display:flex;gap:8px;margin:0 0 4px}
-.fpill{font-size:13.5px;padding:8px 16px;border-radius:9px;background:var(--accent-soft);
+.fpill{font-size:13.5px;padding:11px 16px;border-radius:9px;background:var(--accent-soft);
 color:var(--ink);font-weight:500}
 .fpill.off{background:#fff;border:1px solid #E3E4EA;color:var(--text);font-weight:400}
 .cols-h{display:flex;font-size:12.5px;color:var(--mut);padding:16px 0 8px;
@@ -2587,7 +2590,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .ctahint{display:block;font-size:11.5px;color:var(--mut);margin-top:8px;
   text-align:right}
 .tglbtn{width:34px;height:20px;border-radius:10px;background:#D9DBE4;border:0;
-  position:relative;flex:none;cursor:pointer;padding:0}
+  position:relative;flex:none;cursor:pointer;padding:0;box-sizing:content-box;padding:10px 6px;background-clip:content-box}
 .tglbtn.on{background:var(--accent)}
 .tglbtn i{position:absolute;top:2px;left:2px;width:16px;height:16px;
   border-radius:50%;background:#fff;transition:left .12s}
@@ -2595,7 +2598,7 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .rtools{display:flex;gap:4px;flex:none;opacity:0;transition:opacity .12s}
 .trow:hover .rtools,.hubcard:hover .rtools{opacity:1}
 .rtool{font:inherit;font-size:12px;color:var(--mut);background:none;border:0;
-  cursor:pointer;padding:4px 8px;border-radius:7px}
+  cursor:pointer;padding:11px 12px;border-radius:7px}
 .rtool:hover{background:#F0F0F5;color:var(--ink)}
 .rtool.danger:hover{color:#C0392B}
 .inedit{display:flex;gap:8px;align-items:center;width:100%}
@@ -9786,7 +9789,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .tpl-h{display:flex;align-items:center;justify-content:space-between;
   font-size:13px;color:var(--mut);margin:0 2px 10px}
 .tpl-shuf{border:0;background:none;cursor:pointer;color:var(--mut);
-  width:28px;height:28px;border-radius:8px;display:inline-flex;
+  width:38px;height:38px;border-radius:8px;display:inline-flex;
   align-items:center;justify-content:center}
 .tpl-shuf:hover{background:#F0F0F5;color:var(--ink)}
 .tpl-shuf svg{width:15px;height:15px}
@@ -9883,7 +9886,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .mode{position:relative}
 .mode summary{list-style:none;display:flex;gap:8px;align-items:center;cursor:pointer;
   font-size:13px;font-weight:500;color:#26293A;background:var(--pill);
-  border-radius:9px;padding:8px 12px;transition:background .12s}
+  border-radius:9px;padding:11px 14px;transition:background .12s}
 .mode summary:hover{background:#E6E7EC}
 .mode summary:active,.hint:active{background:#DEDFE6}
 .mode summary:focus-visible,.hint:focus-visible{
@@ -9977,7 +9980,7 @@ box-shadow:0 6px 24px rgba(82,102,235,.10)}
 background:none}
 .cbox input::placeholder{color:#9A9DAB}
 .lcluster{position:relative;display:flex;align-items:center;gap:2px}
-.cbtn{border:0;background:none;cursor:pointer;color:#5B5E6B;width:30px;height:30px;
+.cbtn{border:0;background:none;cursor:pointer;color:#5B5E6B;width:38px;height:38px;
   border-radius:8px;display:flex;align-items:center;justify-content:center;
   transition:background .12s}
 .cbtn:hover{background:#F0F0F5}
