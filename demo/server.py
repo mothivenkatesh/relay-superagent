@@ -5240,55 +5240,6 @@ def agents_content(tid: str, f: str = "all", q: str = "",
                 and prop_state(tid, sl)["state"] == "waiting")
 
 
-    seg = lambda key, label: (
-        f'<a class="{"on" if f == key else ""}" '
-        f'href="/agents?f={key}'
-        + (f'&amp;g={g.replace(" ", "+")}' if g else '') + f'">{label}</a>')
-    roster = RELAY_AGENTS
-    n_all = len(roster)
-    n_on = sum(1 for a in roster
-               if a["status"] == "live" or DEMO_ON.get(a["slug"]))
-    led2 = WORLD.d.ledger
-    truns = [r for r in led2.runs.values() if r.tenant_id == tid]
-    n_yes = sum(1 for r in truns
-                if r.state is RunState.AWAITING_GATE) + props_waiting(tid)
-    kept2, n_wins2, _w = recovered(tid)
-    n_live = sum(1 for a in roster if a["status"] == "live")
-    # What is riding on the pending yeses, same math as the home queue.
-    d_stake = sum(price_of(r.order_id) for r in truns
-                  if r.state is RunState.AWAITING_GATE)
-    p_stake = sum(PROPS_DEF[sl].get("stake_n", 0) for sl in PROPS_DEF
-                  if prop_state(tid, sl)["state"] == "waiting") * 100
-    # 14-day pulse across every agent's runs.
-    from datetime import datetime as _dt2
-    _today = _dt2.utcnow().date()
-    _sc = [0] * 14
-    for r in truns:
-        _dlt = (_today - r.occurred_at.date()).days
-        if 0 <= _dlt < 14:
-            _sc[13 - _dlt] += 1
-    _mx = max(_sc) or 1
-    sbars = "".join(
-        f'<i style="height:{max(3, round(20 * c / _mx))}px"></i>'
-        for c in _sc)
-    used_cr = len(truns) * 41 + 218
-    roi = (kept2 / 100) / used_cr if used_cr else 0
-    tiles = (
-        f'<div class="statbar">'
-        f'<a class="sb hero" href="/briefs/morning">'
-        f'<b>&#8377;{roi:.1f}</b>'
-        f'<span>back for every &#8377;1 spent</span>'
-        f'<i>&#8377;{inr(kept2)} kept &middot; {used_cr:,} of 25,000 '
-        f'credits &middot; from the ledger</i></a>'
-        f'<a class="sb" href="/agents"><b>{n_live}</b>'
-        f'<span>working</span><i>{n_on - n_live} in trial</i></a>'
-        f'<a class="sb need" href="/approvals"><b>{n_yes}</b>'
-        f'<span>pending approval</span>'
-        f'<i>&#8377;{inr(d_stake + p_stake)} at stake</i></a>'
-        f'<a class="sb" href="/impact"><b>{len(truns)}</b>'
-        f'<span>jobs done</span>'
-        f'<span class="tspark">{sbars}</span></a>'
-        f'</div>')
     live_cards = "".join(_relay_agent_card(a, tid) for a in agents
                          if a["status"] == "live")
     working = (f'<h2 class="sec fam">Working now</h2>'
@@ -5315,7 +5266,6 @@ def agents_content(tid: str, f: str = "all", q: str = "",
             f'</div>'
             f'<div class="pagehint">Agents that recover payments, collect '
             f'dues and prevent losses. You approve every send.</div>'
-            f'{tiles}'
             f'{body}')
 
 
