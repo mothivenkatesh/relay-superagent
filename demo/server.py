@@ -6214,171 +6214,202 @@ if (!localStorage.getItem('relay_seen_scheduled')){
 
 
 def pricing_content(tid: str) -> str:
-    """The plan page. One idea per element, nothing that needs a footnote.
+    """The plan page, Lindy-shaped: three flat tiers that differ only in
+    credits, one Enterprise strip, one everything-included list, a plain
+    explanation of what a credit buys, and a FAQ. Every agent is in every
+    plan; usage is the only meter."""
+    def tier(name, tag, price, credits, note, pick=False):
+        return (
+            f'<div class="pt{" pick" if pick else ""}">'
+            f'<div class="pt-n">{name}</div>'
+            f'<div class="pt-tag">{tag}</div>'
+            f'<div class="pt-price"><b>&#8377;{price}</b>'
+            f'<span>/mo per store</span></div>'
+            f'<div class="pt-cred"><b>{credits} credits / mo</b>'
+            f'<span>{note}</span></div>'
+            f'<a class="btn primary" href="/">Try for free</a></div>')
+    tiers = (
+        tier("Starter", "Enough for everyday volume.", "999",
+             "3,000", "Standard usage")
+        + tier("Pro", "More usage, more power.", "3,999",
+               "15,000", "5x more than Starter", pick=True)
+        + tier("Max", "For the heaviest workloads.", "7,999",
+               "35,000", "~12x more than Starter"))
 
-    The mechanics follow the agent-based model: plans are counts of agents
-    (how many AI employees do I have?), runs are the meter, packs make the
-    meter cheaper at scale. A run is a whole job, however many steps."""
-    def plan(name, price, per, who, rows, pick=False, chip="",
-             inc="", cta="Get started", pid=""):
-        lis = "".join(f"<li>{r}</li>" for r in rows)
-        chip_h = f'<span class="pr-chip">{chip}</span>' if chip else ""
-        inc_h = f'<div class="pr-inc">{inc}</div>' if inc else ""
-        idattr = f' id="{pid}"' if pid else ""
-        btn = (f'<a class="pr-cta{" go" if pick else ""}" href="/">{cta}</a>')
-        return (f'<div class="pr-plan{" pick" if pick else ""}">'
-                f'<div class="pr-name">{name}{chip_h}</div>'
-                f'<div class="pr-price"><b{idattr}>{price}</b><span>{per}</span></div>'
-                f'<div class="pr-who">{who}</div>'
-                f'{inc_h}<ul class="pr-list">{lis}</ul>{btn}</div>')
-    plans = (
-        plan("Free", "&#8377;0", "", "For the builder community",
-             ["2 pre-built agents", "Unlimited agents built by you",
-              "10,000 credits a month, on your keys", "1 workspace",
-              "Community support"], cta="Start building")
-        + plan("Starter", "&#8377;4,999", "/month", "For your first store",
-               ["5 pre-built agents", "1 agent built by you",
-                "5,000 credits a month", "Standard connections"],
-               pid="prPS")
-        + plan("Growth", "&#8377;19,999", "/month", "For growing brands",
-               ["20 pre-built agents", "5 agents built by you",
-                "25,000 credits a month", "All connections",
-                "Teammates and roles"],
-               pick=True, chip="Most picked",
-               inc="Everything in Starter, and:", pid="prPG")
-        + plan("Enterprise", "Talk to us", "", "For large teams",
-               ["All 27 agents", "Unlimited agents built by you",
-                "Credits sized to you", "Volume pricing",
-                "SSO and audit export", "Dedicated support"],
-               inc="Everything in Growth, and:", cta="Talk to sales")
-    )
+    ent_rows = "".join(f"<li>{r}</li>" for r in [
+        "Everything in Max",
+        "A named account manager",
+        "Audit log export",
+        "Onboarding for your team",
+        "Custom guardrails and approval chains",
+        "Volume credit pricing"])
+
+    FEATURES = [
+        "All 8 agents, in every plan",
+        "Build your own agents in plain language",
+        "Approvals built in: nothing sends without you",
+        "Voice calls + WhatsApp to your buyers",
+        "Scheduled routines with written reports",
+        "Files every agent reads and cites",
+        "Shared memory: one agent's lesson teaches the rest",
+        "History: every case kept for good",
+        "Run inspector: every step, off the ledger",
+        "Audit log: who approved what, when",
+        "Cashfree payments, settlements and disputes built in",
+        "Teammates and roles: choose who can approve"]
+    feats = "".join(f'<li>{f}</li>' for f in FEATURES)
+
+    BANDS = [
+        ("Replies &amp; checks", "1&ndash;2 credits",
+         "A dispute reply drafted, a refund claim checked, a buyer "
+         "question answered."),
+        ("Paperwork", "2&ndash;6 credits",
+         "An evidence pack assembled, a reorder drafted, a weekly "
+         "report written."),
+        ("Calls", "6&ndash;12 credits",
+         "A voice call to a buyer, with the WhatsApp follow-up and "
+         "the note in History.")]
+    bands = "".join(
+        f'<div class="pu-band"><b>{t}</b><span class="pu-cr">{c}</span>'
+        f'<p>{d}</p></div>' for t, c, d in BANDS)
+
+    PRINCIPLES = [
+        ("One pool, every agent",
+         "All 8 agents draw from the same monthly pool. No per-agent "
+         "meters to watch."),
+        ("No surprise bills",
+         "If the pool runs low, agents pause and tell you. Top up or "
+         "wait for the month to refill."),
+        ("You approve every send",
+         "Credits are spent drafting and checking. Nothing reaches a "
+         "buyer or a bank until you say so.")]
+    prins = "".join(
+        f'<div class="pu-prin"><b>{t}</b><p>{d}</p></div>'
+        for t, d in PRINCIPLES)
+
+    FAQ = [
+        ("How do credits work?",
+         "Credits measure the work agents do. A reply costs 1, "
+         "paperwork 2 to 6, a call 6 to 12. You spend them only when "
+         "an agent is working."),
+        ("Do unused credits roll over?",
+         "No. The pool refills on the 1st of every month."),
+        ("What happens if we run out?",
+         "Agents pause and tell you. Nothing breaks and nothing is "
+         "billed on top; buy a top-up or wait for the refill."),
+        ("Will Relay send anything without my approval?",
+         "No. Every send and every hold waits for your approval. After "
+         "20 approvals without edits you can let items under "
+         "&#8377;500 go on their own."),
+        ("Is there a free trial?",
+         "7 days, every agent, full credits. No card to start."),
+        ("What happens if we cancel?",
+         "Agents stop at the end of the month. Your data downloads "
+         "any time from Settings &rarr; Export data.")]
+    faq = "".join(
+        f'<details class="pf"><summary>{q}</summary><p>{a}</p></details>'
+        for q, a in FAQ)
+
     return f"""
 <div class="pr-page">
 <style>
-.pr-page{{--line:var(--hair,#E4E1D8);max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
-.pr-page h1{{font-size:24px;letter-spacing:-.02em;margin:0 0 6px}}
-.pr-def{{color:#6E7263;font-size:13px;margin:0 0 26px;max-width:62ch}}
-.pr-plans{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}}
-.pr-plan{{border:1px solid var(--line);border-radius:16px;background:#fff;padding:20px 18px;display:flex;flex-direction:column}}
-.pr-plan.pick{{border:1.5px solid #0B7A3E;background:linear-gradient(180deg,#F2F9EE,#fff)}}
-.pr-name{{font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px}}
-.pr-chip{{font-size:11px;font-weight:700;color:#0B7A3E;background:#E6F2E0;border-radius:100px;padding:2px 8px}}
-.pr-price{{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:10px}}
-.pr-price span{{font-size:11px;font-weight:500;color:#6E7263;margin-left:2px}}
-.pr-who{{font-size:11px;color:#6E7263;margin-top:2px;padding-bottom:12px;border-bottom:1px solid var(--line)}}
-.pr-list{{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}}
-.pr-list li{{font-size:11px;color:#3D4038;padding-left:18px;position:relative}}
-.pr-list li:before{{content:"✓";position:absolute;left:0;color:#0B7A3E;font-weight:700}}
-.pr-strip{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper-2);padding:14px 18px;font-size:13px;color:#3D4038}}
-.pr-strip b{{font-size:13px}}
-.pr-strip .mut{{color:#6E7263}}
-.pr-strip.cap{{border-color:#0B7A3E;background:#F2F9EE}}
-.pr-foot{{margin-top:14px;font-size:11px;color:#6E7263}}
-.pr-bill{{display:inline-flex;border:1px solid var(--line);border-radius:100px;background:#fff;padding:3px;margin:2px 0 18px}}
-.pr-bill button{{border:0;background:none;font:inherit;font-size:11px;font-weight:600;color:#6E7263;border-radius:100px;padding:12px 20px;min-height:42px;cursor:pointer}}
-.pr-bill button.on{{background:#0B7A3E;color:#fff}}
-.pr-bill em{{font-style:normal;opacity:.75;font-size:11px}}
-.pr-inc{{font-size:11px;font-weight:600;color:#0B7A3E;margin-top:12px}}
-.pr-cta{{margin-top:auto;display:flex;align-items:center;justify-content:center;min-height:44px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-align:center;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;color:#1D221F;text-decoration:none;padding:0}}
-.pr-list{{margin-bottom:16px}}
-.pr-cta.go{{background:#0B7A3E;border-color:#0B7A3E;color:#fff}}
-.pr-usage{{margin-top:16px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:18px 20px}}
-.pr-uhead{{display:flex;justify-content:space-between;align-items:baseline}}
-.pr-uhead b{{font-size:13px}}
-.pr-uhead .mut{{color:#6E7263;font-size:11px}}
-.pr-ubar{{height:8px;border-radius:4px;background:#EFEDE6;margin:12px 0 6px;position:relative;overflow:hidden}}
-.pr-ubar i{{position:absolute;left:0;top:0;bottom:0;background:#0B7A3E;border-radius:4px}}
-.pr-usub{{font-size:11px;color:#6E7263;margin-bottom:14px}}
-.pr-usub b{{color:#1D221F}}
-.pr-ucols{{display:grid;grid-template-columns:1fr 1fr;gap:22px}}
-@media (max-width:900px){{.pr-ucols{{grid-template-columns:1fr}}}}
-.pr-ut{{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#8A8D7C;margin-bottom:8px}}
-.pr-urow{{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid #F1EFE8}}
-.pr-urow b{{font-variant-numeric:tabular-nums}}
-.pr-unote{{margin-top:12px;font-size:11px;color:#8A8D7C}}
-.pr-faq{{margin-top:22px;border-top:1px solid var(--line)}}
-.pr-faq details{{border-bottom:1px solid var(--line)}}
-.pr-faq summary{{font-size:13px;font-weight:600;cursor:pointer;list-style-position:outside;padding:16px 2px}}
-.pr-faq details p{{padding:0 2px 16px}}
-.pr-faq summary:hover{{color:#0B7A3E}}
-.pr-faq p{{font-size:13px;color:#6E7263;margin:8px 0 0;max-width:70ch}}
-.pr-calc{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:18px 20px}}
-.pr-calc-head b{{font-size:13px}}
-.pr-calc-head .mut{{color:#6E7263;font-size:11px;margin-left:8px}}
-.pr-calc input[type=range]{{width:100%;margin:12px 0 8px;accent-color:#0B7A3E;height:36px;cursor:pointer}}
-.pr-calc-row{{display:flex;justify-content:space-between;align-items:baseline}}
-.pr-calc-n b{{font-size:24px;letter-spacing:-.02em}}
-.pr-calc-n span{{font-size:11px;color:#6E7263;margin-left:6px}}
-.pr-calc-p{{text-align:right}}
-.pr-calc-p b{{font-size:24px;letter-spacing:-.02em}}
-.pr-calc-p span{{display:block;font-size:11px;color:#6E7263;margin-top:1px}}
-.pr-calc-buy{{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:#3D4038}}
+.pr-page{{max-width:1020px;margin:0 auto;padding:34px 28px 60px}}
+.pr-page h1{{font-size:32px;font-weight:450;letter-spacing:-.01em;
+  margin:0 0 28px;color:var(--ink)}}
+.pr-tiers{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}}
+@media (max-width:860px){{.pr-tiers{{grid-template-columns:1fr}}}}
+.pt{{border:1px solid var(--hair);border-radius:16px;background:#fff;
+  padding:22px 20px;display:flex;flex-direction:column;gap:6px}}
+.pt.pick{{border:1.5px solid var(--accent,#5266EB);
+  background:linear-gradient(180deg,#F5F6FE,#fff)}}
+.pt-n{{font-size:20px;font-weight:600;color:var(--ink)}}
+.pt-tag{{font-size:13px;color:var(--mut)}}
+.pt-price{{margin-top:10px}}
+.pt-price b{{font-size:32px;font-weight:650;letter-spacing:-.02em;
+  color:var(--ink)}}
+.pt-price span{{font-size:13px;color:var(--mut);margin-left:6px}}
+.pt-cred{{border-top:1px solid var(--hair);margin-top:12px;
+  padding:12px 0 16px}}
+.pt-cred b{{display:block;font-size:13px;color:var(--ink)}}
+.pt-cred span{{font-size:11px;color:var(--mut)}}
+.pt .btn{{margin-top:auto}}
+.pr-ent{{border:1px solid var(--hair);border-radius:16px;background:#fff;
+  padding:22px 24px;margin-top:14px;display:flex;gap:24px;
+  align-items:flex-start;flex-wrap:wrap}}
+.pr-ent-l{{flex:1;min-width:220px}}
+.pr-ent-l b{{font-size:20px;font-weight:600;color:var(--ink)}}
+.pr-ent-l p{{font-size:13px;color:var(--mut);margin:4px 0 0}}
+.pr-ent ul{{flex:1.4;min-width:260px;margin:0;padding:0;list-style:none;
+  columns:2;column-gap:24px;font-size:13px;color:var(--text)}}
+.pr-ent li{{padding:4px 0 4px 20px;position:relative;
+  break-inside:avoid}}
+.pr-ent li::before{{content:"\\2713";position:absolute;left:0;
+  color:#177245;font-weight:700}}
+.pr-sec{{font-size:20px;font-weight:600;color:var(--ink);
+  margin:44px 0 4px}}
+.pr-eyebrow{{font-size:11px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--mut);margin:44px 0 2px}}
+.pr-eyebrow + .pr-sec{{margin-top:0}}
+.pr-sub{{font-size:13px;color:var(--mut);margin:0 0 18px;max-width:60ch}}
+.pr-feats{{margin:14px 0 0;padding:0;list-style:none;columns:3;
+  column-gap:28px;font-size:13px;color:var(--text)}}
+@media (max-width:860px){{.pr-feats{{columns:1}}}}
+.pr-feats li{{padding:6px 0 6px 22px;position:relative;
+  break-inside:avoid}}
+.pr-feats li::before{{content:"\\2713";position:absolute;left:0;
+  color:#177245;font-weight:700}}
+.pu-bands{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+  margin-top:14px}}
+@media (max-width:860px){{.pu-bands{{grid-template-columns:1fr}}}}
+.pu-band{{border:1px solid var(--hair);border-radius:14px;
+  background:#fff;padding:16px 18px}}
+.pu-band b{{font-size:13px;color:var(--ink);display:block}}
+.pu-cr{{font-size:11px;font-weight:700;color:#3A46A8;
+  background:var(--accent-soft,#E9EBF8);border-radius:100px;
+  padding:2px 10px;display:inline-block;margin:6px 0 8px}}
+.pu-band p{{font-size:13px;color:var(--mut);margin:0;line-height:1.55}}
+.pu-prins{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+  margin-top:14px}}
+@media (max-width:860px){{.pu-prins{{grid-template-columns:1fr}}}}
+.pu-prin b{{font-size:13px;color:var(--ink)}}
+.pu-prin p{{font-size:13px;color:var(--mut);margin:4px 0 0;
+  line-height:1.55}}
+.pf{{border-bottom:1px solid var(--hair)}}
+.pf summary{{list-style:none;cursor:pointer;font-size:13px;
+  font-weight:600;color:var(--ink);padding:14px 0;min-height:32px;
+  display:flex;align-items:center;justify-content:space-between}}
+.pf summary::-webkit-details-marker{{display:none}}
+.pf summary::after{{content:"+";color:var(--mut);font-size:14px}}
+.pf[open] summary::after{{content:"\\2212"}}
+.pf p{{font-size:13px;color:var(--text);margin:0 0 14px;
+  line-height:1.6;max-width:66ch}}
+.pr-end{{text-align:center;margin:56px 0 0}}
+.pr-end b{{font-size:24px;font-weight:600;color:var(--ink);
+  display:block}}
+.pr-end p{{font-size:13px;color:var(--mut);margin:6px 0 16px}}
+.pr-end .fine{{font-size:11px;color:var(--mut);margin-top:10px}}
 </style>
-<h1>Plans</h1>
-<div class="pr-bill"><button class="on" id="prBm"
-  onclick="prBill(0)">Monthly</button><button id="prBy"
-  onclick="prBill(1)">Yearly <em>save 20%</em></button></div>
-<p class="pr-def">Priced by agents, bundled in plans,
-like hires on payroll. Metered in credits: <b>1 credit = &#8377;1</b>,
-tokens, WhatsApp fees and voice minutes inside. No separate bills.</p>
-<div class="pr-plans">{plans}</div>
-<div class="pr-strip cap"><b>Your bill never crosses your plan
-without your approval.</b> <span class="mut">Top-ups are approved like
-everything else.</span></div>
-<div class="pr-strip"><b>A reply 1 credit &middot; paperwork 2
-&middot; a voice call 6.</b> <span class="mut">Same rule for every
-agent.</span></div>
-<div class="pr-calc">
-  <div class="pr-calc-head"><b>What will my month cost?</b>
-  <span class="mut">Slide to your monthly orders.</span></div>
-  <input type="range" id="prSlide" min="0" max="6" step="1" value="3"
-         oninput="prCalc(this.value)">
-  <div class="pr-calc-row">
-    <div class="pr-calc-n"><b id="prN">3,000</b><span>orders a month</span></div>
-    <div class="pr-calc-p"><b id="prP">Growth &middot; &#8377;19,999</b><span id="prR">/month</span></div>
-  </div>
-  <div class="pr-calc-buy" id="prB">&#8776; 9,000 credits of calls,
-  paperwork and replies. Growth includes 25,000.</div>
-</div>
-<div class="pr-usage">
-  <div class="pr-uhead"><b>Your usage this month</b>
-  <span class="mut">Growth plan &middot; resets on the 1st</span></div>
-  <div class="pr-ubar"><i style="width:5.6%"></i></div>
-  <div class="pr-usub"><b>1,407</b> of 25,000 credits &middot; 5.6% used
-  &middot; on pace for ~4,200 this month</div>
-  <div class="pr-ucols">
-    <div class="pr-ucol"><span class="pr-ut">By kind of work</span>
-      <div class="pr-urow"><span>142 voice calls &times; 6</span><b>852</b></div>
-      <div class="pr-urow"><span>96 paperwork jobs &times; 2</span><b>192</b></div>
-      <div class="pr-urow"><span>363 replies &times; 1</span><b>363</b></div>
-    </div>
-    <div class="pr-ucol"><span class="pr-ut">By agent</span>
-      <div class="pr-urow"><span>Cart Recovery Agent</span><b>522</b></div>
-      <div class="pr-urow"><span>Disputes Agent</span><b>412</b></div>
-      <div class="pr-urow"><span>Payment Recovery Agent</span><b>348</b></div>
-      <div class="pr-urow"><span>Everyone else</span><b>125</b></div>
-    </div>
-  </div>
-  <div class="pr-unote">Every row traces to a job in History. Your bill
-  never crosses your plan without your approval.</div>
-</div>
-<div class="pr-faq">
-  <details><summary>When credits run low?</summary><p>Relay asks.
-  Approve a top-up (10,000 for &#8377;9,000 &middot; 50,000 for
-  &#8377;40,000) or pause agents. Revenue agents draw credits
-  first.</p></details>
-  <details><summary>Do credits roll over?</summary><p>Plan credits refresh
-  monthly. Pack credits last 1 year.</p></details>
-  <details><summary>"On your keys"?</summary><p>Builders use their own model
-  and voice accounts and pay those directly.</p></details>
-  <details><summary>Which AI model runs my jobs?</summary><p>The best one
-  for each step, at the lowest cost. Routing is inside; you never pick
-  a model.</p></details>
-</div>
-<div class="pr-foot">Nothing billed until your first month closes.
-Every bill comes with what the agents won that month.</div>
-</div>
-""" + _PR_CALC_JS
+<h1>The team that punches above its price.</h1>
+<div class="pr-tiers">{tiers}</div>
+<div class="pr-ent"><div class="pr-ent-l"><b>Enterprise</b>
+<p>Everything in Max, plus the controls your review will ask about.</p>
+</div><ul>{ent_rows}</ul>
+<a class="btn ghost" href="/">Talk to sales</a></div>
+<div class="pr-sec">Everything included, right out of the box.</div>
+<ul class="pr-feats">{feats}</ul>
+<div class="pr-eyebrow">How usage works</div>
+<div class="pr-sec">What&rsquo;s a credit?</div>
+<div class="pr-sub">Credits measure the work agents do. You spend them
+only when an agent is working.</div>
+<div class="pu-bands">{bands}</div>
+<div class="pu-prins">{prins}</div>
+<div class="pr-sec">FAQ</div>
+{faq}
+<div class="pr-end"><b>Ready when you are.</b>
+<p>The stores already on Relay run their payments without hiring.</p>
+<a class="btn primary" href="/">Try for free</a>
+<div class="fine">7-day free trial &middot; cancel anytime</div></div>
+</div>"""
 
 
 _PR_CALC_JS = """
