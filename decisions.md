@@ -475,3 +475,87 @@ Roster is now 15 agents under 6 managers.
 contributed, Figma-community-style) is a real product surface and has no
 representation here. If Payment Forms and KYC Journeys become templates
 others can publish, that is a distribution mechanism, not just a feature.
+
+## D28 — Roster cut to 8 outreach-and-money agents (2026-08-17)
+
+Captain's call, given directly in session: the roster is exactly 8 —
+Appointment Booking, COD Confirmation (cod_guard), Dispute Responder
+(dispute_defender), Abandoned Cart Recovery (cart_rescue), Failed Payment
+Recovery (payment_rescue), EMI Collections (loan_recovery, renamed from
+Loan Recovery), Subscription Dunning, Refund Risk (refund_shield).
+Everything else left the roster: the accounts/inventory/analyst desks
+(already ceded to CoWorker in spirit), KYC Desk, Returns Desk, GST,
+Payment Forms, Daily MIS, and the whole roadmap tail (Cofounder, Custom
+Reports, Delivery Rescue, Repeat Purchase, Loyalty, Store Credit, EMI
+Cohort, Marketplace Claims, Checkout Watchdog, Instagram Shopping,
+Listings Optimization, AR Collection, Customer Support, CSAT, Review
+Generation/Response, Performance Marketing, Smart Approval).
+
+Read: the lineup is now pure act-and-collect — every agent either calls a
+buyer or defends money in motion. The think-and-report desks are gone
+entirely, which finishes what CEDED_TO_COWORKER started.
+
+Mechanics: families collapsed to Sells / Collects / Protects (+ Built by
+you); PROPS_DEF trimmed to the four kept proposal owners; AGENT_LINKS and
+TEACHINGS rewired so no chip points at a removed slug; hiring shelf
+repointed to cod_guard / refund_shield / subscription_dunning. Slugs and
+engine identifiers unchanged (loan_recovery keeps its slug under the EMI
+Collections name). Roles renamed to the captain's exact wording on the
+three live cards. Tests green after the cut.
+
+## D29 — Copy voice: literal and direct (2026-08-17)
+
+Captain's call, in session: "why all copies are passive voice and very
+indirect, why can't you write in literal sense." The Khatabook-plain
+doctrine had drifted into clever-plain — promise-shaped aphorisms
+("Leaving is allowed to be easy; that is what makes staying a choice",
+"Never. By design.", "Work your team does on its own clock"). New rule:
+
+- Active voice, literal statements. Say what the thing does, not what it
+  means. "Download your data as spreadsheets" beats "It's yours. Take
+  all of it."
+- No aphorisms, no philosophy in microcopy. One clever line on a landing
+  page is marketing; in product chrome it is friction.
+- Feature names name the object ("All disputes", "Evidence files",
+  "Saved notes"), not the feeling ("What your team remembers").
+- The trust line survives but stated flat: "Nothing is sent without your
+  approval" / "You approve every send".
+
+First sweep applied to: Export data, Scheduled (intro, hint chip,
+placeholder), approve-mode menu, Files pagehint, Agents pagehint,
+onboarding checklist. Older surfaces still carry the old voice; rewrite
+them as they are touched.
+
+## D30 — Demo hardened: threaded, persistent, modular (2026-08-17)
+
+Captain asked for A+ on backward compatibility, scalability and
+modularity. The demo now has real answers on each axis:
+
+**Modularity.** demo/ is three modules with one job each:
+- roster.py — the 8 agents and every per-agent table (days, stories,
+  links, goals, glyphs, seeds, proposals, teachings, tints). Pure data,
+  zero imports; editing an agent never touches Python logic.
+- state.py — versioned persistence + the request lock.
+- server.py — routes and rendering only. The 110-line CSS block the two
+  shells duplicated is now one SHARED_UI_CSS constant.
+
+**Backward compatibility.**
+- State files carry schema=2; v1 (.demo_cfg.json) migrates on load;
+  unknown/newer schemas and corrupt files fail open to empty, never a
+  crash; unknown keys are dropped both ways.
+- ROUTE_ALIASES: renamed surfaces keep old URLs forever (/files and
+  /knowledge → /memory, /routines → /scheduled, /history → /journeys).
+- Engine seams unchanged, ledger stays append-only.
+
+**Scalability (within a demo's honest limits).**
+- HTTPServer → ThreadingHTTPServer: slow clients no longer block the
+  next request; 20 parallel page loads verified.
+- One coarse RLock (state.LOCK) around each handler keeps the shared
+  in-memory state race-free; every POST persists atomically
+  (tempfile + os.replace), so state now survives restarts — verified
+  by toggling a routine, killing the server, and reading it back.
+- The next real step remains what it always was: FastAPI + the
+  Postgres ledger. This pass makes the demo correct under concurrency,
+  not web-scale.
+
+73 tests green; all routes + aliases 200.

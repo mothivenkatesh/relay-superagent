@@ -164,8 +164,13 @@ captain thinking about the next decision, not waiting.
   escalates to a human and NEVER auto-sends.
 
 ## How to run
-- `uv run pytest` — 108 tests, ~1s (Postgres contract tests use :5435).
-- `uv run python demo/server.py` — Relay demo on :8790. Nav is Home /
+- `uv run pytest` — 73 tests, ~1s (Postgres contract tests use :5435).
+- `uv run python demo/server.py` — Relay demo on :8790. The demo is now
+  three modules (D30): `roster.py` (all agent data, pure literals),
+  `state.py` (versioned atomic persistence in .demo_state.json + the
+  request lock), `server.py` (routes + rendering, ThreadingHTTPServer).
+  Old URLs live forever via Handler.ROUTE_ALIASES. Edit agents in
+  roster.py, never in server.py. Nav is Home /
   Needs you / History / Your team / Settings (routes unchanged:
   / /approvals /journeys /agents /settings). Home is the AI-CFO screen:
   one big rupee number off the record, "N things need your yes", "What
@@ -221,6 +226,14 @@ queue, Agents console (8 agents, live vs Coming-next badges) all render
 dispute content with zero GTM leftovers. Connectors still on fakes.
 
 ## Lessons (append when the captain corrects course)
+- **Copy voice is literal (captain, 2026-08-17, D29).** Active voice,
+  direct statements; say what the thing does. No aphorisms or
+  promise-shaped lines in product chrome ("Leaving is allowed to be
+  easy…" is out). Feature names name the object ("All disputes"), not
+  the feeling ("What your team remembers"). Trust line stated flat:
+  "Nothing is sent without your approval." This supersedes the poetic
+  end of Khatabook-plain; the big-numbers-few-words-zero-jargon part
+  still stands.
 - Product face is **Relay** (bare name — captain's explicit call, over the
   earlier "Relay SuperAgent"). The repo/folder stays `relay-superagent`
   purely to avoid filesystem/GitHub collision with Cashfree Relay repos.
@@ -245,6 +258,6 @@ dispute content with zero GTM leftovers. Connectors still on fakes.
   animations at arbitrary states — verify logic from those shots, never
   animation end-states; real browsers finish fill:both.
 
-- **Fitts pass is a standing gate (2026-08-07).** Any UI change ships only after the tap-target audit: render every affected route, measure every `a`, `button`, `summary` (and sliders), and fix anything under ~38px tall (32px tolerated only when wider than 200px). Patterns already in place: fixed square buttons at 38-40px, pills with 10-11px vertical padding, toggles keep their look via content-box padding, small inline links get `display:inline-block;padding:10px 6px;margin:-10px -6px`. The audit snippet lives in the session notes; re-run it after touching any template.
+- **Button standard is 32px (captain, 2026-08-17 — supersedes the 38-40px Fitts floor of 2026-08-07).** Every button, icon button, pill and menu row is exactly 32px tall (`min-height:32px`, icon squares 32×32, sendbtn 32px circle); dropdowns open at top:36px. The Fitts AUDIT itself still stands — after any UI change, measure every `a`, `button`, `summary` and fix anything that drifts from 32px or loses its hit area — but the target is uniform 32px, not 38-40. Do not "fix" controls back up to 40px.
 
 - **Design system is law (2026-08-07).** Dropdowns, selects, inputs and card chrome follow docs/design-system.md and the DESIGN SYSTEM block in demo/server.py's CSS. New UI uses `ds-*` classes; never style a new menu ad hoc. If a component needs something the spec lacks, extend the spec first.

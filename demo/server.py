@@ -16,12 +16,15 @@ import json
 import re as _re
 import sys
 from datetime import datetime, timedelta
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import state as _state  # noqa: E402  (demo/state.py: versioned persistence)
 
 from relay_superagent.domain.models import (  # noqa: E402
     AgentType, DisputeReason, EvidenceItem, GateAction, Policy, RunState, TriggerEvent,
@@ -647,7 +650,6 @@ TEAM = [
     ("ops_arjun", "Arjun Pillai",    "looks after you",   "Relay’s people", False),
     ("ops_riya",  "Riya Kapoor",     "support",           "Relay’s people", False),
 ]
-REP = {tid: name for tid, name, _, _, _ in TEAM}
 STATE_META = {
     RunState.AWAITING_GATE: ("Pending approval", "wait"),
     RunState.ACTED: ("Sent to the bank", "ok"),
@@ -658,7 +660,6 @@ STATE_META = {
     RunState.SUPPRESSED: ("Set aside", "mut"),
     RunState.FAILED: ("Needs a person", "warn"),
 }
-STEPS = ["safety", "retrieve", "draft", "check", "gate"]
 
 
 def auth_page(mode: str, error: str = "") -> str:
@@ -672,29 +673,31 @@ def auth_page(mode: str, error: str = "") -> str:
             else ('New here? <a href="/signup">Create a workspace</a>'))
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay &middot; {'Sign up' if signup else 'Log in'}</title>
 <style>
 *{{box-sizing:border-box;margin:0}}
-body{{font-family:'Circular Std',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#FAFAFC;min-height:100vh;
+body{{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#FAFAFC;min-height:100vh;
   display:flex;align-items:center;justify-content:center;color:#1a1c23}}
 .card{{background:#fff;border:1px solid #E6E7EE;border-radius:14px;
   padding:36px 32px;width:360px}}
 .brand{{display:flex;align-items:center;gap:8px;margin-bottom:24px;font-weight:650}}
 .logo{{display:inline-flex;width:26px;height:26px;border-radius:7px;background:#5266EB;
-  color:#fff;align-items:center;justify-content:center;font-size:14px;font-weight:700}}
-h1{{font-size:17px;font-weight:600;margin-bottom:16px}}
-label{{display:block;font-size:12.5px;color:#5a5e6e;margin-bottom:12px}}
+  color:#fff;align-items:center;justify-content:center;font-size:13px;font-weight:700}}
+h1{{font-size:20px;font-weight:600;margin-bottom:16px}}
+label{{display:block;font-size:11px;color:#5a5e6e;margin-bottom:12px}}
 input{{display:block;width:100%;margin-top:4px;padding:8px 12px;font:inherit;
-  font-size:14px;border:1px solid #E3E4EA;border-radius:9px;background:#fff;
+  font-size:13px;border:1px solid #E3E4EA;border-radius:9px;background:#fff;
   transition:border-color .15s,box-shadow .15s}}
 input:hover{{border-color:#C9CBD6}}
 input::placeholder{{color:#9A9DAB}}
 input:focus{{outline:none;border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,235,.13)}}
 {BTN_CSS}
-.err{{background:#FDF2F2;border:1px solid #F5C6C6;color:#9b3535;font-size:12.5px;
+.err{{background:#FDF2F2;border:1px solid #F5C6C6;color:#9b3535;font-size:11px;
   border-radius:8px;padding:8px 12px;margin-bottom:16px}}
-.swap{{font-size:12.5px;color:#5a5e6e;margin-top:16px;text-align:center}}
+.swap{{font-size:11px;color:#5a5e6e;margin-top:16px;text-align:center}}
 .swap a{{color:#5266EB;text-decoration:none}}
 .demo{{margin-top:8px;text-align:center}}
 </style></head><body>
@@ -723,11 +726,13 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
     style = auth_page("login").split("<style>")[1].split("</style>")[0]
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay &middot; Verify your email</title>
 <style>{style}
-.code input{{font-size:22px;letter-spacing:8px;text-align:center;font-variant-numeric:tabular-nums}}
-.hint{{font-size:12.5px;color:#5a5e6e;margin-bottom:16px}}
+.code input{{font-size:24px;letter-spacing:8px;text-align:center;font-variant-numeric:tabular-nums}}
+.hint{{font-size:11px;color:#5a5e6e;margin-bottom:16px}}
 </style></head><body>
 <div class="card">
   <div class="brand"><span class="logo">C</span>Relay</div>
@@ -757,7 +762,7 @@ WORK_CSS = """
 .compose svg{width:15px;height:15px}
 .navblock{margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid #ECECF1}
 .navblock.grp{border-bottom:none;padding-bottom:2px;margin-bottom:2px}
-.navlabel{font-size:12px;font-weight:600;letter-spacing:.03em;color:#9A9FA6;padding:10px 10px 4px}
+.navlabel{font-size:11px;font-weight:600;letter-spacing:.03em;color:#9A9FA6;padding:10px 10px 4px}
 .navbtn{width:100%;border:0;background:none;font:inherit;cursor:pointer;
   text-align:left}
 .railsearch{margin:0 4px 8px;padding:8px 12px;font:inherit;font-size:13px;
@@ -771,7 +776,7 @@ WORK_CSS = """
 .railhead .navsec{margin:0;padding:0;line-height:1}
 .railhead .railfilter{padding:0;align-items:center}
 .railfilter{display:flex;gap:8px;padding:2px 8px 8px}
-.rf{font:inherit;font-size:12.5px;font-weight:500;color:var(--mut,#8A8D9C);
+.rf{font:inherit;font-size:11px;font-weight:500;color:var(--mut,#8A8D9C);
   background:none;border:1px solid transparent;border-radius:8px;padding:4px 12px;
   cursor:pointer;display:inline-flex;gap:8px;align-items:center}
 .rf:hover{background:#F0F0F5}
@@ -780,7 +785,7 @@ WORK_CSS = """
   background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:0 4px}
 .raillist{padding-bottom:8px;flex:1;overflow-y:auto;min-height:0}
 .rail{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:10px;
-  font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px}
+  font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px}
 #raillist [data-st][hidden]{display:none}
 .rail:hover{background:#F0F0F5}
 .rail.active{background:#ECECF1;color:var(--ink,#1B1F30)}
@@ -793,7 +798,7 @@ WORK_CSS = """
 .rwhen{flex:none;font-size:11px;color:var(--mut,#8A8D9C)}
 .rsub{display:flex;align-items:center;gap:8px}
 .rprev{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  font-size:12px;color:var(--mut,#8A8D9C)}
+  font-size:11px;color:var(--mut,#8A8D9C)}
 .rail.unread .rname{font-weight:700}
 .rail.unread .rprev{color:var(--text,#3A3D4D)}
 
@@ -803,12 +808,13 @@ WORK_CSS = """
 .arow-min{padding:6px 10px;gap:8px}
 .quietrow .rlabel{color:var(--mut);font-weight:400}
 .quietrow:hover .rlabel{color:var(--ink,#1B1F30)}
-.qword{flex:none;font-size:10.5px;color:#B9BCC7}
-.conv{display:flex;align-items:center;gap:8px;padding:10px 10px;border-radius:8px;
-font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
+.qword{flex:none;font-size:11px;color:#B9BCC7}
+.conv{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;
+font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
 .conv .ctitle{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.conv .kebab{visibility:hidden;color:var(--mut,#8A8D9C);padding:0 2px;font-size:15px}
+.conv .kebab{visibility:hidden;color:var(--mut,#8A8D9C);padding:10px 6px;
+  margin:-10px -6px;font-size:13px;display:inline-block}
 .conv:hover{background:#F0F0F5}
 .conv:hover .kebab{visibility:visible}
 .conv.active{background:#ECECF1;color:var(--ink,#1B1F30)}
@@ -819,15 +825,15 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .qrow:last-child{border-bottom:0}
 .qmain{display:flex;align-items:center;gap:12px;padding:12px 0}
 .qtext{flex:1;min-width:0}
-.qtext b{display:block;font-size:14px;color:var(--ink)}
-.qsub{display:flex;gap:8px;align-items:baseline;font-size:12.5px;
+.qtext b{display:block;font-size:13px;color:var(--ink)}
+.qsub{display:flex;gap:8px;align-items:baseline;font-size:11px;
   margin-top:2px;flex-wrap:wrap}
 .qno{color:#A63A2B}
 .qarr{color:#B9BCC7}
 .qyes{color:#177245}
 .qacts{display:flex;gap:8px;align-items:center;flex:none}
 .qmore{border:0;background:none;color:var(--mut);cursor:pointer;
-  width:38px;height:38px;border-radius:8px;display:inline-flex;
+  width:32px;height:32px;border-radius:8px;display:inline-flex;
   align-items:center;justify-content:center;transition:transform .15s}
 .qmore svg{width:16px;height:16px}
 .qmore:hover{background:#F0F0F5}
@@ -842,7 +848,7 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .needsrow .rbadge{margin:0}
 .nr-t{flex:1;min-width:0}
 .nr-t b{display:block;font-size:13px}
-.nr-sub{display:block;font-size:11.5px;opacity:.8}
+.nr-sub{display:block;font-size:11px;opacity:.8}
 .needsrow .nharrow{opacity:.6}
 .needsrow:hover .nharrow{opacity:1}
 .spot-scrim{position:fixed;inset:0;background:rgba(24,25,32,.4);z-index:80;
@@ -855,10 +861,10 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .spot-head{display:flex;align-items:center;gap:12px;padding:16px 20px;
   border-bottom:1px solid var(--hair,#E8E9EF)}
 .spot-head svg{width:18px;height:18px;color:#8A8D9C;flex:none}
-.spot-in{flex:1;border:0;outline:none;font:inherit;font-size:16px;
+.spot-in{flex:1;border:0;outline:none;font:inherit;font-size:13px;
   color:var(--ink,#1B1F30)}
 .spot-in::placeholder{color:#9A9DAB}
-.spot-x{border:0;background:none;font-size:16px;color:#8A8D9C;
+.spot-x{border:0;background:none;font-size:13px;color:#8A8D9C;
   cursor:pointer;padding:4px}
 .spot-res{max-height:56vh;overflow-y:auto;padding:8px}
 .spot-sec{font-size:11px;font-weight:700;letter-spacing:.06em;
@@ -868,20 +874,20 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .spot-row.sel{background:#F4F5F9}
 .sr-av{width:28px;height:28px;border-radius:8px;flex:none;display:grid;
   place-items:center;font-weight:700;font-size:13px}
-.sr-t{flex:1;min-width:0;font-size:14px;color:var(--ink,#1B1F30)}
+.sr-t{flex:1;min-width:0;font-size:13px;color:var(--ink,#1B1F30)}
 .sr-t b{font-weight:500}
-.sr-sub{display:block;font-size:12px;color:#8A8D9C;white-space:nowrap;
+.sr-sub{display:block;font-size:11px;color:#8A8D9C;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .sr-enter{flex:none;color:#B9BCC7;opacity:0}
 .spot-row.sel .sr-enter{opacity:1}
-.spot-empty{padding:24px;text-align:center;color:#8A8D9C;font-size:13.5px}
+.spot-empty{padding:24px;text-align:center;color:#8A8D9C;font-size:13px}
 .needshdr{display:flex;align-items:center;gap:8px;margin:12px 8px 4px;
-  font-size:12px;font-weight:600;color:#9A6215}
+  font-size:11px;font-weight:600;color:#9A6215}
 .needshdr .rbadge{margin:0}
 .needshdr .nharrow{margin-left:auto;color:var(--mut);opacity:0;
   transition:opacity .12s}
 .needshdr:hover .nharrow{opacity:1}
-.rstake{flex:none;font-size:12px;font-weight:700;color:#9A6215}
+.rstake{flex:none;font-size:11px;font-weight:700;color:#9A6215}
 .st.need2{background:#FBF2E2;color:#9A6215}
 .arow-min .rlabel{font-size:13px}
 .arow-min.unread .rlabel{font-weight:600;color:var(--ink,#1B1F30)}
@@ -899,11 +905,11 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .cdot.work{background:var(--accent,#5266EB)}
 .cdot.done{background:#1E9E5A}
 .railfoot{display:flex;gap:8px;align-items:center;padding:8px 12px 4px;
-  margin-top:8px;border-top:1px solid #ECECF1;font-size:12.5px;
+  margin-top:8px;border-top:1px solid #ECECF1;font-size:11px;
   color:var(--mut,#8A8D9C);flex:none;flex-wrap:wrap;row-gap:2px}
 .railfoot a{color:var(--mut,#8A8D9C)}
 .railfoot a:hover{color:var(--ink,#1B1F30)}
-.cempty{padding:4px 8px;font-size:12.5px;color:var(--mut,#8A8D9C)}
+.cempty{padding:4px 8px;font-size:11px;color:var(--mut,#8A8D9C)}
 .navsec.csec{margin-top:16px;display:flex;align-items:center;gap:6px}
 .navsec.csec svg{width:12px;height:12px;flex:none}
 .steps{align-self:stretch;max-width:100%}
@@ -914,13 +920,13 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 
 /* the work, ticking off */
 .wsteps{list-style:none;margin:2px 0 4px;padding:0;max-width:100%}
-.wstep{display:flex;align-items:baseline;gap:8px;padding:8px 0;font-size:13.5px;
+.wstep{display:flex;align-items:baseline;gap:8px;padding:8px 0;font-size:13px;
   color:var(--mut,#8A8D9C);opacity:.45;transition:opacity .25s,color .25s}
 .wstep.live,.wstep.done{opacity:1}
 .wstep.live{color:var(--ink,#1B1F30)}
 .wstep.done{color:var(--text,#3A3D4D)}
 .wlabel{flex:0 1 auto}
-.wfound{color:var(--mut,#8A8D9C);font-size:12.5px;opacity:0;transition:opacity .25s}
+.wfound{color:var(--mut,#8A8D9C);font-size:11px;opacity:0;transition:opacity .25s}
 .wstep.done .wfound{opacity:1}
 .wtick{width:14px;height:14px;flex:none;border-radius:50%;position:relative;
   border:1.5px solid #D3D6E0;align-self:center}
@@ -937,38 +943,38 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .wp-h{padding:16px 24px 16px;border-bottom:1px solid #F1F1F5}
 .wp-kicker{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
   color:var(--mut,#8A8D9C);margin-bottom:8px}
-.wp-h h3{font-size:15.5px;font-weight:600;color:var(--ink,#1B1F30);line-height:1.35}
-.wp-meta{font-size:12.5px;color:var(--mut,#8A8D9C);margin-top:4px}
+.wp-h h3{font-size:13px;font-weight:600;color:var(--ink,#1B1F30);line-height:1.35}
+.wp-meta{font-size:11px;color:var(--mut,#8A8D9C);margin-top:4px}
 .wp-body{padding:16px 24px 8px}
 .wp-claim{background:#F4F4F7;border-radius:8px;padding:8px 12px;font-size:13px;
   color:#4A4E63;margin-bottom:16px}
-.wp-p{font-size:14px;line-height:1.7;color:#26293A;margin-bottom:12px}
+.wp-p{font-size:13px;line-height:1.7;color:#26293A;margin-bottom:12px}
 .srcchip{display:inline-block;font-size:11px;font-weight:600;color:#4553C8;
   background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:1px 8px;
   margin-left:4px;vertical-align:1px;white-space:nowrap}
 .srcchip:hover{background:#DCE0F7}
 .wp-srcs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
   padding:12px 24px;background:#FAFAFC;border-top:1px solid #F1F1F5}
-.wp-srch{font-size:11.5px;font-weight:600;color:var(--mut,#8A8D9C);margin-right:2px}
+.wp-srch{font-size:11px;font-weight:600;color:var(--mut,#8A8D9C);margin-right:2px}
 .wp-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
   padding:16px 24px;border-top:1px solid #F1F1F5}
 .wp-acts form{display:flex;gap:8px}
-.wp-trust{font-size:12px;color:var(--mut,#8A8D9C);margin-left:auto}
+.wp-trust{font-size:11px;color:var(--mut,#8A8D9C);margin-left:auto}
 .wp-edit{padding:0 24px 16px}
-.wp-edit textarea{width:100%;font:inherit;font-size:13.5px;padding:8px 12px;
+.wp-edit textarea{width:100%;font:inherit;font-size:13px;padding:8px 12px;
   border:1px solid #E3E4EA;border-radius:9px;margin-bottom:8px;color:#26293A;
   background:#fff;resize:vertical}
 .wp-edit textarea:focus{outline:none;border-color:#98A5F0;
   box-shadow:0 0 0 3px rgba(82,102,235,.13)}
 .wp-open{display:block;padding:12px 24px;border-top:1px solid #F1F1F5;
-  font-size:12.5px;font-weight:500;color:var(--accent,#5266EB);background:#FCFCFD}
+  font-size:11px;font-weight:500;color:var(--accent,#5266EB);background:#FCFCFD}
 .wp-open:hover{background:#F5F6FB}
 
 /* the case page */
 .casehead{display:flex;align-items:flex-start;gap:16px;margin:2px 0 20px;flex-wrap:wrap}
-.casename{display:flex;align-items:center;gap:8px;margin:2px 0 4px;font-size:26px}
+.casename{display:flex;align-items:center;gap:8px;margin:2px 0 4px;font-size:24px}
 .casemeta{font-size:13px;color:var(--mut,#8A8D9C)}
-.casest{font-size:12.5px;font-weight:600;border-radius:999px;padding:4px 12px;
+.casest{font-size:11px;font-weight:600;border-radius:999px;padding:4px 12px;
   margin-left:auto;flex:none;white-space:nowrap}
 .casest.need{background:#FCEED8;color:#9A6215}
 .casest.work{background:var(--accent-soft,#E9EBF8);color:#4553C8}
@@ -978,32 +984,32 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 @media (max-width:900px){.casegrid{grid-template-columns:minmax(0,1fr)}}
 .ctimeline{list-style:none;margin:8px 0 0;padding:0}
 .cstep{display:flex;align-items:baseline;gap:12px;padding:8px 0 8px 16px;
-  position:relative;font-size:13.5px;opacity:0;animation:wfadein .45s ease forwards}
+  position:relative;font-size:13px;opacity:0;animation:wfadein .45s ease forwards}
 .cstep:not(:last-child)::before{content:"";position:absolute;left:3px;top:16px;
   bottom:-9px;width:1px;background:#E7E8EE}
 .cdot2{position:absolute;left:0;top:12px;width:8px;height:8px;border-radius:50%;
   background:#C6C9D4}
 .clab{flex:1;color:var(--ink,#1B1F30);min-width:0}
-.csub{display:block;font-size:12.5px;color:var(--mut,#8A8D9C);margin-top:1px;
+.csub{display:block;font-size:11px;color:var(--mut,#8A8D9C);margin-top:1px;
   overflow-wrap:anywhere}
-.cwhen{color:var(--mut,#8A8D9C);font-size:12px;flex:none}
+.cwhen{color:var(--mut,#8A8D9C);font-size:11px;flex:none}
 .cdecide{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
 .pcard{background:#fff;border:1px solid var(--hair,#E8E9EF);border-radius:12px;
   padding:8px 16px;margin-top:8px}
-.prow{padding:12px 0;border-bottom:1px solid #F1F1F5;font-size:13.5px}
+.prow{padding:12px 0;border-bottom:1px solid #F1F1F5;font-size:13px}
 .prow:last-child{border-bottom:none}
 .prow b{display:block;color:var(--ink,#1B1F30);font-size:13px;margin-bottom:2px}
-.prow span{color:var(--mut,#8A8D9C);font-size:12.5px;overflow-wrap:anywhere}
+.prow span{color:var(--mut,#8A8D9C);font-size:11px;overflow-wrap:anywhere}
 .agchip2{display:inline-block;background:var(--accent-soft,#E9EBF8);
   color:#3A46A8;border-radius:8px;padding:1px 8px;font-weight:600;
   font-size:.95em;white-space:nowrap}
 .agchip2:hover{background:#DDE1F6}
 .onemem{display:flex;align-items:center;gap:12px;background:#fff;
   border:1px solid var(--hair);border-radius:14px;padding:14px 20px;
-  margin:0 0 16px;max-width:880px;font-size:13.5px}
+  margin:0 0 16px;max-width:880px;font-size:13px}
 .onemem svg{width:18px;height:18px;color:#3A46A8;flex:none}
 .onemem span{flex:1}
-.onemem a{color:var(--accent);font-size:12.5px;flex:none}
+.onemem a{color:var(--accent);font-size:11px;flex:none}
 .avwrap{position:relative;flex:none;display:inline-flex}
 .avwrap .pres{position:absolute;right:-2px;bottom:-2px;width:10px;
   height:10px;border-radius:50%;border:2px solid #fff}
@@ -1013,8 +1019,8 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .mention{display:inline-block;border-radius:8px;padding:0 6px;
   font-weight:600;font-size:.95em;white-space:nowrap;line-height:1.5}
 .burger{display:none;position:fixed;top:12px;left:12px;z-index:70;
-  width:40px;height:40px;border-radius:12px;border:1px solid #E8E9EF;
-  background:#fff;font-size:17px;cursor:pointer;
+  width:32px;height:32px;border-radius:12px;border:1px solid #E8E9EF;
+  background:#fff;font-size:20px;cursor:pointer;
   box-shadow:0 2px 12px rgba(27,31,48,.08)}
 @media (max-width:760px){
   .burger{display:grid;place-items:center}
@@ -1035,7 +1041,10 @@ font-size:13.5px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 
 # One button system for every surface (decisions: consistency over variety).
 BTN_CSS = """
-.btn{font:inherit;font-size:13px;font-weight:500;border-radius:9px;padding:10px 18px;min-height:40px;
+.btn{font:inherit;font-size:13px;font-weight:500;border-radius:9px;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  box-sizing:border-box;text-decoration:none;white-space:nowrap;
+  padding:0 18px;min-height:32px;
   border:1px solid transparent;cursor:pointer;
   transition:background .12s,border-color .12s,color .12s}
 .btn.primary{background:var(--accent,#5266EB);color:#fff}
@@ -1044,11 +1053,13 @@ BTN_CSS = """
 .btn.ghost{background:#fff;border-color:#E3E4EA;color:var(--text,#3A3D4D)}
 .btn.ghost:hover{border-color:#C9CBD6;color:var(--ink,#1B1F30)}
 .btn.ghost:active{background:#F5F5F8}
-.btn.wide{width:100%;padding:8px;font-size:14px;font-weight:600;margin-top:8px}
-.btn.sm{padding:4px 12px;font-size:12.5px}
+.btn.wide{width:100%;font-size:13px;font-weight:600;margin-top:8px}
+.btn.sm{padding:0 14px;font-size:11px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:focus-visible{outline:2px solid #98A5F0;outline-offset:2px}
-.sendbtn{width:40px;height:40px;border-radius:50%;border:none;background:var(--pill,#EEEFF2);
+.btn.hire{font-weight:600;padding:0 18px 0 14px}
+.btn.hire svg{flex:none;opacity:.9}
+.sendbtn{width:32px;height:32px;border-radius:50%;border:none;background:var(--pill,#EEEFF2);
   color:#5A5D6D;cursor:pointer;display:grid;place-items:center;flex:none;
   transition:background .12s,color .12s}
 .sendbtn svg{width:15px;height:15px}
@@ -1056,6 +1067,158 @@ BTN_CSS = """
 .sendbtn:active{background:#3D4EC4;color:#fff}
 .sendbtn:focus-visible{outline:2px solid #98A5F0;outline-offset:2px}
 """
+
+# Card chrome shared by the hub and chat shells: schedule cards,
+# overflow menus, goal numbers. One copy, injected into both.
+SHARED_UI_CSS = """
+/* --- agent builder (/agents/new) --- */
+.bthread{max-width:640px}
+.bmsg{border-radius:14px;padding:12px 16px;font-size:13px;
+  line-height:1.55;margin:0 0 14px}
+.bmsg.user{background:var(--accent-soft);color:#26293A;
+  margin-left:15%;border-bottom-right-radius:4px}
+.bmsg.bot{background:#fff;border:1px solid var(--hair);color:var(--ink);
+  margin-right:15%;border-bottom-left-radius:4px}
+.bprog{margin:0 0 14px;border-left:2px solid #CBE8D4;padding-left:12px}
+.bprog-r{font-size:13px;color:#177245;padding:3px 0}
+.bq{background:#fff;border:1px solid var(--hair);border-radius:14px;
+  padding:14px 16px;margin:0 0 12px}
+.bq-t{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.bopt{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;
+  border-radius:9px;cursor:pointer}
+.bopt:hover{background:#F5F5F8}
+.bopt input{margin-top:3px;accent-color:var(--accent,#5266EB)}
+.bopt b{font-size:13px;color:var(--ink);font-weight:600;display:block}
+.bopt small{font-size:11px;color:var(--mut);display:block;margin-top:1px}
+.bopt .rec{font-style:normal;font-size:11px;font-weight:600;
+  color:#177245;background:#E5F4EC;border-radius:100px;
+  padding:1px 8px;margin-left:8px;vertical-align:1px}
+.btext{font:inherit;font-size:13px;border:1px solid var(--hair);
+  border-radius:9px;padding:8px 12px;width:100%;box-sizing:border-box;
+  outline:none;min-height:32px}
+.btext:focus{border-color:#98A5F0}
+.bwrap{max-width:740px;margin:6vh auto 0;display:flex;
+  flex-direction:column;align-items:flex-start}
+.bkicker{font-size:11px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.bh1{font-size:32px;font-weight:450;color:var(--ink);
+  letter-spacing:-.01em;margin:0 0 8px}
+.bsub{font-size:13px;color:var(--mut);margin-bottom:20px;max-width:56ch}
+.bresume{display:flex;align-items:center;gap:10px;width:100%;
+  box-sizing:border-box;border:1px solid var(--hair);border-radius:12px;
+  background:#fff;padding:12px 16px;margin-bottom:14px;font-size:13px;
+  color:var(--ink)}
+.bresume:hover{border-color:#98A5F0}
+.bresume .go{margin-left:auto;color:var(--accent)}
+.bresume svg{width:16px;height:16px;color:var(--accent)}
+.bbox{width:100%;box-sizing:border-box;background:#fff;
+  border:1.5px solid #C7CDF3;border-radius:18px;padding:8px;
+  box-shadow:0 6px 24px rgba(82,102,235,.10)}
+.bbox:focus-within{border-color:#98A5F0}
+.bbox textarea{width:100%;box-sizing:border-box;border:none;
+  outline:none;font:inherit;font-size:13px;color:var(--ink);
+  background:none;resize:none;min-height:96px;padding:12px 12px 4px}
+.bbox textarea::placeholder{color:#9A9DAB}
+.brow{display:flex;align-items:center;gap:8px;padding:0 8px 4px}
+.bchan{display:inline-flex}
+.bchan input{position:absolute;opacity:0;pointer-events:none}
+.bchan span{display:inline-flex;align-items:center;min-height:32px;
+  padding:0 14px;border-radius:100px;border:1px solid var(--hair);
+  font-size:13px;color:var(--text);cursor:pointer}
+.bchan input:checked+span{background:var(--accent-soft);
+  border-color:#98A5F0;color:#3A46A8;font-weight:600}
+.bexh{font-size:11px;color:var(--mut);margin:24px auto 10px;
+  align-self:center}
+.bexrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
+  align-self:center;max-width:640px}
+.bex{font:inherit;font-size:13px;color:var(--text);background:#fff;
+  border:1px solid var(--hair);border-radius:100px;min-height:32px;
+  padding:0 16px;cursor:pointer}
+.bex:hover{border-color:#98A5F0;color:var(--ink)}
+.bgrid{display:grid;grid-template-columns:1fr 340px;gap:28px;
+  align-items:start}
+@media (max-width:900px){.bgrid{grid-template-columns:1fr}}
+.bcfg{display:grid;grid-template-columns:150px 1fr;gap:12px;
+  padding:12px 0;border-bottom:1px solid var(--hair);font-size:13px}
+.bcfg span{color:var(--mut)}
+.bcfg div{color:var(--ink)}
+.bnext{margin-top:16px;font-size:13px;color:var(--text)}
+.bnext ol{margin:8px 0 0 18px;padding:0;line-height:1.7}
+.bchange{display:flex;align-items:center;gap:8px;margin-top:20px;
+  background:#fff;border:1.5px solid #C7CDF3;border-radius:14px;
+  padding:6px 6px 6px 14px}
+.bchange:focus-within{border-color:#98A5F0}
+.bchange input{flex:1;border:none;outline:none;font:inherit;
+  font-size:13px;color:var(--ink);background:none;min-width:0}
+.brail{border:1px solid var(--hair);border-radius:16px;background:#fff;
+  padding:14px 16px;position:sticky;top:16px}
+.brail-h{font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+.brail-r{display:flex;align-items:baseline;gap:10px;padding:10px 0;
+  border-top:1px solid var(--hair);font-size:13px}
+.brail-r:first-of-type{border-top:none}
+.brail-t{font-weight:600;color:var(--ink);white-space:nowrap}
+.brail-r.off .brail-t{color:var(--mut);font-weight:500}
+.brail-v{margin-left:auto;color:var(--mut);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+/* --- shared card chrome --- */
+.schedhead{display:flex;align-items:center;gap:8px}
+.schedhead .tdesc{flex:1;min-width:0}
+.schedhead b{font-size:13px;color:var(--ink)}
+.schedbody{font-size:11px;line-height:1.5}
+.schedfoot{display:flex;align-items:center;gap:12px;margin-top:auto;
+  min-height:28px}
+.readit{font-size:11px;font-weight:500;color:var(--accent);
+  margin-left:auto;display:inline-flex;align-items:center;
+  padding:10px 8px;margin-top:-10px;margin-bottom:-10px;border-radius:8px}
+.readit:hover{text-decoration:underline}
+.rmenu{position:relative;flex:none}
+.rmenu summary{list-style:none;cursor:pointer;width:32px;height:32px;
+  border-radius:8px;display:inline-flex;align-items:center;
+  justify-content:center;color:var(--mut)}
+.rmenu summary::-webkit-details-marker{display:none}
+.rmenu summary:hover,.rmenu[open] summary{background:#F0F0F5;color:var(--ink)}
+.rmenu-list{position:absolute;right:0;top:36px;z-index:30;background:#fff;
+  border:1px solid var(--hair,#E3E4EA);border-radius:10px;min-width:170px;
+  box-shadow:0 8px 28px rgba(27,31,48,.14);padding:4px;display:flex;
+  flex-direction:column}
+.rmenu-list button{font:inherit;font-size:13px;color:var(--ink);
+  background:none;border:0;border-radius:7px;cursor:pointer;
+  text-align:left;padding:0 12px;min-height:32px;width:100%}
+.rmenu-list button:hover{background:#F0F0F5}
+.rmenu-list button.danger:hover{background:#FBE5E5;color:#C0392B}
+.notebar.wide .notein{max-width:none}
+.cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
+  align-items:center;justify-content:center}
+.cico svg{width:18px;height:18px}
+.cico.brand{background:#fff;border:1px solid var(--hair)}
+.cico.brand img{width:22px;height:22px;object-fit:contain;border-radius:4px}
+.bizlogo{height:13px;display:block;margin-top:3px}
+.bizlogo.lg{height:20px;display:inline-block;vertical-align:middle}
+.goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
+  padding:16px 20px;margin:0 0 24px;max-width:720px}
+.goaltop{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px}
+.goallbl{font-size:11px;font-weight:600;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--mut)}
+.goalline{display:flex;gap:16px;align-items:center;margin:4px 0 12px}
+.goalnum{font-size:32px;color:var(--ink);font-weight:650;flex:none}
+.goaltxt b{display:block;font-size:13px;color:var(--ink)}
+.goaltxt .mut{font-size:11px}
+.goalbar{position:relative;height:8px;border-radius:99px;background:#EEEFF3}
+.goalbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
+.goalbar em{position:absolute;top:-3px;bottom:-3px;width:2px;
+  background:#1B1F30;border-radius:2px}
+.goalfoot{display:flex;justify-content:space-between;font-size:11px;
+  color:var(--mut);margin-top:6px}
+.goalact{display:flex;gap:12px;align-items:baseline;padding:8px 0;
+  border-bottom:1px solid #F1F1F5;font-size:13px}
+.goalact:last-child{border-bottom:0}
+.goalact .tdesc{flex:1}
+.goalmini{font-size:11px;color:var(--mut);margin:0 0 8px}
+.goalmini b{color:#177245}
+"""
+
 
 
 def _fmt_latency(ms):
@@ -1077,6 +1240,7 @@ def esc(s):
 # Official Lucide line icons (ISC), embedded inline — no runtime deps.
 # Path data fetched from lucide-static; stroke 1.75 app-wide.
 ICONS = {
+    'bot': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8" />  <rect width="16" height="12" x="4" y="8" rx="2" />  <path d="M2 14h2" />  <path d="M20 14h2" />  <path d="M15 13v2" />  <path d="M9 13v2" /></svg>',
     'home': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />  <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>',
     'tasks': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" />  <path d="m9 12 2 2 4-4" /></svg>',
     'cmd': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8" />  <path d="m4 17 6-6-6-6" /></svg>',
@@ -1162,15 +1326,6 @@ def recovered(tid: str) -> tuple[int, int, str]:
             f"since {first.strftime('%-d %B')}")
 
 
-def _working_since(tid: str) -> tuple[str, int]:
-    """When the switched-on agent started, and how much it has looked at.
-    the proof that this is a team that runs, not a chat you open."""
-    led = WORLD.d.ledger
-    mine = [r for r in led.runs.values() if r.tenant_id == tid]
-    if not mine:
-        return ("", 0)
-    return (min(r.occurred_at for r in mine).strftime("%-d %B"), len(mine))
-
 
 def rail_cases(tid: str, limit: int = 18) -> list[dict]:
     """The work, newest first: one row per order anyone has touched. One
@@ -1191,65 +1346,22 @@ def rail_cases(tid: str, limit: int = 18) -> list[dict]:
             "last": max(r.occurred_at for r in runs),
             "label": f"{customer_of(order)} · {bought(order)}"})
         if key == "need" and ASSIGN.get(order):
-            out[-1]["word"] = f'With {esc(ASSIGN[order].split()[0])} to say yes'
+            out[-1]["word"] = f'With {esc(ASSIGN[order].split()[0])} to approve'
     out.sort(key=lambda c: c["last"], reverse=True)
     return out[:limit]
 
-
-def agent_rail_state(tid: str, a: dict) -> tuple:
-    """(preview, needs_yes, badge_count) for one agent's rail row. Work
-    items aggregate under the agent responsible for them, the way messages
-    aggregate under a contact."""
-    slug = a["slug"]
-    if slug == "dispute_defender":
-        led = WORLD.d.ledger
-        n = sum(1 for r in led.runs.values()
-                if r.tenant_id == tid and r.state is RunState.AWAITING_GATE)
-        if n:
-            return (f'{n} repl{"ies" if n != 1 else "y"} waiting on your yes',
-                    True, n)
-        return ("Every dispute answered. Watching the mail.", False, 0)
-    if slug in PROPS_DEF:
-        p = prop_state(tid, slug)
-        d = PROPS_DEF[slug]
-        if p["state"] == "waiting":
-            return (f'{d["rail"]} &middot; needs your yes', True, 1)
-        if p["state"] == "approved":
-            return (d["approved"], False, 0)
-        return (d["declined"], False, 0)
-    if slug in REPORT_AGENTS:
-        return ("Wrote today&rsquo;s note into your brief", False, 0)
-    return ("Watching &middot; learning your business", False, 0)
 
 
 def rail_html(tid: str, active: str = "", convs: str | None = None,
               email: str = "") -> str:
     """The Paperclip read of a chat rail: the persistent contacts are your
-    STAFF. One row per agent, unread-bold when it needs your yes, and the
+    STAFF. One row per agent, unread-bold when it needs your approval, and the
     work aggregates under the agent responsible: 7 disputes are one
     Disputes Officer row carrying a 7, not seven rows."""
     # HCI: the sidebar is chrome: stable landmarks and temporal recall.
     # The work queue is primary content and lives on the main canvas; the
     # rail keeps ONE ambient landmark for it, then conversation history.
-    led_r = WORLD.d.ledger
-    n_need = sum(1 for r in led_r.runs.values()
-                 if r.tenant_id == tid
-                 and r.state is RunState.AWAITING_GATE) + props_waiting(tid)
     rows = ""
-    if n_need:
-        total_p = sum(price_of(r.order_id) for r in led_r.runs.values()
-                      if r.tenant_id == tid
-                      and r.state is RunState.AWAITING_GATE)
-        total_p += 100 * sum(
-            PROPS_DEF[sl].get("stake_n", 0) for sl in PROPS_DEF
-            if prop_state(tid, sl)["state"] == "waiting")
-        rows += (
-            f'<a class="needsrow" href="/approvals">'
-            f'<span class="rbadge">{n_need}</span>'
-            f'<span class="nr-t"><b>Pending approvals</b>'
-            f'<span class="nr-sub">&#8377;{inr(total_p)} riding on '
-            f'them</span></span>'
-            f'<span class="nharrow">&rarr;</span></a>')
     return f"""
   <button class="burger" aria-label="Menu"
     onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
@@ -1258,28 +1370,16 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
       <span class="bname"><b>Relay</b><img class="bizlogo" src="{HUFT_LOGO}" alt="{BUSINESS}"></span></div>
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
-      <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New chat</span></a>
-    </div>
-    <div class="navlabel">Analyze</div>
-    <div class="navblock grp">
-      <a class="nav{' on' if active in ('journeys', 'activity') else ''}" href="/impact">{ICONS["chart"]}<span>Insights</span></a>
-      <a class="nav" href="/approvals">{ICONS["tasks"]}<span>Review</span></a>
+      <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New task</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
-    </div>
-    <div class="navlabel">Build</div>
-    <div class="navblock grp">
-      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["pen"]}<span>Agent Builder</span></a>
-      <a class="nav" href="/skills">{ICONS["flow"]}<span>Playbooks</span></a>
-      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Knowledge</span></a>
+      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
+      <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Files</span></a>
     </div>
 
 
     <div class="raillist" id="raillist">
       {rows}
       {convs if convs is not None else ''}
-    </div>
-    <div class="railsys">
-      <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
     </div>
     <details class="acct railacct">
       <summary class="railme">
@@ -1319,9 +1419,9 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
                        "#E0A800", "#2B8A9E", "#D6336C", "#6741D9"];
   let spotItems = [], spotSel = 0, spotT = null;
   const QUICK = [
-    {{kind: "Go", title: "Everything waiting on your yes", sub: "the approvals queue", href: "/approvals"}},
+    {{kind: "Go", title: "Everything waiting on your approval", sub: "the approvals queue", href: "/approvals"}},
     {{kind: "Go", title: "Morning brief", sub: "what the office did", href: "/briefs/morning"}},
-    {{kind: "Go", title: "Knowledge", sub: "what your team knows", href: "/memory"}}];
+    {{kind: "Go", title: "Files", sub: "what your team knows", href: "/memory"}}];
   function railSearchToggle(){{ openSpot(); }}
   function openSpot(){{
     document.getElementById('spotscrim').classList.add('open');
@@ -1468,7 +1568,7 @@ def plain_detail(d: str) -> str:
     if d in PLAIN_SKIP:
         return PLAIN_SKIP[d]
     if d == "gate_timeout":
-        return "waited a day for your yes, so a person has it now"
+        return "waited a day for your approval, so a person has it now"
     if d.startswith("stalled"):
         return "got stuck part-way, so a person has it now"
     if d == "drafter_escalate":
@@ -1883,7 +1983,7 @@ def plain_step(e: dict, r) -> tuple[str, str]:
         return ("Held it back", plain_detail(d))
     if agent == "gate":
         if kind == "surfaced":
-            return ("Put it in front of you", "waiting on your yes")
+            return ("Put it in front of you", "waiting on your approval")
         if kind == "approved":
             who = _who(d.removeprefix('by '), seed=r.run_id)
             return (("You said yes" if who == "you"
@@ -2014,9 +2114,9 @@ def case_content(tid: str, order_id: str) -> str:
         + (mile("done", "Filed with the bank", "exactly once") if filed
            else mile("cur",
                      f"Waiting on {esc(ASSIGN[order_id].split()[0])}"
-                     if ASSIGN.get(order_id) else "Waiting on your yes",
+                     if ASSIGN.get(order_id) else "Waiting on your approval",
                      "one tap") if waiting
-           else mile("todo", "Filed with the bank", "after your yes"))
+           else mile("todo", "Filed with the bank", "after your approval"))
         + f'<span class="mbar {"done" if res_out is not None else ""}"></span>'
         + (settle if res_out is not None
            else mile("cur", "Bank reviewing", "in progress") if filed
@@ -2039,9 +2139,9 @@ def case_content(tid: str, order_id: str) -> str:
         # is the select itself, so the state and the action are one thing.
         assign_ui = (
             f'<div class="assignbar">'
-            + (f'<span>Waiting on {mention(assignee)} to say yes.</span>'
+            + (f'<span>Waiting on {mention(assignee)} to approve.</span>'
                if assignee else
-               '<span>This yes is with <b>you</b>.</span>')
+               '<span>This approval is with <b>you</b>.</span>')
             + f'<form method="post" action="/api/assign">'
             f'<label class="assignlbl" for="assignsel">Whose yes:</label>'
             f'<select class="assignsel" id="assignsel" name="name" '
@@ -2085,8 +2185,9 @@ def case_content(tid: str, order_id: str) -> str:
 
 
 HOME_CONTENT = """
+    __PROOF__
     <h1 class="page" id="tasks">Approvals</h1>
-    <div class="pagehint">__QSUMMARY__ Nothing moves until you say yes.
+    <div class="pagehint">__QSUMMARY__ Nothing is sent until you approve.
       <form method="post" action="/api/sample" style="display:inline;margin-left:8px">
       <button class="btn ghost sm">Try a sample</button></form></div>
     __PROPS__
@@ -2095,9 +2196,9 @@ HOME_CONTENT = """
       <b id="bcount"></b>
       <input id="bwhy" class="whyin" style="width:190px" maxlength="200"
              placeholder="why? (applies to dismissals)">
-      <button class="btn primary sm" onclick="bulk('approve', this)">Say yes to these</button>
+      <button class="btn primary sm" onclick="bulk('approve', this)">Approve these</button>
       <button class="btn ghost sm" onclick="bulk('reject', this)">Don&rsquo;t send these</button>
-      <span class="mut" style="font-size:12px">j/k move &middot; x pick &middot; a yes &middot; d no &middot; e change</span>
+      <span class="mut" style="font-size:11px">j/k move &middot; x pick &middot; a yes &middot; d no &middot; e change</span>
     </div>
     __TASKS__
     <script>
@@ -2134,10 +2235,33 @@ def render(tid: str = "t1", email: str = "") -> str:
     n_all_q = len(waiting_props) + len(waiting)
     d_stake = sum(price_of(r.order_id) for r in waiting)
     summary = (f'<b>{n_all_q}</b> decisions, '
-               f'<b>&#8377;{inr(stake_total + d_stake)}</b> riding on them.'
+               f'<b>&#8377;{inr(stake_total + d_stake)}</b> at stake.'
                if n_all_q else 'All clear.')
+
+    # Lead with what got done, not what's owed (Lassie: "a screen that
+    # opens with a queue has handed the owner a job"). Same statbar
+    # grammar as /agents, reused rather than reinvented.
+    kept, n_wins, window = recovered(tid)
+    roster = RELAY_AGENTS
+    n_live = sum(1 for a in roster if a["status"] == "live")
+    n_on = sum(1 for a in roster
+               if a["status"] == "live" or DEMO_ON.get(a["slug"]))
+    proof = (
+        f'<div class="statbar">'
+        f'<a class="sb hero" href="/impact"><b>&#8377;{inr(kept)}</b>'
+        f'<span>kept {window}</span>'
+        f'<i>{n_wins} decision{"s" if n_wins != 1 else ""} you said yes to'
+        f'</i></a>'
+        f'<a class="sb" href="/agents"><b>{n_live}</b><span>working</span>'
+        f'<i>{n_on - n_live} in trial</i></a>'
+        f'<a class="sb{" need" if n_all_q else ""}" href="#tasks">'
+        f'<b>{n_all_q}</b><span>need your approval</span>'
+        f'<i>&#8377;{inr(stake_total + d_stake)} at stake</i></a>'
+        f'</div>')
+
     return (TEMPLATE
             .replace("__CONTENT__", HOME_CONTENT)
+            .replace("__PROOF__", proof)
             .replace("__SIDEBAR__", sidebar_html("tasks", tid,
                                                  convs=conv_list_html(tid),
                                                  email=email))
@@ -2154,14 +2278,16 @@ def render(tid: str = "t1", email: str = "") -> str:
 
 TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay</title>
 <style>
 :root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
 --accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Circular Std',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
-color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:14px}
+body{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:13px}
 a{text-decoration:none;color:inherit}
 .sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
 border-right:1px solid #ECECF1;padding:16px 12px;display:flex;
@@ -2169,38 +2295,38 @@ flex-direction:column;overflow:hidden}
 .brand{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-bottom:12px}
 .logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
 font-size:13px;display:grid;place-items:center}
-.brand b{font-size:14px;color:var(--ink);font-weight:600;line-height:1.15}
+.brand b{font-size:13px;color:var(--ink);font-weight:600;line-height:1.15}
 .brand .bname{display:flex;flex-direction:column;gap:1px}
 .brand .biz{font-size:11px;color:var(--mut);font-weight:500;letter-spacing:.2px}
 .bizchip{border:1px solid var(--hair);border-radius:999px;padding:3px 8px;
-font-size:12px;color:var(--ink);background:#fff;white-space:nowrap}
-.pro{margin-left:auto;background:#21232E;color:#fff;font-size:10.5px;font-weight:600;
+font-size:11px;color:var(--ink);background:#fff;white-space:nowrap}
+.pro{margin-left:auto;background:#21232E;color:#fff;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
-.nav{display:flex;align-items:center;gap:12px;padding:11px 10px;min-height:40px;border-radius:8px;
-color:var(--text);font-size:13.5px;margin-bottom:1px}
+.nav{display:flex;align-items:center;gap:12px;padding:6px 10px;min-height:32px;border-radius:8px;
+color:var(--text);font-size:13px;margin-bottom:1px}
 .nav svg{width:16px;height:16px;color:#6A6D7D;flex:none}
 .nav:hover{background:#F0F0F5}
 .nav.active{background:var(--accent-soft);color:var(--ink);font-weight:500}
 .nav.active svg{color:var(--ink)}
-.nav .count{margin-left:auto;color:var(--mut);font-size:12.5px}
-.nav .new{margin-left:auto;background:#E3E6F0;color:#4A4E63;font-size:10.5px;font-weight:600;
+.nav .count{margin-left:auto;color:var(--mut);font-size:11px}
+.nav .new{margin-left:auto;background:#E3E6F0;color:#4A4E63;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
 hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
-.navsec{margin:8px 8px 8px;font-size:12px;font-weight:600;color:var(--mut)}
+.navsec{margin:8px 8px 8px;font-size:11px;font-weight:600;color:var(--mut)}
 .bm{padding:4px 8px}
 .bm span{font-size:13px;color:var(--text);display:flex;gap:12px;align-items:center}
 .bm span svg{width:15px;height:15px;color:#6A6D7D}
-.bm i{font-style:normal;font-size:12.5px;color:var(--mut);padding-left:24px;display:block}
+.bm i{font-style:normal;font-size:11px;color:var(--mut);padding-left:24px;display:block}
 .main{margin-left:248px;min-height:100vh;background:linear-gradient(#FDFDFE,#F4F5F9)}
-.topbar{display:flex;align-items:center;padding:20px 44px;color:var(--mut);font-size:13.5px}
-.topbar .search input{border:none;outline:none;background:none;font:inherit;font-size:13.5px;color:var(--ink);width:220px}
+.topbar{display:flex;align-items:center;padding:20px 44px;color:var(--mut);font-size:13px}
+.topbar .search input{border:none;outline:none;background:none;font:inherit;font-size:13px;color:var(--ink);width:220px}
 .search input::placeholder{color:#9A9DAB}
 .search{display:flex;gap:8px;align-items:center;cursor:pointer}
 .topbar .search svg{width:15px;height:15px}
 .topbar .right{margin-left:auto;display:flex;gap:16px;align-items:center}
 .avatar{width:26px;height:26px;border-radius:50%;background:#5266EB;color:#fff;
   display:inline-flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:650;text-transform:uppercase}
+  font-size:11px;font-weight:650;text-transform:uppercase}
 .acct{position:relative}
 .acct summary{list-style:none;cursor:pointer}
 .acct summary::-webkit-details-marker{display:none}
@@ -2209,12 +2335,12 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
   border:1px solid var(--hair);border-radius:12px;
   box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
   z-index:40;text-align:left}
-.acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13.5px}
-.acct-mail{color:var(--mut);padding:0 12px;font-size:12.5px}
-.acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:12px;
+.acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13px}
+.acct-mail{color:var(--mut);padding:0 12px;font-size:11px}
+.acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:11px;
   border-bottom:1px solid var(--hair);margin-bottom:4px}
 .acct-out{display:block;padding:12px 14px;border-radius:8px;color:#B3372B;
-  font-size:13.5px;text-decoration:none}
+  font-size:13px;text-decoration:none}
 .acct-out:hover{background:#FBF1EF}
 .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;
   display:block}
@@ -2226,31 +2352,31 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .railme:hover{background:#F0F0F4}
 .railme .avatar{width:30px;height:30px;flex:none}
 .rm-t{flex:1;min-width:0;line-height:1.3}
-.rm-t b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
-.rm-t span{display:block;font-size:11.5px;color:var(--mut)}
+.rm-t b{display:block;font-size:13px;color:var(--ink);font-weight:600}
+.rm-t span{display:block;font-size:11px;color:var(--mut)}
 .railme > svg{width:15px;height:15px;color:var(--mut);flex:none}
 .railacct .acctmenu{top:auto;bottom:calc(100% + 8px);left:0;right:0;
   min-width:0}
 .acct-set{display:block;padding:12px 14px;border-radius:8px;
-  color:var(--ink);font-size:13.5px}
+  color:var(--ink);font-size:13px}
 .acct-set:hover{background:#F5F5F8}
 .hubtabs{display:flex;gap:24px;border-bottom:1px solid var(--hair);
   margin:0 0 24px}
-.hubtabs a{padding:10px 6px 12px;font-size:13.5px;font-weight:500;
+.hubtabs a{padding:10px 6px 12px;font-size:13px;font-weight:500;
   color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
 .hubtabs a.on{color:var(--ink);border-color:var(--ink)}
 .hubhead{display:flex;align-items:flex-start;justify-content:space-between;
   gap:24px;margin-bottom:12px}
 .hubsearch{width:280px;border:1px solid var(--hair);border-radius:10px;
-  padding:9px 14px;font:inherit;font-size:13.5px;outline:none;
+  padding:9px 14px;font:inherit;font-size:13px;outline:none;
   background:#fff;flex:none}
 .hubsearch:focus{border-color:#98A5F0}
 .hubtoolrow{display:flex;align-items:center;justify-content:space-between;
   margin:0 0 12px}
 .hubpills{display:flex;gap:8px}
 .hubpill{border:1px solid var(--hair);background:#fff;border-radius:999px;
-  padding:10px 16px;font:inherit;font-size:12.5px;font-weight:500;
-  color:var(--ink);cursor:pointer;transition:background .12s;min-height:40px}
+  padding:10px 16px;font:inherit;font-size:11px;font-weight:500;
+  color:var(--ink);cursor:pointer;transition:background .12s;min-height:32px}
 .hubpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .hubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
   margin:0 0 8px}
@@ -2262,20 +2388,20 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .hubcard .rtools{position:absolute;right:10px;bottom:8px;background:#fff;
   padding:2px 4px;border-radius:8px}
 .hubcard .hc-t{flex:1;min-width:0}
-.hubcard .hc-t b{display:block;font-size:14px;color:var(--ink)}
-.hubcard .hc-t span{font-size:12.5px;color:var(--mut);line-height:1.45;
+.hubcard .hc-t b{display:block;font-size:13px;color:var(--ink)}
+.hubcard .hc-t span{font-size:11px;color:var(--mut);line-height:1.45;
   display:block;margin-top:2px}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
 .hubsec h2.sec{margin-top:20px}
 a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
-.wpf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin:0}
+.wpf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;margin:0}
 .wpf a{text-decoration:none;color:#5266EB}
 .wpf a:hover{text-decoration:underline}
 .wpf a.on{color:#1D221F;font-weight:700}
 .wpf span{color:#D5D2C8}
 .stile .fdots{display:flex;gap:8px;margin-top:9px;align-items:center}
-.fdots em{font-style:normal;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#6E7263}
+.fdots em{font-style:normal;display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6E7263}
 .fdots .fd{width:8px;height:8px;border-radius:3px;display:inline-block}
 .stile .mut2{display:block;color:#9A9D8E;font-size:11px;margin-top:2px}
 .statbar{display:flex;border:1px solid var(--hair);border-radius:16px;background:#fff;margin:0 0 14px;overflow:hidden}
@@ -2283,7 +2409,7 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .sb:first-child{border-left:0}
 .sb:hover{background:#FAFAF6}
 .sb b{font-size:20px;letter-spacing:-.02em}
-.sb>span{font-size:11.5px;color:#6E7263}
+.sb>span{font-size:11px;color:#6E7263}
 .sb i{font-style:normal;font-size:11px;color:#9A9D8E;white-space:nowrap}
 .sb.need b{color:#A9700B}
 .sb.need{background:linear-gradient(135deg,#FCF7EA,#fff)}
@@ -2294,87 +2420,53 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .sb .tspark i{width:4px}
 @media (max-width:900px){.statbar{flex-wrap:wrap}.sb{flex:1 1 33%;border-top:1px solid var(--hair)}.sb.hero{flex:1 1 100%;border-left:0;border-top:0}}
 .roi{border:1.5px solid #0B7A3E;background:linear-gradient(135deg,#0E3A26,#17532F);color:#F4F1EA;border-radius:18px;padding:16px 24px;display:flex;align-items:center;gap:20px;margin:2px 0 16px}
-.roi>b{font-size:38px;letter-spacing:-.03em;color:#CEF993;flex:none}
+.roi>b{font-size:32px;letter-spacing:-.03em;color:#CEF993;flex:none}
 .roi-l{display:flex;flex-direction:column;gap:2px}
-.roi-l span{font-size:13.5px}
-.roi-l .mut3{font-size:12px;opacity:.72}
-.roi-m{margin-left:auto;text-align:right;font-size:11.5px;opacity:.75;line-height:1.5}
+.roi-l span{font-size:13px}
+.roi-l .mut3{font-size:11px;opacity:.72}
+.roi-m{margin-left:auto;text-align:right;font-size:11px;opacity:.75;line-height:1.5}
 .imp{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;margin-left:8px}
-.imp b{font-size:16.5px;letter-spacing:-.01em}
+.imp b{font-size:13px;letter-spacing:-.01em}
 .impbars{display:flex;flex-direction:column;gap:2px;width:46px}
 .impbars i{height:4px;border-radius:2px;display:block}
 .impbars .h{background:#DEDBD1;width:100%}
 .impbars .a{background:currentColor}
-.imp .lbl{font-size:9.5px;color:#8A8D7C;white-space:nowrap}
+.imp .lbl{font-size:11px;color:#8A8D7C;white-space:nowrap}
 .agentcard2{display:flex;flex-direction:column;gap:10px;border:1px solid var(--hair);background:#fff;border-radius:14px;padding:14px 16px;text-decoration:none;color:inherit;min-width:0}
 .agentcard2:hover{border-color:#B9CDB4}
 .agentcard2.alive{border-color:#BFD9BA;background:linear-gradient(180deg,#FBFDF9,#fff)}
 .ac-h{display:flex;gap:12px;align-items:flex-start}
 .ac-h .st{flex:none;margin-left:auto}
 .ac-n{min-width:0;flex:1}
-.ac-n b{display:block;font-size:14.5px;letter-spacing:-.01em;line-height:1.3}
-.ac-n span{display:block;font-size:12.5px;color:#6E7263;line-height:1.45;margin-top:2px}
-.ac-goal{display:flex;align-items:center;gap:10px;font-size:11.5px}
+.ac-n b{display:block;font-size:13px;letter-spacing:-.01em;line-height:1.3}
+.ac-n span{display:block;font-size:11px;color:#6E7263;line-height:1.45;margin-top:2px}
+.ac-goal{display:flex;align-items:center;gap:10px;font-size:11px}
 .ac-goal .gl{color:#6E7263;flex:none;white-space:nowrap}
-.ac-goal b{flex:none;font-size:12px}
+.ac-goal b{flex:none;font-size:11px}
 .gbar{position:relative;flex:1;height:6px;border-radius:3px;background:#EFEDE6;min-width:60px}
 .gbar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#1E9E5A}
 .gbar em{position:absolute;top:-2px;bottom:-2px;width:2px;background:#B4B09F;border-radius:1px}
 .ac-f{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid #F1EFE8;font-size:11px;color:#8A8D7C;white-space:nowrap;overflow:hidden}
-.ac-f b{font-size:13.5px;flex:none}
+.ac-f b{font-size:13px;flex:none}
 .ac-f .impbars{width:34px;flex:none}
 .teamfaces{display:inline-flex;margin:0 2px 0 6px;vertical-align:middle}
 .teamfaces .aglyph{width:22px !important;height:22px !important;border-radius:7px;outline:2px solid #FAFAF6;margin-left:-7px}
 .teamfaces .aglyph:first-child{margin-left:0}
 .teamfaces .aglyph svg{width:12px;height:12px}
 .teamfaces .pres{display:none}
-.teamline{font-size:12.5px;color:#8A8D7C;margin:-6px 2px 12px;max-width:72ch}
-.teamgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:18px 0 8px}
-@media (max-width:1100px){.teamgrid{grid-template-columns:repeat(2,1fr)}}
-.tcard{border:1px solid var(--hair);border-radius:16px;background:#fff;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;box-shadow:0 5px 0 -2px var(--tcb),0 10px 0 -5px var(--tcb);transition:transform .12s}
-.tcard:hover{transform:translateY(-2px)}
-.tcard.sel{border-color:var(--tc)}
-.tc-faces{display:flex;gap:6px;align-items:center}
-.tc-faces .aglyph{width:26px !important;height:26px !important;border-radius:8px}
-.tc-faces .aglyph svg{width:14px;height:14px}
-.tc-faces .pres{display:none}
-.tc-more{font-size:10.5px;color:#8A8D7C;font-weight:600}
-.tcard>b{font-size:15.5px;letter-spacing:-.01em;margin-top:2px}
-.tc-line{font-size:11.8px;color:#6E7263;line-height:1.45}
-.tc-meta{font-size:10.5px;color:#9A9D8E}
-.tc-cta{margin-top:auto;padding-top:6px;font-size:12px;font-weight:700;color:var(--tc)}
-.tghead{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;margin:30px 0 4px}
-.tg-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0B7A3E}
-.tghead b{font-size:22px;letter-spacing:-.02em}
-.tg-sub{font-size:13.5px;color:#6E7263}
-.hireshelf{margin:28px 0 8px}
-.hire-h{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
-.hire-h b{font-size:16px;letter-spacing:-.01em}
-.hire-h span{font-size:12.5px;color:#6E7263}
-.hiregrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media (max-width:1100px){.hiregrid{grid-template-columns:1fr}}
-.hcard{border:1.5px dashed #D9C79A;background:linear-gradient(180deg,#FDFBF3,#fff);border-radius:16px;padding:15px 16px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit}
-.hcard:hover{border-color:#A9700B}
-.hcard .why{font-size:12.5px;color:#6E7263;line-height:1.45}
-.hcard .repl{font-size:11px;color:#9A9D8E}
-.hcard .hmult{margin-left:auto;font-size:15px;font-weight:700;color:#A9700B;flex:none}
-.hcard .hcta{margin-top:auto;padding-top:4px;font-size:12.5px;font-weight:700;color:#0B7A3E}
-.teamhero{border:1px solid var(--tcb);background:linear-gradient(180deg,var(--tcb),#fff 130%);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;gap:7px;margin:2px 0 18px}
-.teamhero>b{font-size:21px;letter-spacing:-.02em}
-.teamhero .tc-line{font-size:13.5px;color:#4B4E44;max-width:70ch}
+.teamline{font-size:11px;color:#8A8D7C;margin:-6px 2px 12px;max-width:72ch}
 .lifecyc{display:flex;flex-direction:column;gap:9px;border:1px solid var(--hair);background:#fff;border-radius:14px;padding:14px 18px;margin:0 0 18px}
 .lc-steps{display:flex;align-items:center}
 .lc-step{display:flex;align-items:center;gap:7px;flex:none}
 .lc-dot{width:22px;height:22px;border-radius:50%;border:2px solid #D5D2C8;background:#fff;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
 .lc-step.done .lc-dot{background:#1E9E5A;border-color:#1E9E5A}
 .lc-step.cur .lc-dot{border-color:#0B7A3E}
-.lc-step>span:last-child{font-size:11.5px;color:#8A8D7C;white-space:nowrap}
+.lc-step>span:last-child{font-size:11px;color:#8A8D7C;white-space:nowrap}
 .lc-step.cur>span:last-child{color:#1D221F;font-weight:700}
 .lc-line{flex:1;height:2px;background:#EFEDE6;margin:0 10px;min-width:14px;border-radius:1px}
 .lc-line.done{background:#1E9E5A}
-.lc-sub{font-size:12.5px;color:#6E7263}
+.lc-sub{font-size:11px;color:#6E7263}
 @media (max-width:900px){.lc-step>span:last-child{display:none}.lc-step.cur>span:last-child{display:inline}}
-.tclear{margin:0 0 16px;font-size:13px}
 .trow a:not(.viachip):not(.st):not(.btn):not(.jobopt),
 .schedfoot a:not(.viachip):not(.st):not(.btn):not(.jobopt),
 .lastrun a:not(.viachip):not(.st):not(.btn):not(.jobopt),
@@ -2392,8 +2484,6 @@ p.mut a:not(.viachip):not(.st):not(.btn):not(.jobopt),
 .jexport a:not(.viachip):not(.st):not(.btn):not(.jobopt),
 .gridcount a:not(.viachip):not(.st):not(.btn):not(.jobopt){display:inline-block;padding:10px 6px;margin:-10px -6px}
 .viachip{padding:4px 10px;margin:0}
-.tclear a{display:inline-flex;align-items:center;min-height:42px;padding:0 18px;gap:7px;color:#1D221F;font-weight:600;text-decoration:none;background:#fff;border:1px solid var(--hair);border-radius:100px}
-.tclear a:hover{border-color:#B9CDB4;background:#FAFAF6}
 .stile .tspark,.sb .tspark{display:flex;gap:2px;align-items:flex-end;margin-top:9px;height:22px}
 .stile .tspark i,.sb .tspark i{width:5px;border-radius:2px;background:#1E9E5A;display:inline-block;margin:0;padding:0;font-size:0;color:transparent}
 .aglyph{border-radius:12px;display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none}
@@ -2401,77 +2491,38 @@ p.mut a:not(.viachip):not(.st):not(.btn):not(.jobopt),
 .aglyph .pres.on{background:#1E9E5A}
 .aglyph .pres.off{background:#C2C5D2}
 .apc{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border:1px solid var(--hair);border-radius:12px;background:#fff;padding:10px 16px;margin:12px 0 4px;font-size:13px}
-.apc b{font-size:17px;letter-spacing:-.01em}
+.apc b{font-size:20px;letter-spacing:-.01em}
 .apc-p{color:#1D221F;font-weight:600}
 .apc-r{color:#5B5E52}
 .apc-c{color:#8A8D7C;margin-left:auto}
-a.agentcard .hc-t b{font-size:14.5px}
-a.agentcard .hc-t span{font-size:12.5px}
+a.agentcard .hc-t b{font-size:13px}
+a.agentcard .hc-t span{font-size:11px}
 a.agentcard:hover{border-color:#B9CDB4}
 .agentcard .hc-t span{white-space:normal;line-height:1.35}
 .hubcard.sched{flex-direction:column;align-items:stretch;gap:8px}
-.schedhead{display:flex;align-items:center;justify-content:space-between;
-  gap:12px}
-.schedhead b{font-size:14px;color:var(--ink)}
-.schedbody{font-size:12.5px;line-height:1.5}
-.schedfoot{display:flex;align-items:center;gap:12px;margin-top:auto;
-  min-height:28px}
-.readit{font-size:12.5px;font-weight:500;color:var(--accent);
-  margin-left:auto}
-.readit:hover{text-decoration:underline}
-.hubcard.sched .rtools{position:static;background:none;padding:0}
-.notebar.wide .notein{max-width:none}
-.cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
-  align-items:center;justify-content:center}
-.cico svg{width:18px;height:18px}
-.cico.brand{background:#fff;border:1px solid var(--hair)}
-.cico.brand img{width:22px;height:22px;object-fit:contain;border-radius:4px}
-.bizlogo{height:13px;display:block;margin-top:3px}
-.bizlogo.lg{height:20px;display:inline-block;vertical-align:middle}
-.goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
-  padding:16px 20px;margin:0 0 24px;max-width:720px}
-.goaltop{display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:8px}
-.goallbl{font-size:11.5px;font-weight:600;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--mut)}
-.goalline{display:flex;gap:16px;align-items:center;margin:4px 0 12px}
-.goalnum{font-size:34px;color:var(--ink);font-weight:650;flex:none}
-.goaltxt b{display:block;font-size:14.5px;color:var(--ink)}
-.goaltxt .mut{font-size:12.5px}
-.goalbar{position:relative;height:8px;border-radius:99px;background:#EEEFF3}
-.goalbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
-.goalbar em{position:absolute;top:-3px;bottom:-3px;width:2px;
-  background:#1B1F30;border-radius:2px}
-.goalfoot{display:flex;justify-content:space-between;font-size:12px;
-  color:var(--mut);margin-top:6px}
-.goalact{display:flex;gap:12px;align-items:baseline;padding:8px 0;
-  border-bottom:1px solid #F1F1F5;font-size:13.5px}
-.goalact:last-child{border-bottom:0}
-.goalact .tdesc{flex:1}
-.goalmini{font-size:12.5px;color:var(--mut);margin:0 0 8px}
-.goalmini b{color:#177245}
+""" + SHARED_UI_CSS + """
 .content{max-width:1120px;margin:0 auto;padding:8px 44px 88px}
 .alogo{display:inline-flex;width:18px;height:18px;border-radius:5px;color:#fff;
-  font-size:10.5px;font-weight:700;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;align-items:center;justify-content:center;
   vertical-align:-4px;margin:0 4px 0 2px}
 img.alogo{background:#fff;border:1px solid var(--hair);object-fit:contain;padding:1px}
 h1.page{font-size:32px;font-weight:450;color:var(--ink);letter-spacing:-.01em;margin:8px 0 16px}
-.pagehint{color:var(--mut);font-size:13.5px;margin:0 0 16px;line-height:1.55}
+.pagehint{color:var(--mut);font-size:13px;margin:0 0 16px;line-height:1.55}
 h1.page + .pagehint{margin-top:-8px}
 .impactline{background:#E5F4EC;color:#177245;border-radius:10px;padding:12px 16px;
-  font-size:13.5px;margin-bottom:16px}
+  font-size:13px;margin-bottom:16px}
 .impactline b{font-weight:650}
 .pills{display:flex;gap:8px;margin:0 0 4px}
-.fpill{font-size:13.5px;padding:11px 16px;border-radius:9px;background:var(--accent-soft);
+.fpill{font-size:13px;padding:11px 16px;border-radius:9px;background:var(--accent-soft);
 color:var(--ink);font-weight:500}
 .fpill.off{background:#fff;border:1px solid #E3E4EA;color:var(--text);font-weight:400}
-.cols-h{display:flex;font-size:12.5px;color:var(--mut);padding:16px 0 8px;
+.cols-h{display:flex;font-size:11px;color:var(--mut);padding:16px 0 8px;
 border-bottom:1px solid var(--hair)}
 .cols-h .right{margin-left:auto}
 .taskwrap{border-bottom:1px solid #EEEFF3}
 .trow{display:flex;align-items:center;gap:12px;row-gap:8px;padding:16px 0;
-font-size:14.5px;color:#26293A;flex-wrap:wrap}
-.trow.slim{border-bottom:1px solid #EEEFF3;padding:16px 0;font-size:14px}
+font-size:13px;color:#26293A;flex-wrap:wrap}
+.trow.slim{border-bottom:1px solid #EEEFF3;padding:16px 0;font-size:13px}
 .trow .ico{width:16px;height:16px;color:#6A6D7D;flex:none}
 .trow .ico svg{width:16px;height:16px;display:block}
 .trow .ico.warn-i{color:#B47816}
@@ -2480,7 +2531,7 @@ font-size:14.5px;color:#26293A;flex-wrap:wrap}
 .mut{color:var(--mut)}
 .tacts{display:flex;gap:8px;align-items:center;flex:none;opacity:.92;margin-left:auto}
 .tacts form{display:flex;gap:8px}
-.when{color:#5A5D6D;font-size:13.5px;flex:none;min-width:52px;
+.when{color:#5A5D6D;font-size:13px;flex:none;min-width:52px;
   white-space:nowrap;text-align:right;margin-left:auto}
 """ + BTN_CSS + WORK_CSS + """
 .bulkbar{display:flex;gap:8px;align-items:center;margin:16px 0 2px;
@@ -2488,7 +2539,7 @@ padding:8px 16px;border:1px solid #DFDBFA;background:#F4F3FE;border-radius:10px}
 .taskwrap.kfocus{background:#FAFAFE;box-shadow:inset 3px 0 0 var(--accent)}
 .selrun{width:15px;height:15px;accent-color:var(--accent);flex:none;cursor:pointer}
 .rolepills{display:flex;gap:8px;align-items:center;justify-content:center;
-margin:0 0 16px;font-size:12.5px;color:var(--mut)}
+margin:0 0 16px;font-size:11px;color:var(--mut)}
 .rolepills a{padding:4px 12px;border-radius:999px;border:1px solid var(--hair);
 color:var(--text);text-decoration:none;font-weight:500}
 .rolepills a.on{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -2505,31 +2556,31 @@ transition:border-color .15s,box-shadow .15s}
 border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,235,.13)}
 .jfind::placeholder,.whyin::placeholder,.editbox textarea::placeholder{color:#9A9DAB}
 .jfind:disabled,.whyin:disabled,.editbox textarea:disabled{opacity:.45;cursor:not-allowed}
-.editbox textarea{width:100%;font-size:13.5px;padding:8px 12px;margin-bottom:8px}
-h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
-.st{font-size:12px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap;flex:none}
+.editbox textarea{width:100%;font-size:13px;padding:8px 12px;margin-bottom:8px}
+h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
+.st{font-size:11px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap;flex:none}
 .st.ok{background:#E5F4EC;color:#177245}
 .st.warn{background:#FCEED8;color:#9A6215}
 .st.wait{background:var(--accent-soft);color:#4553C8}
 .st.mut{background:#EFEFF3;color:#6A6D7D}
-.empty{color:var(--mut);padding:16px 2px;font-size:13.5px}
+.empty{color:var(--mut);padding:16px 2px;font-size:13px}
 .atoolbar{display:flex;gap:16px;margin:4px 0 16px;align-items:center;flex-wrap:wrap}
 .atoolbar .search-in{flex:1;max-width:420px;display:flex;gap:8px;align-items:center;
   background:#fff;border:1px solid var(--hair);border-radius:10px;padding:8px 12px}
 .atoolbar .search-in svg{width:15px;height:15px;color:var(--mut)}
-.atoolbar .search-in input{border:none;outline:none;font:inherit;font-size:13.5px;
+.atoolbar .search-in input{border:none;outline:none;font:inherit;font-size:13px;
   width:100%;background:none;color:var(--ink)}
 .seg{display:flex;background:var(--pill);border-radius:10px;padding:3px}
 .seg a{font-size:13px;font-weight:500;padding:8px 16px;border-radius:8px;color:var(--mut)}
 .seg a.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(27,31,48,.08)}
 .atable{background:#fff;border:1px solid var(--hair);border-radius:12px;overflow:hidden}
 .atable .thead{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr 60px;
-  padding:12px 16px;font-size:11.5px;font-weight:600;letter-spacing:.05em;
+  padding:12px 16px;font-size:11px;font-weight:600;letter-spacing:.05em;
   text-transform:uppercase;color:var(--mut);background:#FAFAFC;
   border-bottom:1px solid var(--hair)}
 .atable .arow2{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr 60px;
   align-items:center;padding:12px 16px;border-bottom:1px solid #F1F1F5;
-  color:var(--ink);font-size:14px}
+  color:var(--ink);font-size:13px}
 .atable .arow2:last-child{border-bottom:none}
 .atable .arow2:hover{background:#FAFAFC}
 .aname{display:flex;align-items:center;gap:12px;position:relative}
@@ -2539,16 +2590,16 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
   border-radius:50%;border:1.5px solid #fff}
 .dot2.on{background:#1E9E5A}.dot2.off{background:#C2C5D2}
 .atable .go2{color:var(--mut);text-align:right}
-.hzn{font-size:12.5px;color:var(--mut);border-top:1px solid #F1F1F5;
+.hzn{font-size:11px;color:var(--mut);border-top:1px solid #F1F1F5;
   padding-top:8px;margin-top:2px}
 .hzn.on{color:#177245;font-weight:500}
 .slimcard{display:flex !important;align-items:center;gap:8px;
-  padding:12px 16px !important;font-size:14px;color:var(--ink)}
+  padding:12px 16px !important;font-size:13px;color:var(--ink)}
 .slimcard .dot2{position:static;border:0;width:8px;height:8px;flex:none}
 .slimcard .ident{flex:none}
 .slimcard b{flex:none;font-weight:600}
 .slimcard .slimdesc{flex:1;min-width:0;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;font-size:12.5px}
+  text-overflow:ellipsis;font-size:11px}
 .slimcard .go2{flex:none}
 .sec.fam{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .sec.fam .st{flex:none;line-height:1.4}
@@ -2559,9 +2610,9 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .stile:hover{border-color:#C7CDF3}
 .stile.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .filein{flex:1;font:inherit;font-size:13px;padding:8px;background:#fff;border:1.5px solid var(--hair);border-radius:10px}
-.stile b{display:block;font-size:26px;font-weight:600;letter-spacing:-.01em}
+.stile b{display:block;font-size:24px;font-weight:600;letter-spacing:-.01em}
 .stile span{display:block;font-size:13px;font-weight:500;margin-top:4px}
-.stile i{display:block;font-style:normal;font-size:11.5px;
+.stile i{display:block;font-style:normal;font-size:11px;
   color:var(--mut);margin-top:2px}
 .stile.need b{color:#B47816}
 .lastrun{display:flex;gap:20px;align-items:stretch;background:#fff;
@@ -2570,8 +2621,8 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .lr-l{flex:1;min-width:260px}
 .lr-h{display:flex;align-items:center;gap:8px;font-weight:600;
   font-size:13px;color:var(--ink);margin-bottom:4px}
-.lr-when{margin-left:auto;font-weight:400;font-size:12px}
-.lr-t{font-size:13.5px;line-height:1.55}
+.lr-when{margin-left:auto;font-weight:400;font-size:11px}
+.lr-t{font-size:13px;line-height:1.55}
 .lr-spark{flex:none;display:flex;flex-direction:column;gap:4px;
   justify-content:center}
 .lr-spark > .mut{font-size:11px}
@@ -2587,12 +2638,12 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .hstep:last-child::before{display:none}
 .hstep .hdot{position:absolute;left:0;top:6px;width:8px;height:8px;
   border-radius:50%;background:var(--ink);box-shadow:0 0 0 3px #ECECF1}
-.hstep b{display:block;font-size:14px;color:var(--ink)}
+.hstep b{display:block;font-size:13px;color:var(--ink)}
 .hstep .mut{font-size:13px}
 .capwrap{display:flex;flex-wrap:wrap;gap:8px;max-width:640px;margin:4px 0 8px}
 .capchip{display:inline-flex;align-items:center;gap:8px;background:#fff;
   border:1px solid var(--hair);border-radius:999px;padding:8px 16px;
-  font-size:12.5px;color:var(--text)}
+  font-size:11px;color:var(--text)}
 .capchip svg{width:13px;height:13px;color:#6A6D7D}
 .capchip.act{background:var(--accent-soft,#E9EBF8);border-color:transparent;
   color:#3A46A8}
@@ -2607,25 +2658,25 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
   font-weight:700}
 .mile.done .mdot{background:var(--accent);color:#fff}
 .mile.cur .mdot{background:#fff;border:2px solid var(--accent)}
-.mile b{font-size:12.5px;color:var(--ink)}
+.mile b{font-size:11px;color:var(--ink)}
 .mile.todo b{color:var(--mut);font-weight:500}
-.mile .msub{font-size:11.5px;color:var(--mut)}
+.mile .msub{font-size:11px;color:var(--mut)}
 .mbar{flex:1;height:3px;border-radius:99px;background:#ECECF1;
   margin-top:12px;min-width:24px}
 .mbar.done{background:var(--accent)}
-.ctahint{display:block;font-size:11.5px;color:var(--mut);margin-top:8px;
+.ctahint{display:block;font-size:11px;color:var(--mut);margin-top:8px;
   text-align:right}
 .tglbtn{width:34px;height:20px;border-radius:10px;background:#D9DBE4;border:0;
   position:relative;flex:none;cursor:pointer;padding:0}
 .tglbtn::after{content:"";position:absolute;inset:-10px}
-.cfgsel{font:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--hair);border-radius:9px;background:#fff;min-height:40px;cursor:pointer}
+.cfgsel{font:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--hair);border-radius:9px;background:#fff;min-height:32px;cursor:pointer}
 .pchips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
-.pchip{font:inherit;font-size:12px;color:#3A3D4D;background:#fff;border:1px dashed var(--hair);border-radius:100px;padding:9px 14px;cursor:pointer;min-height:38px}
+.pchip{font:inherit;font-size:11px;color:#3A3D4D;background:#fff;border:1px dashed var(--hair);border-radius:100px;padding:9px 14px;cursor:pointer;min-height:32px}
 .pchip:hover{border-color:#5266EB;color:#5266EB}
 .rulelist{display:flex;flex-direction:column;gap:8px;max-width:680px}
-.rule-row{display:flex;align-items:center;gap:10px;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:12px 14px;font-size:13.5px}
+.rule-row{display:flex;align-items:center;gap:10px;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:12px 14px;font-size:13px}
 .rule-row>span{flex:1}
-.rulex{border:0;background:none;color:var(--mut);cursor:pointer;width:38px;height:38px;border-radius:8px;flex:none;font-size:13px}
+.rulex{border:0;background:none;color:var(--mut);cursor:pointer;width:32px;height:32px;border-radius:8px;flex:none;font-size:13px}
 .rulex:hover{background:#FBE5E5;color:#C2374B}
 .dgrid td{padding:11px 14px;border-bottom:1px solid #F0F0F4}
 .dgrid td.cbx,.dgrid th.cbx{width:40px;text-align:center}
@@ -2639,9 +2690,9 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .dgrid tbody tr:hover{background:#FAFAF6}
 .dgrid tbody tr.pickable{cursor:pointer}
 .dgrid tbody tr.pickable:hover{background:#F2F6FB}
-.flash{display:flex;gap:12px;align-items:center;border:1px solid #D9C79A;background:#FDF8EC;border-radius:12px;padding:12px 16px;margin:14px 0 4px;font-size:13.5px}
+.flash{display:flex;gap:12px;align-items:center;border:1px solid #D9C79A;background:#FDF8EC;border-radius:12px;padding:12px 16px;margin:14px 0 4px;font-size:13px}
 .flash.ok{border-color:#BFD9BA;background:#F2F9EE}
-.flashundo{border:0;background:none;color:#5266EB;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;padding:8px 10px;margin:-8px 0}
+.flashundo{border:0;background:none;color:#5266EB;font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:8px 10px;margin:-8px 0}
 .setcard{border:1px solid var(--hair);background:#fff;border-radius:16px;padding:6px 22px 20px;margin:16px 0}
 .setcard h2.sec:first-child{margin-top:16px}
 .tooloff{opacity:.55}
@@ -2678,28 +2729,28 @@ h2.sec{font-size:15px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .menu .mopt:hover,.acctmenu a:hover,.ammenu button:hover,.jobopt:hover,.tmenu-it:hover{background:var(--ds-hover)}
 .ds-option.danger,.acct-out{color:#B3372B}
 /* -- DS Select -- */
-select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px solid var(--hair);border-radius:10px;background:#fff;min-height:40px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%238A8D9C%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");background-repeat:no-repeat;background-position:right 12px center}
+select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px solid var(--hair);border-radius:10px;background:#fff;min-height:32px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%238A8D9C%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");background-repeat:no-repeat;background-position:right 12px center}
 /* -- DS Input -- */
-.inedit-in,.cfgbox,.hubsearch,.jfind{font:inherit;font-size:13.5px;border:1px solid var(--hair);border-radius:10px;background:#fff;padding:10px 14px;min-height:40px}
+.inedit-in,.cfgbox,.hubsearch,.jfind{font:inherit;font-size:13px;border:1px solid var(--hair);border-radius:10px;background:#fff;padding:10px 14px;min-height:32px}
 .inedit-in:focus,.cfgbox:focus,.hubsearch:focus,.jfind:focus{outline:2px solid #C9D2F5;border-color:#5266EB}
 /* -- DS Card chrome -- */
-.hubcard,.agentcard2,.tcard,.hcard,.apc,.lifecyc,.teamhero,.statbar,.lastrun{border-radius:16px}
-.hubcard,.agentcard2,.hcard,.apc,.lifecyc,.statbar,.lastrun{border-color:var(--hair)}
+.hubcard,.agentcard2,.apc,.lifecyc,.statbar,.lastrun{border-radius:16px}
+.hubcard,.agentcard2,.apc,.lifecyc,.statbar,.lastrun{border-color:var(--hair)}
 .tglbtn.on{background:var(--accent)}
 .tglbtn i{position:absolute;top:2px;left:2px;width:16px;height:16px;
   border-radius:50%;background:#fff;transition:left .12s}
 .tglbtn.on i{left:16px}
 .rtools{display:flex;gap:4px;flex:none;opacity:0;transition:opacity .12s}
 .trow:hover .rtools,.hubcard:hover .rtools{opacity:1}
-.rtool{font:inherit;font-size:12px;color:var(--mut);background:none;border:0;
+.rtool{font:inherit;font-size:11px;color:var(--mut);background:none;border:0;
   cursor:pointer;padding:11px 12px;border-radius:7px}
 .rtool:hover{background:#F0F0F5;color:var(--ink)}
 .rtool.danger:hover{color:#C0392B}
 .inedit{display:flex;gap:8px;align-items:center;width:100%}
-.inedit-in{flex:1;font:inherit;font-size:13.5px;border:1.5px solid #C7CDF3;
+.inedit-in{flex:1;font:inherit;font-size:13px;border:1.5px solid #C7CDF3;
   border-radius:9px;padding:8px 12px;outline:none}
 .inedit-in:focus{border-color:var(--accent)}
-.cfgbox{font:inherit;font-size:13.5px;line-height:1.55;color:var(--ink);
+.cfgbox{font:inherit;font-size:13px;line-height:1.55;color:var(--ink);
   background:#fff;border:1.5px solid var(--hair);border-radius:12px;
   padding:12px 16px;outline:none}
 .cfgbox:focus{border-color:var(--accent)}
@@ -2708,15 +2759,15 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
   padding:1px 8px;background:#fff}
 .assignbar{display:flex;align-items:center;gap:12px;background:#FFF8EC;
   border:1px solid #F0DCB4;border-radius:12px;padding:12px 16px;
-  margin:0 0 16px;font-size:13.5px;flex-wrap:wrap}
+  margin:0 0 16px;font-size:13px;flex-wrap:wrap}
 .assignbar form{display:flex;gap:8px;align-items:center;margin-left:auto}
-.assignlbl{font-size:12px;color:var(--mut)}
+.assignlbl{font-size:11px;color:var(--mut)}
 .thread2{max-width:640px;background:#fff;border:1px solid var(--hair);
   border-radius:14px;padding:8px 16px;margin:4px 0 8px}
 .thr{display:flex;gap:8px;align-items:flex-start;padding:12px 0;
-  border-bottom:1px solid #F1F1F5;font-size:13.5px}
+  border-bottom:1px solid #F1F1F5;font-size:13px}
 .thr:last-child{border-bottom:0}
-.thr .tht{flex:none;width:98px;font-size:11.5px;color:var(--mut);
+.thr .tht{flex:none;width:98px;font-size:11px;color:var(--mut);
   padding-top:3px;font-variant-numeric:tabular-nums}
 .thr .thb{flex:1;line-height:1.55}
 .thr.open .thb{font-weight:500;color:var(--ink)}
@@ -2730,33 +2781,33 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .tier{background:#fff;border:1px solid var(--hair);border-radius:12px;
   padding:12px 16px;margin-bottom:8px}
 .tierh{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.tierh b{font-size:14px}
+.tierh b{font-size:13px}
 .tierh .st{margin-left:auto}
 .tier p{margin:0;font-size:13px;color:var(--text);line-height:1.55}
 .cashcard{max-width:640px;background:#fff;border:1.5px solid #C7CDF3;
   border-radius:16px;padding:20px 24px;margin:4px 0 8px}
-.cashcard h3{font-size:17px;color:var(--ink);margin:4px 0 8px}
-.cashwhy{font-size:13.5px;line-height:1.6;margin-bottom:12px}
+.cashcard h3{font-size:20px;color:var(--ink);margin:4px 0 8px}
+.cashwhy{font-size:13px;line-height:1.6;margin-bottom:12px}
 .abwrap{display:flex;gap:12px;margin:12px 0 16px;flex-wrap:wrap}
 .ab{flex:1;min-width:200px;border-radius:12px;padding:12px 16px}
 .ab span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;margin-bottom:4px;opacity:.75}
-.ab b{font-size:15px;line-height:1.4;display:block}
+.ab b{font-size:13px;line-height:1.4;display:block}
 .ab.no{background:#FDF1EF;color:#A63A2B}
 .ab.yes{background:#E9F7EF;color:#177245}
 .cashmore{margin-top:12px;border-top:1px solid #F1F1F5;padding-top:8px}
-.cashmore summary{font-size:12.5px;color:var(--mut);cursor:pointer;
+.cashmore summary{font-size:11px;color:var(--mut);cursor:pointer;
   padding:4px 0}
 .cashmore[open] summary{margin-bottom:8px}
-.cashrow{display:flex;gap:12px;font-size:13.5px;line-height:1.6;
+.cashrow{display:flex;gap:12px;font-size:13px;line-height:1.6;
   padding:8px 0;border-top:1px solid #F1F1F5}
-.cashrow span:first-child{flex:none;width:88px;font-size:11.5px;
+.cashrow span:first-child{flex:none;width:88px;font-size:11px;
   text-transform:uppercase;letter-spacing:.05em;color:var(--mut);
   padding-top:2px}
 .wpbtns{display:flex;gap:8px;align-items:center;margin-top:12px;
   flex-wrap:wrap}
 .cashdone{margin-top:12px;background:#FAFAFC;border-radius:12px;
-  padding:12px 16px;font-size:13.5px;color:var(--text)}
+  padding:12px 16px;font-size:13px;color:var(--text)}
 .cashdone.ok{background:#E9F7EF;color:#177245;font-weight:500}
 .trace{margin-top:12px;border-top:1px solid #F1F1F5;padding-top:12px}
 .trace-h{font-size:11px;font-weight:700;letter-spacing:.08em;
@@ -2768,21 +2819,21 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .tr3.running .tpill{animation:pulse 1.4s ease infinite}
 @keyframes pulse{50%{opacity:.4}}
 .tr3 .tlabel{flex:1;font-size:13px;color:var(--ink)}
-.tr3 .tstat{font-size:12px;color:#1E9E5A;font-weight:600}
+.tr3 .tstat{font-size:11px;color:#1E9E5A;font-weight:600}
 .tr3.running .tstat{color:#177245}
 .assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:8px 8px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:16px 0 24px}
-.tabbar a{padding:13px 18px;font-size:13.5px;font-weight:500;color:var(--mut);
+.tabbar a{padding:13px 18px;font-size:13px;font-weight:500;color:var(--mut);
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabbar a.on{color:var(--accent);border-bottom-color:var(--accent)}
 .tabbar a:hover{color:var(--ink)}
 .twopane{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
 .pane-list .pitem{display:flex;gap:12px;align-items:center;background:#fff;
   border:1px solid var(--hair);border-radius:10px;padding:12px 16px;margin-bottom:8px;
-  font-size:13.5px;color:var(--ink)}
+  font-size:13px;color:var(--ink)}
 .pane-list .pitem.on{border-color:#C7CDF3;box-shadow:0 0 0 1px #C7CDF3}
-.pane-list .pitem .sub2{display:block;font-size:12px;color:var(--mut);margin-top:1px}
+.pane-list .pitem .sub2{display:block;font-size:11px;color:var(--mut);margin-top:1px}
 .pane-list .pitem .tgl{margin-left:auto;width:30px;height:18px;border-radius:9px;
   background:#D9DBE4;position:relative;flex:none}
 .pane-list .pitem .tgl.on{background:var(--accent)}
@@ -2791,14 +2842,14 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .pane-list .pitem .tgl.on::after{left:14px}
 .pane-detail{background:#fff;border:1px solid var(--hair);border-radius:12px;
   padding:16px 20px;min-height:120px}
-.pane-detail h3{font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:8px}
-.pane-detail p{font-size:13.5px;color:var(--text);line-height:1.6}
+.pane-detail h3{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.pane-detail p{font-size:13px;color:var(--text);line-height:1.6}
 .trow{flex-wrap:wrap;row-gap:8px}
 .trow .tdesc{min-width:min(320px,100%)}
 .rgt{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
 .jbtime{display:block;font-size:11px;color:var(--mut);margin-top:4px;text-align:right;max-width:460px}
 .jtabs{display:flex;gap:8px;margin:8px 0 16px;flex-wrap:wrap}
-.jtab{display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:500;
+.jtab{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:500;
   padding:8px 16px;border-radius:10px;background:var(--pill);color:var(--text)}
 .jtab.on{background:#21232E;color:#fff}
 .jtab.on .alogo{border-color:transparent}
@@ -2810,7 +2861,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .jnav{margin-left:auto;display:flex;gap:8px;flex:none}
 .jcirc{width:36px;height:36px;border-radius:50%;padding:0;display:grid;place-items:center}
 .jday{font-size:11px;letter-spacing:.12em;fill:var(--mut);font-weight:600;font-family:inherit}
-.jdate{font-size:9.5px;letter-spacing:.06em;fill:#B4BAC8;font-weight:600;font-family:inherit}
+.jdate{font-size:11px;letter-spacing:.06em;fill:#B4BAC8;font-weight:600;font-family:inherit}
 .jday-grid{stroke:#E4E5EC}
 .jrule{stroke:#D9DDE6;stroke-width:1}
 .jruletick{stroke:#C9CFDB;stroke-width:1}
@@ -2826,31 +2877,31 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .jmark{transition:opacity .35s,transform .22s;transform-box:fill-box;transform-origin:center;cursor:pointer}
 .jmark.future{opacity:.42}
 .jmark.active{transform:scale(1.3)}
-.jgaplab{font-size:10.5px;color:var(--mut);margin-top:3px;font-weight:600}
+.jgaplab{font-size:11px;color:var(--mut);margin-top:3px;font-weight:600}
 .jflash{animation:jfade .28s ease}
 @keyframes jfade{from{opacity:.3;transform:translateY(4px)}to{opacity:1;transform:none}}
-.jgap{font-size:9.5px;letter-spacing:.06em;fill:var(--mut);font-weight:700;font-family:inherit}
+.jgap{font-size:11px;letter-spacing:.06em;fill:var(--mut);font-weight:700;font-family:inherit}
 .jgapbox{fill:#F1F2F7;stroke:#E4E5EC}
 .jback{display:inline-block;margin:0 0 16px;color:var(--mut);font-size:13px;font-weight:600;text-decoration:none}
 .jback:hover{color:var(--ink)}
-.jfind{width:100%;max-width:440px;margin:8px 0 16px;padding:8px 16px;font-size:14px}
+.jfind{width:100%;max-width:440px;margin:8px 0 16px;padding:8px 16px;font-size:13px}
 .jgoalrow{cursor:pointer}
 .shstats{display:flex;gap:16px;margin:16px 0 8px}
 .shstat{flex:1;border:1px solid var(--hair);border-radius:12px;padding:16px 16px}
-.shstat .n{font-size:26px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
-.shstat .l{font-size:12px;color:var(--mut);margin-top:2px}
+.shstat .n{font-size:24px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.shstat .l{font-size:11px;color:var(--mut);margin-top:2px}
 .dgridwrap{overflow-x:auto;margin-top:16px;border:1px solid #E4E5EC;border-radius:10px}
-.dgrid{width:100%;border-collapse:collapse;font-size:13.5px;min-width:980px}
+.dgrid{width:100%;border-collapse:collapse;font-size:13px;min-width:980px}
 .dgrid th{position:sticky;top:0;background:#F7F7FA;border-bottom:1px solid #E4E5EC;
 border-right:1px solid #ECEDF2;padding:8px 12px;font-weight:600;color:var(--ink);
-text-align:left;font-size:12.5px;white-space:nowrap}
+text-align:left;font-size:11px;white-space:nowrap}
 .dgrid th.ghost{color:#A6ACBB;font-weight:500}
 .dgrid td{border-bottom:1px solid #F0F1F5;border-right:1px solid #F0F1F5;
 padding:8px 12px;vertical-align:middle;background:#fff;height:46px;line-height:1.45}
 .dgrid tr:hover td{background:#FBFBFD}
 .dgrid td.chk,.dgrid th.chk{width:36px;text-align:center;border-right-color:#ECEDF2}
 .dgrid td.chk input{width:14px;height:14px;accent-color:var(--accent)}
-.dgrid td.acct{white-space:nowrap;font-size:13.5px}
+.dgrid td.acct{white-space:nowrap;font-size:13px}
 .dgrid td.wide{min-width:300px}
 .dgrid td.ghost{background:#FAFAFC}
 .dgrid td.pending .cw,.dgrid td.pending .cv{visibility:hidden}
@@ -2878,7 +2929,7 @@ background-size:200% 100%;animation:btnsheen 1.6s linear infinite}
 .dgrid td.num,.dgrid th.num{text-align:right;white-space:nowrap}
 .dgrid .ell{display:inline-block;max-width:420px;overflow:hidden;
 text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
-.gridcount{font-size:12px;color:var(--mut);margin:12px 2px -8px}
+.gridcount{font-size:11px;color:var(--mut);margin:12px 2px -8px}
 .gmore{margin-top:12px}
 .rowin{animation:rowin .45s ease both}
 @keyframes rowin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -2889,17 +2940,31 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
 .notebar{display:flex;gap:8px;align-items:stretch;margin:16px 0 4px}
 .notebar .notein{margin:0;max-width:560px;flex:1}
 .notebar .btn{padding-top:0;padding-bottom:0;display:inline-flex;align-items:center}
-.whyin{width:130px;padding:8px 8px;font-size:12.5px}
+.schedbar{display:block;background:#fff;
+  border:1.5px solid #C7CDF3;border-radius:18px;
+  box-shadow:0 6px 24px rgba(82,102,235,.10);padding:8px;margin:16px 0 4px}
+.schedbar:focus-within{border-color:#98A5F0;box-shadow:0 6px 28px rgba(82,102,235,.16)}
+.schedbar .schedin{width:100%;box-sizing:border-box;border:none;outline:none;
+  font:inherit;font-size:13px;color:var(--ink);background:none;
+  padding:16px 16px 24px;min-width:0}
+.schedbar .schedin::placeholder{color:#9A9DAB}
+.schedbar .srow{display:flex;align-items:center;gap:8px;padding:0 8px 4px}
+.schedbar .schedtag{display:inline-flex;align-items:center;gap:7px;
+  background:var(--pill,#EEEFF2);color:#5A5D6D;border-radius:100px;
+  padding:0 14px;min-height:36px;font-size:11px}
+.schedbar .schedtag svg{width:13px;height:13px}
+.schedbar .sendbtn{margin-left:auto}
+.whyin{width:130px;padding:8px 8px;font-size:11px}
 .ehist{max-width:660px;margin-top:8px}
 .eh-item{position:relative;padding:0 0 24px 32px}
 .eh-item:not(:last-child):after{content:"";position:absolute;left:7px;top:20px;bottom:-2px;width:2px;background:#ECEEF3}
 .eh-node{position:absolute;left:1px;top:3px;width:12px;height:12px;border:2px solid #D0D5DE;border-radius:50%;background:#fff}
-.eh-head{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
-.eh-av{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#fff;flex:none}
-.eh-when{color:var(--mut);font-size:12.5px;font-weight:500}
+.eh-head{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.eh-av{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex:none}
+.eh-when{color:var(--mut);font-size:11px;font-weight:500}
 .eh-line{margin:8px 0 0 32px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.eh-verb{color:#3F4A5C;font-size:13.5px;font-weight:600}
-.echip{padding:3px 12px;border-radius:8px;font-size:12.5px;font-weight:600;border:1px solid transparent}
+.eh-verb{color:#3F4A5C;font-size:13px;font-weight:600}
+.echip{padding:3px 12px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid transparent}
 .ec-purple{background:#F1EBFE;color:#6B3FD6;border-color:#E4D9FB}
 .ec-pink{background:#FDE7F1;color:#C0316E;border-color:#F9D3E4}
 .ec-blue{background:#E5EEFB;color:#2E5AAC;border-color:#D3E2F7}
@@ -2912,14 +2977,14 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
 .jcard{display:grid;grid-template-columns:130px 1fr;gap:20px;background:#fff;
   border:1px solid var(--hair);border-radius:12px;padding:16px 20px;margin-top:12px}
 .jday2{font-size:11px;letter-spacing:.08em;color:var(--mut);font-weight:600;margin:8px 0 2px}
-.jtime{font-size:21px;font-weight:600;color:var(--ink)}
-.jcard h3{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.jtime{font-size:20px;font-weight:600;color:var(--ink)}
+.jcard h3{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px}
 .jkv{display:grid;grid-template-columns:130px 1fr;gap:8px 16px;font-size:13px}
-.jkv .k{font-size:10.5px;letter-spacing:.08em;color:var(--mut);font-weight:600;
+.jkv .k{font-size:11px;letter-spacing:.08em;color:var(--mut);font-weight:600;
   align-self:baseline;padding-top:2px}
 .jscroll{overflow-x:auto;background:#fff;border:1px solid var(--hair);
   border-radius:12px;margin-bottom:12px}
-.jlane{font-size:10.5px;letter-spacing:.08em;fill:var(--mut);font-weight:600}
+.jlane{font-size:11px;letter-spacing:.08em;fill:var(--mut);font-weight:600}
 .jgrid{stroke:#EFEFF4;stroke-dasharray:2 4}
 .jheadline{stroke:var(--accent);stroke-width:1.4;opacity:.75}
 .jmark{cursor:pointer}
@@ -2929,13 +2994,13 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
   text-transform:uppercase;margin-bottom:4px}
 .dhead{display:flex;align-items:center;gap:16px;margin:8px 0 2px}
 .dhead .back2{display:flex;align-items:center;justify-content:center;
-  width:38px;height:38px;flex:none;border-radius:10px;border:1px solid var(--hair);
+  width:32px;height:32px;flex:none;border-radius:10px;border:1px solid var(--hair);
   background:#fff;color:var(--text);font-size:20px;transition:background .12s}
 .dhead .back2:hover{background:var(--pill);color:var(--ink)}
 .dhead .back2:active{background:#DEDFE6}
 .dhead .tile{width:44px;height:44px}
-.dhead .meta{font-size:12.5px;color:var(--mut);margin-top:3px;display:flex;gap:8px;align-items:center}
-.dhead h1{font-size:22px;font-weight:600;color:var(--ink);margin:0}
+.dhead .meta{font-size:11px;color:var(--mut);margin-top:3px;display:flex;gap:8px;align-items:center}
+.dhead h1{font-size:24px;font-weight:600;color:var(--ink);margin:0}
 .agchips{display:flex;gap:4px;flex-wrap:wrap}
 .agchip{display:inline-flex;width:26px;height:26px;border-radius:7px;
   background:var(--accent-soft);color:var(--accent);align-items:center;
@@ -2950,10 +3015,10 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
 .acard .tile{width:36px;height:36px;border-radius:9px;background:var(--accent-soft);
   color:var(--accent);display:flex;align-items:center;justify-content:center}
 .acard .tile svg{width:18px;height:18px}
-.acard h3{font-size:14.5px;font-weight:600;color:var(--ink)}
-.acard p{font-size:12.5px;color:var(--mut);line-height:1.5;flex:1}
+.acard h3{font-size:13px;font-weight:600;color:var(--ink)}
+.acard p{font-size:11px;color:var(--mut);line-height:1.5;flex:1}
 .acard .foot{display:flex;align-items:center;gap:8px;margin-top:2px}
-.acard .foot .n{margin-left:auto;font-size:12px;color:var(--mut)}
+.acard .foot .n{margin-left:auto;font-size:11px;color:var(--mut)}
 </style></head><body>
 __SIDEBAR__
 <div class="main">
@@ -3204,333 +3269,17 @@ def _shell(content: str, active: str, tid: str, email: str) -> str:
             .replace("__INITIAL__", user_avatar(email)))
 
 
-def _card(title: str, sub: str, right: str = "") -> str:
-    return (f'<div class="trow slim"><span class="ico">{ICONS["bolt"]}</span>'
-            f'<span class="tdesc"><b>{title}</b> <span class="mut">{sub}</span></span>'
-            f'{right}</div>')
 
+from roster import (  # noqa: E402  (demo/roster.py: all agent data)
+    RELAY_AGENTS, AGENT_SEED, AGENT_DAYS, AGENT_THREADS, AGENT_STORY,
+    AGENT_LINKS, AGENT_GOALS, AGENT_GLYPHS, PROPS_DEF, PROP_EXECS,
+    TEACHINGS, _TINT, _FACULTY,
+)
 
-# Relay's back office, organised as the three people a founder would
-# otherwise have to hire: a CFO who knows where the money is, an ops manager
-# who keeps orders moving, and a support manager who deals with customers
-# and their banks. Every agent keys off the same order, which is why this is
-# one back office and not seven tools.
-#
-# `today` renders as "Without Relay:" — who does this work now, and what it
-# costs or why it goes undone. That gap is the product. Dispute Defender is
-# the only one switched on here; the rest are off.
-#
-# No personas on these cards, deliberately. A five-person business has no
-# risk lead and no ops lead. One person wears every hat, and that person is
-# the only reader this copy is written for.
-# The office is organised by the three people a founder would otherwise
-# have to hire — not by an internal functional taxonomy. A founder thinks
-# "I need a CFO", never "I need a finance desk".
-DESKS = [
-    ("accounts", "Your accounts manager",
-     "Ties out every rupee against the bank, tells you what you were "
-     "actually paid, and warns you before cash gets tight."),
-    ("inventory", "Your inventory manager",
-     "Knows what you have, what is moving, and what you are about to run "
-     "out of."),
-    ("risk", "Your risk &amp; compliance manager",
-     "Checks what looks wrong before the money leaves, and keeps you filing-ready."),
-    ("support", "Your support manager",
-     "Answers your customers and their banks, and sees returns through to "
-     "the refund."),
-    ("calling", "Your telecaller",
-     "Calls buyers: to confirm the order, to recover the payment, to "
-     "close the sale."),
-    ("analyst", "Your MIS analyst",
-     "Puts the numbers in front of you every morning, and says what "
-     "changed."),
-]
-
-# Ceded to CoWorker, the AI CFO: the think-and-report finance desks.
-# Relay keeps the agents that ACT. Data stays (teach maps, proposals);
-# they just leave the roster.
-# Krishan (CFO brief, cash), Priya (vendor payouts), Rohan (recon +
-# marketplace claims), Maya (marketing efficiency), Ankita (GST).
-CEDED_TO_COWORKER = {"three_way_recon", "settlement_insights",
-                     "cashflow_forecast", "daily_mis", "payouts_desk",
-                     "gst_compliance", "performance_marketing",
-                     "marketplace_claims"}
-
-RELAY_AGENTS = [
-    dict(slug="cofounder", name="Cofounder Agent", icon="chart",
-        status="roadmap", desk="analyst",
-        role="Cofounder Agent",
-        desc="Connects what every agent learns into your next move, and "
-             "files it as a proposal for your yes.",
-        today="The patterns sit across 24 heads and 5 dashboards; "
-              "nobody joins them.",
-        replaces="the cofounder you cannot afford yet"),
-    dict(slug="delivery_rescue", name="Delivery Rescue Agent", icon="chart",
-        status="roadmap", desk="support",
-        role="Delivery Rescue Agent",
-        desc="Failed deliveries fixed before they become returns: calls "
-             "the buyer, fixes the address, forces the reattempt.",
-        today="The courier marks &lsquo;customer unavailable&rsquo; and "
-              "nobody calls. The parcel rides home as RTO.",
-        replaces="the ops person chasing couriers all day"),
-    dict(slug="repeat_purchase", name="Repeat Purchase Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="Repeat Purchase Agent",
-        desc="Notices who is due to run out, and nudges before they "
-             "reorder elsewhere.",
-        today="Repeat revenue waits for the buyer to remember you.",
-        replaces="the retention marketing you never get to"),
-    dict(slug="loyalty", name="Loyalty Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="Loyalty Agent",
-        desc="One loyalty balance across every brand and channel you run. "
-             "Points earned anywhere, spent anywhere.",
-        today="Every brand runs its own points. A buyer loyal to one is "
-              "a stranger to the rest.",
-        replaces="the loyalty program that never left the planning doc"),
-    dict(slug="store_credit", name="Store Credit Agent", icon="chart",
-        status="roadmap", desk="risk",
-        role="Store Credit Agent",
-        desc="Turns refunds into store credit and gift vouchers that come "
-             "back as orders, online and at the counter.",
-        today="Every refund leaves as cash. None of it comes back as "
-              "a next order.",
-        replaces="refunds that walk out the door for good"),
-    dict(slug="emi_cohort", name="EMI Cohort Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="EMI Cohort Agent",
-        desc="Reads payment history to spot buyers good for a merchant-side "
-             "EMI, and routes the offer for your yes.",
-        today="High-intent buyers stall at the full price. Nobody offers "
-              "them a split.",
-        replaces="the conversions lost at the price step"),
-    dict(slug="marketplace_claims", name="Marketplace Claims Agent", icon="chart",
-        status="roadmap", desk="risk",
-        role="Marketplace Claims Agent",
-        desc="Collects what marketplaces owe you: lost shipments, damaged "
-             "returns, unpaid claims, filed on time.",
-        today="Claim windows lapse because filing is tedious paperwork.",
-        replaces="money you were owed and never collected"),
-    dict(slug="checkout_watchdog", name="Checkout Watchdog Agent", icon="chart",
-        status="roadmap", desk="risk",
-        role="Checkout Watchdog Agent",
-        desc="Tests your checkout and every payment method, every hour. "
-             "Screams first.",
-        today="A broken payment method on a sale day burns quietly "
-              "till a buyer complains.",
-        replaces="finding out from an angry customer"),
-    dict(slug="instagram_shopping", name="Instagram Shopping Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="Instagram Shopping Agent",
-        desc="Turns DMs into orders. Replies, carts and payment links, inside Instagram.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="listings_opt", name="Listings Optimization Agent", icon="chart",
-        status="roadmap", desk="analyst",
-        role="Listings Optimization Agent",
-        desc="Listings that rank and convert, kept fresh on every marketplace.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="subscription_dunning", name="Subscription Dunning Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="Subscription Dunning Agent",
-        desc="Saves failing subscriptions before they cancel.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="ar_collection", name="AR Collection Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="AR Collection Agent",
-        desc="Chases invoices till they clear, politely and on schedule.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="loan_recovery", name="Loan Recovery Agent", icon="chart",
-        status="roadmap", desk="calling",
-        role="Loan Recovery Agent",
-        desc="Recovers bounced EMIs, politely.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="custom_reports", name="Custom Reports Agent", icon="chart",
-        status="roadmap", desk="analyst",
-        role="Custom Reports Agent",
-        desc="Any report, asked for in words.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="customer_support", name="Customer Support Agent", icon="chart",
-        status="roadmap", desk="support",
-        role="Customer Support Agent",
-        desc="Answers where-is-my-order, instantly, on every channel.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="csat_feedback", name="CSAT &amp; Feedback Agent", icon="chart",
-        status="roadmap", desk="support",
-        role="CSAT &amp; Feedback Agent",
-        desc="Asks every buyer how it went, and hears the answer.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="review_generation", name="Review Generation Agent", icon="chart",
-        status="roadmap", desk="support",
-        role="Review Generation Agent",
-        desc="Turns happy buyers into reviews.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="review_response", name="Review Response Agent", icon="chart",
-        status="roadmap", desk="support",
-        role="Review Response Agent",
-        desc="Replies to every review, in your voice.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="performance_marketing", name="Performance Marketing Agent", icon="chart",
-        status="roadmap", desk="analyst",
-        role="Performance Marketing Agent",
-        desc="Reads margin, not just ROAS.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    dict(slug="smart_approval", name="Smart Approval Agent", icon="chart",
-        status="roadmap", desk="risk",
-        role="Smart Approval Agent",
-        desc="Learns which yeses to spare you.",
-        today="Someone does this by hand today, or nobody does.",
-        replaces="a job you would otherwise hire for"),
-    # --- Your accounts manager -------------------------------------------
-    dict(slug="three_way_recon", name="3-Way Reconciliation", icon="ledger",
-        status="roadmap", desk="accounts",
-        role="Reconciliation Agent",
-        desc="Matches every order to the payout to the bank credit. Tells "
-             "you what didn&rsquo;t tie.",
-        today="Someone ties out lines by hand every day. Tools get to about "
-              "80%, and a failed payout can surface weeks later.",
-        replaces="an accounts executive tying out the bank, &#8377;20&ndash;30k a month"),
-    dict(slug="settlement_insights", name="Settlement Insights", icon="chart",
-        status="roadmap", desk="accounts",
-        role="Settlement Agent",
-        desc="Tells you what&rsquo;s landing, when, what was deducted, and "
-             "what&rsquo;s stuck.",
-        today="You find out what you were actually paid by opening a "
-              "statement and doing the maths.",
-        replaces="the part of the accounts job spent reading statements"),
-    dict(slug="cashflow_forecast", name="Cashflow Forecast", icon="flow",
-        status="roadmap", desk="accounts",
-        role="Cashflow Agent",
-        desc="Tells you what cash lands this week, what is already spoken "
-             "for, and when it gets tight.",
-        today="You find out you are short in the week you are short. The "
-              "forecast lives in someone&rsquo;s head or a stale sheet.",
-        replaces="the finance person who keeps the cash sheet, &#8377;25&ndash;40k a month"),
-    dict(slug="payouts_desk", name="Payouts Desk", icon="send",
-        status="roadmap", desk="accounts",
-        role="Payouts Agent",
-        desc="Pays vendors, staff and refunds on time, each in the way they "
-             "want to be paid.",
-        today="Payment day is one person with a bank tab open, copying "
-              "account numbers. Something always goes out late.",
-        replaces="the accounts payable clerk, &#8377;20&ndash;28k a month"),
-    dict(slug="payment_forms", name="Payment Forms", icon="pen",
-        status="roadmap", desk="accounts",
-        role="Billing Agent",
-        desc="Builds a payment form on the fly for anything that isn&rsquo;t "
-             "normal checkout: a bulk order, a part advance, a "
-             "subscription mandate: with any verification the rules "
-             "require built into the same form.",
-        today="Someone opens the dashboard, hand-builds a link, WhatsApps it, "
-              "then chases the customer and types the details into the books "
-              "afterwards.",
-        replaces="the billing executive who hand-builds links, "
-                 "&#8377;18&ndash;25k a month"),
-    # --- Your inventory manager ------------------------------------------
-    dict(slug="stock_watch", name="Stock Watch", icon="folder",
-        status="roadmap", desk="inventory",
-        role="Quick Commerce Agent",
-        desc="Watches stock across every channel, warns you before you run "
-             "out, and stops you selling what you don&rsquo;t have.",
-        today="You oversell on one channel and sit on dead stock in "
-              "another. Someone checks sheets by hand, usually after a "
-              "customer has already complained.",
-        replaces="an inventory executive, &#8377;18&ndash;25k a month"),
-    # --- Your risk manager -----------------------------------------------
-    dict(slug="refund_shield", name="Refund Shield", icon="moon",
-        status="roadmap", desk="risk",
-        role="Refund Risk Agent",
-        desc="Checks every refund claim for fraud before you pay it.",
-        today="Claims get paid before anyone looks, because looking at every "
-              "claim costs more than the fraud does.",
-        replaces="a fraud reviewer you almost certainly never hired"),
-    dict(slug="gst_compliance", name="GST &amp; Compliance", icon="funnel",
-        status="roadmap", desk="risk",
-        role="Compliance Agent",
-        desc="Keeps GST, TDS and e-invoices tied to real orders, and flags "
-             "what won&rsquo;t match before you file.",
-        today="Your CA asks for the file on the 18th. Someone spends two "
-              "days rebuilding it out of three different systems.",
-        replaces="the monthly compliance scramble your CA bills you for"),
-    dict(slug="kyc_desk", name="KYC Desk", icon="lock",
-        status="roadmap", desk="risk",
-        role="KYC Agent",
-        desc="Screens a buyer in seconds, runs the standard checks, escalates "
-             "to a deeper review when the risk calls for it, and blocks mule "
-             "accounts before any money moves.",
-        today="The counter needs a PAN before a &#8377;2L sale. Someone types "
-              "the number into a portal and files a printout while the "
-              "customer stands there waiting.",
-        replaces="a KYC executive checking documents by hand, "
-                 "&#8377;18&ndash;25k a month"),
-    # --- Your support manager --------------------------------------------
-    dict(slug="dispute_defender", name="Dispute Defender", icon="shield",
-        status="live", desk="support",
-        role="Disputes Agent",
-        desc="Gathers the proof, writes the reply, and files it before the "
-             "deadline.",
-        today="Proof sits across your store, the courier and your inbox. By "
-              "the time it&rsquo;s gathered, the window has shut.",
-        replaces="the support executive who chases proof, &#8377;18&ndash;25k a month"),
-    dict(slug="returns_desk", name="Returns Desk", icon="baton",
-        status="roadmap", desk="support",
-        role="Returns Agent",
-        desc="Follows every return from pickup to restock, and releases the "
-             "refund once the goods are actually back.",
-        today="Refunds go out before the item returns, or the customer "
-              "chases you for weeks. Nobody joins the courier&rsquo;s "
-              "tracking to your refund.",
-        replaces="the returns coordinator between courier, warehouse and refund"),
-    # --- Your telecaller --------------------------------------------------
-    dict(slug="cart_rescue", name="Cart Rescue", icon="tasks",
-        status="live", desk="calling",
-        role="Cart Recovery Agent",
-        desc="Calls buyers who left without paying and sends them a payment "
-             "link.",
-        today="A WhatsApp blast gets a fraction back. Nobody can call 400 "
-              "dropped carts a day.",
-        replaces="a telecaller, &#8377;15&ndash;22k a month"),
-    dict(slug="payment_rescue", name="Payment Rescue", icon="bolt",
-        status="live", desk="calling",
-        role="Payment Recovery Agent",
-        desc="Reads why a payment failed, waits a few minutes, then calls "
-             "and sends a fresh link.",
-        today="A failed UPI payment is just a lost order. Nobody reads a "
-              "decline code.",
-        replaces="a telecaller, &#8377;15&ndash;22k a month"),
-    dict(slug="cod_guard", name="COD Guard", icon="note",
-        status="roadmap", desk="calling",
-        role="COD Confirmation Agent",
-        desc="Confirms COD orders before dispatch and blocks addresses that "
-             "keep failing.",
-        today="Someone works the COD list every morning. COD is half your "
-              "orders and a fifth of them come back.",
-        replaces="the morning COD calling shift, &#8377;15&ndash;22k a month"),
-    # --- Your MIS analyst -------------------------------------------------
-    dict(slug="daily_mis", name="Daily MIS", icon="book",
-        status="roadmap", desk="analyst",
-        role="Morning Brief Agent",
-        desc="Sends you the numbers that matter each morning, and flags what "
-             "changed and why.",
-        today="Someone rebuilds the MIS sheet every morning. It tells you "
-              "what happened, never why.",
-        replaces="an MIS executive, &#8377;25&ndash;35k a month"),
-]
-
-# Dispute Defender's own crew — the seven sub-agents inside the pipeline
+# Dispute Responder's own crew — the seven sub-agents inside the pipeline
 # (§6 of the spec), each behind its own access/memory/playbook/quality tabs.
 PLAY_AGENTS = {
-    "Dispute Defender": ["detection-agent", "eligibility-agent", "response-agent",
+    "Dispute Responder": ["detection-agent", "eligibility-agent", "response-agent",
                          "compliance-agent", "filing-agent", "escalation-agent",
                          "reporting-agent"],
 }
@@ -3597,16 +3346,16 @@ def workflows_content(tid: str) -> str:
     resolved = sum(1 for r in runs if r.state is RunState.RESOLVED)
     PCOLS = "1.1fr 2.6fr 1.5fr .8fr 1.4fr"
     play_rows = [
-        _trow2(PCOLS, ["<b>Dispute Defender</b>",
+        _trow2(PCOLS, ["<b>Dispute Responder</b>",
                        '<span class="mut">Dispute filed &rarr; evidence-cited '
                        'response &rarr; your approval &rarr; filed with the '
                        'bank.</span>',
-                       _agent_chips(PLAY_AGENTS["Dispute Defender"]),
+                       _agent_chips(PLAY_AGENTS["Dispute Responder"]),
                        '<span class="st ok">live</span>',
                        f'<span class="mut">{len(runs)} runs &middot; {waiting} '
                        f'waiting &middot; {resolved} resolved</span>']),
-        _trow2(PCOLS, ["<b>COD Guard, Payment Rescue, Cart Rescue, Settlement "
-                       "Clarity, Refund Shield, Loan Recovery, Due Diligence</b>",
+        _trow2(PCOLS, ["<b>the COD agent, the payment agent, the cart agent, Settlement "
+                       "Clarity, the refund agent, Loan Recovery, Due Diligence</b>",
                        '<span class="mut">Relay&rsquo;s other seven agents. '
                        'see the full fleet on the Agents console.</span>',
                        '<span class="st mut">not yet wired in this demo</span>',
@@ -3651,8 +3400,8 @@ def workflows_content(tid: str) -> str:
          "ever see it.".format(biz=BUSINESS),
          f"{n_drafted} drafted &middot; {n_blocked} blocked or escalated", "qa_blocked"),
         ("tasks", "4 · You decide",
-         "You get the card. Say yes, change the wording, or say no. "
-         "nothing is filed without your yes. Anything you leave goes to a "
+         "You get the card. Approve it, change the wording, or decline. "
+         "nothing is filed without your approval. Anything you leave goes to a "
          "person, never files itself.",
          f"{n_wait} waiting now", "edited"),
         ("note", "5 · The response is filed with the bank",
@@ -3838,30 +3587,6 @@ def projects_content(tid: str) -> str:
 PCOLS = "1.6fr 1.2fr 1.1fr 1.1fr .8fr .7fr .8fr"
 
 
-def vault_content(tid: str) -> str:
-    from relay_superagent.secrets import get_secret
-    rails = [("The AI that writes the replies", "anthropic"),
-             ("Slack, so you can say yes from there", "slack-bot"),
-             ("Slack button security", "slack-signing"),
-             ("Meeting notes (not used here)", "fathom-webhook"),
-             ("Your email inbox", "gmail-token"),
-             ("Order notes (not used here)", "hubspot-token"),
-             ("Signing in", "workos-api-key")]
-    def rail_status(acct):
-        if get_secret(acct):
-            return '<span class="st ok">connected</span>'
-        # every adapter is built; what remains is the key — say exactly that
-        return ('<span class="st wait">built, not switched on</span>')
-    rows = "".join(
-        f'<div class="trow slim"><span class="ico">{ICONS["lock"]}</span>'
-        f'<span class="tdesc"><b>{esc(name)}</b> <span class="mut">held by Relay</span></span>'
-        + rail_status(acct) + '</div>'
-        for name, acct in rails)
-    hint = ('<div class="empty">Nothing here is yours to set up. Relay holds '
-            'every one of these itself, in the Mac keychain, never in a '
-            'file.</div>')
-    return f'<h2 class="sec" id="vault">What it&rsquo;s plugged into</h2>{rows}{hint}'
-
 
 # Per-agent console data (CM-21 demo world). Access grants and memory
 # fields mirror the real architecture; playbook rules quote the seeded
@@ -3903,7 +3628,7 @@ AGENT_DEFS = {
     "filing-agent": dict(icon="note", name="filing-agent",
         charter="Sends the reply you approved, exactly once, and records how it ended.",
         reads=["replies you said yes to"], effects=["send the reply to the bank"],
-        scope="The only one that talks to the bank: and only after your yes.",
+        scope="The only one that talks to the bank: and only after your approval.",
         session=["what was sent", "when"], profile=["how the dispute ended, and for how much"],
         rules=["Exactly once. A crash can never send the same reply twice.",
                "It only acts on replies you said yes to."]),
@@ -3940,8 +3665,8 @@ DESK_ACCESS = {
                  "person decides."]),
     "inventory": dict(
         reads=["stock counts", "orders coming in", "supplier lead times"],
-        does=["warn you before you run out", "draft a reorder for your yes"],
-        rules=["It never places an order itself: a reorder waits for your yes.",
+        does=["warn you before you run out", "draft a reorder for your approval"],
+        rules=["It never places an order itself: a reorder waits for your approval.",
                "A warning names the product, the days left, and why."],
         handoff=["A reorder bigger than your usual goes to a person first.",
                  "Counts that disagree across channels: a person "
@@ -3957,8 +3682,8 @@ DESK_ACCESS = {
                  "person the same day."]),
     "support": dict(
         reads=["disputes from the bank", "your orders", "the proof on file"],
-        does=["write the reply for your yes", "file it once you agree"],
-        rules=["Nothing reaches a bank or a buyer without your yes.",
+        does=["write the reply for your approval", "file it once you agree"],
+        rules=["Nothing reaches a bank or a buyer without your approval.",
                "Every claim in a reply points at proof on file."],
         handoff=["An angry buyer, or any mention of legal action, goes "
                  "straight to a person.",
@@ -3990,100 +3715,8 @@ DEMO_ON: dict[str, bool] = {}    # slug -> switched on (demo state, in-memory)
 DEMO_ON.update({a["slug"]: True for a in RELAY_AGENTS
                 if a["status"] != "live"})
 
-# One rescue, followed through: the multithreaded story a founder needs to
-# see to believe a caller agent. Voice and WhatsApp are one conversation to
-# the buyer; the agent waits, switches channel, retries at a sane hour, and
-# stops when told. Times are offsets, not clock times, so the story is
-# stable however long the demo has been up.
-AGENT_THREADS = {
-    "cart_rescue": dict(
-        opening="6:12 PM. Vikram leaves a &#8377;1,899 Donut Bed order at checkout.",
-        closing="Won back &#8377;1,899. Three touches over two days, then it "
-                "stops. A buyer who says stop is never contacted again.",
-        won="&#8377;1,899 paid",
-        rows=[
-            ("+30 min", "call", "Calls Vikram. No answer. It does not ring "
-             "twice in a row.", "missed"),
-            ("+32 min", "wa", "&ldquo;Your cart is saved. Pay in one tap "
-             "whenever you are ready.&rdquo; Payment link attached.", "delivered"),
-            ("next day, 11 AM", "call", "Second call, at a sane hour. Vikram "
-             "answers: he wanted COD. The agent offers the prepaid "
-             "discount instead.", "2 min call"),
-            ("+2 min", "wa", "Fresh link with the discount applied.", "paid"),
-        ]),
-    "payment_rescue": dict(
-        opening="8:41 PM. Sneha&rsquo;s UPI payment fails on a &#8377;549 "
-                "refill. The bank timed out; she does not know if she paid.",
-        closing="Saved the order the same evening. The agent read the "
-                "decline reason first, so every follow-up matched what "
-                "actually went wrong.",
-        won="&#8377;549 paid",
-        rows=[
-            ("+5 min", "wa", "&ldquo;That payment did not go through and "
-             "nothing was charged. Here is a fresh link.&rdquo;", "read"),
-            ("+20 min", "call", "No payment yet, so it calls. Sneha retries "
-             "on the call; her card declines this time (limit).", "3 min call"),
-            ("+1 min", "wa", "New link with UPI and card both open, plus "
-             "&ldquo;pay on delivery&rdquo; as the fallback.", "paid"),
-        ]),
-}
 
 
-# A day on the job, one per agent: the fastest way to believe an agent is
-# to watch one shift. Three or four beats, real objects, real amounts, and
-# the gate visible wherever money would move.
-AGENT_DAYS = {
-    "three_way_recon": [
-        ("7:00 AM", "Pulled yesterday: 214 orders, 3 payouts, one bank statement.", ""),
-        ("7:04 AM", "211 tied out on their own.", "matched"),
-        ("7:05 AM", "&#8377;4,310 short on one payout. Named the 3 orders inside it.", "flagged"),
-        ("7:06 AM", "Wrote the morning note. Your accounts person starts at zero.", "done")],
-    "settlement_insights": [
-        ("11:20 AM", "Settlement landed: &#8377;1,84,220.", ""),
-        ("11:21 AM", "Broke it down: &#8377;2,140 fees, &#8377;890 held back, reason named.", "done"),
-        ("11:22 AM", "&ldquo;Landing today&rdquo; updated. Nothing stuck.", "done")],
-    "cashflow_forecast": [
-        ("8:00 AM", "Read what lands this week and what goes out.", ""),
-        ("8:01 AM", "Thursday looks tight: vendor day and a GST debit collide.", "warned"),
-        ("8:01 AM", "Suggested moving one payout by two days. Your call.", "your yes")],
-    "payouts_desk": [
-        ("6:00 PM", "Lined up 14 payments due tomorrow: vendors, 2 refunds, the courier.", ""),
-        ("6:01 PM", "One list, one yes. You approved from your phone.", "your yes"),
-        ("6:02 PM", "Paid each one the way they want it. Every payment against its bill.", "done")],
-    "payment_forms": [
-        ("2:10 PM", "A bulk buyer wants to pay &#8377;2.6 lakh as a 40% advance.", ""),
-        ("2:11 PM", "Built the form: PAN, the advance, balance on delivery. One link.", "done"),
-        ("2:12 PM", "Buyer paid in one step. The books already know.", "paid")],
-    "stock_watch": [
-        ("9:00 AM", "Counted every channel: store, Amazon, Flipkart, quick commerce.", ""),
-        ("9:01 AM", "Sara's Chicken & Rice: 6 days left at this pace. The supplier needs 10.", "warned"),
-        ("9:02 AM", "Drafted the reorder. It goes nowhere until your yes.", "your yes")],
-    "refund_shield": [
-        ("4:40 PM", "Refund claim: &ldquo;bottle arrived broken&rdquo;, &#8377;1,249.", ""),
-        ("4:41 PM", "Checked the photo, the delivery scan, the history: second claim in 3 weeks.", "flagged"),
-        ("4:41 PM", "Held for a person. The buyer sees &ldquo;being reviewed&rdquo;, not a no.", "held")],
-    "gst_compliance": [
-        ("18th, 10:00 AM", "Tied the month&rsquo;s invoices to real orders. Two won&rsquo;t match.", ""),
-        ("10:01 AM", "Named both, with the fix for each.", "flagged"),
-        ("10:02 AM", "One clean file to your CA. Nothing rebuilt by hand.", "done")],
-    "returns_desk": [
-        ("Monday", "Return picked up: Snuggle Sphere Donut Bed, &#8377;1,899.", "tracking"),
-        ("Wednesday", "Reached the warehouse. Seal checked, item fine.", "checked"),
-        ("Wednesday", "Refund released the same hour. It never went out early.", "done")],
-    "cod_guard": [
-        ("10:00 AM", "38 COD orders lined up for dispatch today.", ""),
-        ("10:20 AM", "31 confirmed on call, 4 more on WhatsApp.", "confirmed"),
-        ("10:25 AM", "3 never picked up twice. Held from dispatch, pincode noted.", "held")],
-    "daily_mis": [
-        ("7:30 AM", "Collected yesterday from every channel.", ""),
-        ("7:31 AM", "Orders up 12%, but returns on one SKU doubled. Said why.", "insight"),
-        ("7:32 AM", "One page, in your morning brief.", "done")],
-    "dispute_defender": [
-        ("9:14 AM", "Bank sends a dispute: &ldquo;never arrived&rdquo;, &#8377;549.", ""),
-        ("9:14 AM", "Proof pulled: delivery scan, WhatsApp thread, policy as it read that day.", "done"),
-        ("9:15 AM", "Reply written and put in front of you. One tap.", "your yes"),
-        ("9:40 AM", "Filed with the bank, exactly once. Deadline was 6 days out.", "filed")],
-}
 
 
 def day_html(slug: str) -> str:
@@ -4093,13 +3726,13 @@ def day_html(slug: str) -> str:
     rows = "".join(
         f'<div class="thr"><span class="tht">{when}</span>'
         f'<span class="thb">{text}</span>'
-        + (f'<span class="st {"ok" if stat in ("done", "paid", "matched", "confirmed", "checked", "filed") else "wait" if stat == "your yes" else "mut"}">{stat}</span>'
+        + (f'<span class="st {"ok" if stat in ("done", "paid", "matched", "confirmed", "checked", "filed") else "wait" if stat == "your approval" else "mut"}">{stat}</span>'
            if stat else '')
         + '</div>'
         for when, text, stat in day)
     return (f'<h2 class="sec">A day on the job</h2>'
             f'<div class="pagehint">One real shift, start to finish. '
-            f'Anything that moves money stops for your yes.</div>'
+            f'Anything that moves money stops for your approval.</div>'
             f'<div class="thread2">{rows}</div>')
 
 
@@ -4158,104 +3791,6 @@ def thread_html(slug: str) -> str:
             f'<div class="thr close"><span class="thb">{t["closing"]}</span>'
             f'<span class="st ok">{t["won"]}</span></div></div>')
 
-# One outcome, three-or-four steps. The Razorpay Agent Studio grammar:
-# say what you get, then how, in one glance — never a wall of rows.
-AGENT_STORY = {
-    "three_way_recon": dict(
-        outcome="Every rupee tied out, every morning",
-        steps=[("Pull", "your orders, the payouts, the bank"),
-               ("Match", "line by line, all three ways"),
-               ("Flag", "what didn&rsquo;t tie, with the reason"),
-               ("Report", "one morning note: matched, short, stuck")]),
-    "settlement_insights": dict(
-        outcome="Know what you were actually paid",
-        steps=[("Watch", "every settlement as it lands"),
-               ("Break down", "what was deducted, and why"),
-               ("Tell you", "what&rsquo;s landing today and what&rsquo;s stuck")]),
-    "cashflow_forecast": dict(
-        outcome="See a cash crunch a week before it hits",
-        steps=[("Read", "what&rsquo;s landing and what&rsquo;s going out"),
-               ("Project", "your cash position 7 days ahead"),
-               ("Warn", "the moment a tight week shows up")]),
-    "payouts_desk": dict(
-        outcome="Vendors, staff and refunds paid on time, every time",
-        steps=[("Line up", "what&rsquo;s due, to whom, by when"),
-               ("Ask", "you approve the list: one yes"),
-               ("Pay", "each one, the way they want to be paid"),
-               ("Record", "every payment against its bill")]),
-    "payment_forms": dict(
-        outcome="Any odd payment collected with one form",
-        steps=[("Hear", "what you need: a bulk order, an advance"),
-               ("Build", "the form, checks included"),
-               ("Collect", "the money straight into your account")]),
-    "stock_watch": dict(
-        outcome="Never oversell, never sit on dead stock",
-        steps=[("Watch", "stock across every channel"),
-               ("Warn", "before you run out, days ahead"),
-               ("Draft", "the reorder: sent only on your yes")]),
-    "refund_shield": dict(
-        outcome="Refund fraud caught before the money leaves",
-        steps=[("Check", "every claim against the order and delivery"),
-               ("Score", "what looks wrong, and why"),
-               ("Hold", "the doubtful ones for your call")]),
-    "loyalty": dict(
-        outcome="One loyalty balance that keeps buyers in the family",
-        steps=[("Track", "points across every brand and channel"),
-               ("Spot", "who is close to a reward, and who is drifting"),
-               ("Nudge", "with the reward, before they leave for good")]),
-    "store_credit": dict(
-        outcome="Refunds that come back as orders",
-        steps=[("Offer", "credit or a voucher before cash leaves"),
-               ("Issue", "one balance, good online and at the counter"),
-               ("Watch", "credit turn into the next order")]),
-    "emi_cohort": dict(
-        outcome="High-value carts that convert on a split",
-        steps=[("Read", "payment history for EMI-ready buyers"),
-               ("Tag", "the cohort, with the risk math shown"),
-               ("Route", "the offer, for your yes first")]),
-    "gst_compliance": dict(
-        outcome="Filing-ready books, no month-end scramble",
-        steps=[("Tie", "GST, TDS and e-invoices to real orders"),
-               ("Spot", "what won&rsquo;t match before it&rsquo;s filed"),
-               ("Hand over", "one clean file your CA can use")]),
-    "kyc_desk": dict(
-        outcome="Every buyer checked in seconds, not at the counter",
-        steps=[("Screen", "the buyer the moment it matters"),
-               ("Verify", "the standard checks, automatically"),
-               ("Escalate", "the risky ones to a deeper look"),
-               ("Block", "mule accounts before money moves")]),
-    "dispute_defender": dict(
-        outcome="Every dispute answered before the deadline",
-        steps=[("Read", "the dispute the moment the bank sends it"),
-               ("Gather", "the proof from your own records"),
-               ("Write", "the reply: you approve it"),
-               ("File", "before the deadline, exactly once")]),
-    "returns_desk": dict(
-        outcome="Refunds released only when the goods are back",
-        steps=[("Follow", "every return from pickup to doorstep"),
-               ("Check", "the item actually arrived back"),
-               ("Release", "the refund, and record it")]),
-    "cart_rescue": dict(
-        outcome="Dropped carts called back within the hour",
-        steps=[("Spot", "a cart left at checkout"),
-               ("Call", "the buyer while they still care"),
-               ("Send", "the payment link that closes it")]),
-    "payment_rescue": dict(
-        outcome="Failed payments turned back into orders",
-        steps=[("Read", "why the payment failed"),
-               ("Wait", "a few minutes: then call"),
-               ("Send", "a fresh link that works")]),
-    "cod_guard": dict(
-        outcome="COD confirmed before dispatch, returns cut",
-        steps=[("Call", "every COD order before it ships"),
-               ("Confirm", "the buyer actually wants it"),
-               ("Block", "addresses that keep bouncing")]),
-    "daily_mis": dict(
-        outcome="Your numbers every morning, with the why",
-        steps=[("Collect", "yesterday from every channel"),
-               ("Compare", "against the weeks before"),
-               ("Tell you", "what changed and why it changed")]),
-}
 
 
 # A person reading this is not a developer. Nobody should ever see a slug like
@@ -4285,24 +3820,21 @@ AGENT_CFG: dict = {}
 
 # Founder configuration survives restarts: a tiny JSON write-through.
 # The ledger has Postgres; the founder's settings deserve at least a file.
-_CFG_PATH = Path(__file__).parent / ".demo_cfg.json"
-
-
 def _cfg_save() -> None:
-    try:
-        _CFG_PATH.write_text(json.dumps(
-            {"cfg": AGENT_CFG, "on": DEMO_ON}))
-    except OSError:
-        pass
+    """Persist every merchant-mutable store, atomically and versioned."""
+    _state.save(agent_cfg=AGENT_CFG, demo_on=DEMO_ON, autonomy=AUTONOMY,
+                routines=ROUTINES, kfiles=KFILES, assign=ASSIGN)
 
 
 def _cfg_load() -> None:
-    try:
-        d = json.loads(_CFG_PATH.read_text())
-        AGENT_CFG.update(d.get("cfg", {}))
-        DEMO_ON.update(d.get("on", {}))
-    except (OSError, ValueError):
-        pass
+    """Hydrate stores from disk; migrates v1 files, ignores unknown keys."""
+    d = _state.load()
+    AGENT_CFG.update(d.get("agent_cfg", {}))
+    DEMO_ON.update(d.get("demo_on", {}))
+    AUTONOMY.update(d.get("autonomy", {}))
+    ROUTINES.update(d.get("routines", {}))
+    KFILES.update(d.get("kfiles", {}))
+    ASSIGN.update(d.get("assign", {}))
 
 GUARD_DEFAULTS = {
     "calling": [("quiet", "No calls outside", "9 AM to 8 PM"),
@@ -4315,40 +3847,6 @@ GUARD_DEFAULTS = {
 }
 
 
-# The operating procedure each working agent starts with: real
-# standing instructions and limits, so a settings page never opens
-# empty on an agent that has been on the job since March.
-AGENT_SEED = {
-    "dispute_defender": dict(
-        rules=["Answer every dispute at least 24 hours before the "
-               "bank\u2019s deadline.",
-               "Lead with the delivery proof, then the buyer\u2019s "
-               "own messages.",
-               "Never promise a refund inside a reply.",
-               "Answer in the buyer\u2019s language."],
-        guards={"ask_above": "\u20b91,000"}),
-    "cart_rescue": dict(
-        rules=["Hindi first, English if they switch.",
-               "Offer free delivery above \u20b9999 before any "
-               "discount.",
-               "Never call the same buyer twice in a day; the second "
-               "nudge goes on WhatsApp."],
-        guards={"quiet": "11 AM to 9 PM", "tries": "2 tries"}),
-    "payment_rescue": dict(
-        rules=["Wait 20 minutes after a failed payment; most fix "
-               "themselves.",
-               "Call once, then send the fresh link on WhatsApp; SMS "
-               "it if unread in an hour.",
-               "Never read out the failure reason unless the buyer "
-               "asks."],
-        guards={"quiet": "10 AM to 7 PM", "tries": "3 tries"}),
-    "cod_sentry": dict(
-        rules=["Sale weeks only.",
-               "Hold anything over \u20b93,000 from a first-time "
-               "buyer; release the moment the number checks out.",
-               "When in doubt, hold and ask."],
-        guards={"ask_above": "\u20b93,000"}),
-}
 
 
 
@@ -4496,12 +3994,7 @@ def agent_settings_content(tid: str, a: dict, note=("", "")) -> str:
                         ["Cashfree", "Your store"]],
         "payment_rescue": [["Voice calls", "WhatsApp"], ["Cashfree"]],
         "cod_guard": [["Voice calls", "WhatsApp"], ["Your store"]],
-        "customer_support": [["WhatsApp", "Email"], ["Your store"]],
         "refund_shield": [["Cashfree", "Your store"], ["Cashfree"]],
-        "kyc_desk": [["Cashfree"], ["Your store"]],
-        "loyalty": [["Your store", "WhatsApp"], ["Cashfree"]],
-        "store_credit": [["Cashfree", "Your store"], ["WhatsApp", "Email"]],
-        "emi_cohort": [["Cashfree"], ["WhatsApp", "Email"]],
     }
 
     def _via(tool_text, idx=None):
@@ -4606,97 +4099,7 @@ def agent_settings_content(tid: str, a: dict, note=("", "")) -> str:
             + footer)
 
 
-# The moat, made visible: one order record that every agent reads and
-# writes. AGENT_LINKS is the edge list: what each agent hands the others
-# and what it borrows, all keyed off the same order.
-AGENT_LINKS = {
-    "three_way_recon": dict(
-        gives=[("cashflow_forecast", "what actually landed each day"),
-               ("daily_mis", "clean, tied-out numbers")],
-        uses=[("payouts_desk", "every payment against its bill")]),
-    "settlement_insights": dict(
-        gives=[("cashflow_forecast", "what is landing this week")],
-        uses=[("three_way_recon", "the tie-out it trusts")]),
-    "cashflow_forecast": dict(
-        gives=[("payouts_desk", "which day is safe to pay")],
-        uses=[("settlement_insights", "what is landing"),
-              ("gst_compliance", "what the tax debit will take")]),
-    "payouts_desk": dict(
-        gives=[("three_way_recon", "every payment, filed against its bill")],
-        uses=[("cashflow_forecast", "the safe day to pay")]),
-    "payment_forms": dict(
-        gives=[("kyc_desk", "the order that needs checks")],
-        uses=[("payment_rescue", "which payment rails work for this buyer")]),
-    "stock_watch": dict(
-        gives=[("cart_rescue", "what is actually in stock to sell"),
-               ("cod_guard", "what is worth shipping")],
-        uses=[("returns_desk", "what is coming back sellable")]),
-    "refund_shield": dict(
-        gives=[("dispute_defender", "claim patterns and reused photos")],
-        uses=[("returns_desk", "the warehouse seal check"),
-              ("cod_guard", "the address history")]),
-    "loyalty": dict(
-        gives=[("repeat_purchase", "who is close to a reward, worth a nudge"),
-               ("cofounder", "which brand keeps whose buyers")],
-        uses=[("customer_support", "who just had a bad week"),
-              ("store_credit", "credit balances waiting to be spent")]),
-    "store_credit": dict(
-        gives=[("refund_shield", "a refusal that can still feel fair"),
-               ("loyalty", "balances worth reminding buyers about")],
-        uses=[("returns_desk", "which refunds are cleared to issue")]),
-    "emi_cohort": dict(
-        gives=[("cart_rescue", "who to call with a split offer")],
-        uses=[("payment_rescue", "who stalls at the price step"),
-              ("loyalty", "who has earned trust across brands")]),
-    "gst_compliance": dict(
-        gives=[("daily_mis", "what the filing changed")],
-        uses=[("three_way_recon", "numbers already tied out")]),
-    "kyc_desk": dict(
-        gives=[("payment_forms", "the checks built into the form")],
-        uses=[("refund_shield", "risk signals on the buyer")]),
-    "dispute_defender": dict(
-        gives=[("refund_shield", "which proof banks actually accept")],
-        uses=[("cod_guard", "the confirmation call, as proof"),
-              ("returns_desk", "delivery and return scans")]),
-    "returns_desk": dict(
-        gives=[("refund_shield", "the seal check"),
-               ("stock_watch", "which returns come back sellable")],
-        uses=[("dispute_defender", "which buyers dispute after returning")]),
-    "cart_rescue": dict(
-        gives=[("payment_rescue", "buyers who got stuck mid-payment")],
-        uses=[("stock_watch", "never offers what is out of stock"),
-              ("cod_guard", "which pincodes to offer prepaid instead")]),
-    "payment_rescue": dict(
-        gives=[("payment_forms", "which rails work per buyer")],
-        uses=[("cart_rescue", "what the buyer wanted in the first place")]),
-    "cod_guard": dict(
-        gives=[("cart_rescue", "the pincode truth"),
-               ("dispute_defender", "confirmation calls, kept as proof")],
-        uses=[("stock_watch", "what to hold back from risky addresses")]),
-    "daily_mis": dict(
-        gives=[],
-        uses=[("three_way_recon", "the books"),
-              ("stock_watch", "the stock picture"),
-              ("dispute_defender", "what was won and lost")]),
-}
 
-# What one agent learned and another now uses: the exchange itself,
-# written as rows a founder can read.
-TEACHINGS = [
-    ("cod_guard", "Pincode 400013 bounces 2 of every 5 COD parcels",
-     ["cart_rescue"], "offers those buyers prepaid with a discount instead"),
-    ("returns_desk", "This buyer&rsquo;s returns come back with seals broken",
-     ["refund_shield"], "holds their next cash refund for a person"),
-    ("dispute_defender", "Banks accept the courier scan plus the WhatsApp "
-     "thread, and little else",
-     ["refund_shield"], "asks for exactly that proof, first"),
-    ("payment_rescue", "This buyer&rsquo;s card fails but UPI works",
-     ["payment_forms"], "builds their forms with UPI first"),
-    ("cashflow_forecast", "Vendor day and the GST debit collide on Thursdays",
-     ["payouts_desk"], "queues payments around it without being told"),
-    ("stock_watch", "Sara's dog food sells 3x faster after a festival week",
-     ["cart_rescue"], "calls those carts first while stock lasts"),
-]
 
 
 def role_of(slug: str) -> str:
@@ -4802,198 +4205,13 @@ def latest_run_html(tid: str, slug: str) -> str:
             f'<div class="spark">{bars}</div></div></div>')
 
 
-# ------------------------------------------------------------- agent goals
-# Every agent claims ONE number it is hired to move. The goal is a sentence
-# a founder would say out loud; progress is counted from actions, and every
-# listed action names what it added. Dispute Defender's number is computed
-# from the real record; the rest carry the demo week's numbers, consistent
-# with the morning brief.
-AGENT_GOALS = {
-    "dispute_defender": dict(
-        goal="Win 8 of every 10 disputes", target=80,
-        how="Disputes won, out of disputes answered. Whole record."),
-    "cart_rescue": dict(
-        goal="Recover 7 of every 10 dropped carts", target=70, now=64,
-        how="Carts paid within a day of the call, out of carts called. "
-            "Last 30 days.",
-        actions=[
-            ("Called Meera T. about her ₹4,180 cart; she paid on the "
-             "fresh link", "+1 cart back"),
-            ("WhatsApp follow-up to Rohan D.; paid this morning",
-             "+1 cart back"),
-            ("Called Sana K. twice; no answer, queued for this evening",
-             "still open")]),
-    "payment_rescue": dict(
-        goal="Bring back 6 of every 10 failed payments", target=60, now=58,
-        how="Failed payments completed after its call or message, out of "
-            "failures it chased. Last 30 days.",
-        actions=[
-            ("Messaged the 12 buyers whose UPI timed out on Tuesday; "
-             "7 paid", "+7 payments back"),
-            ("Called Vikram R. about a card decline; paying by Friday",
-             "promised"),
-            ("3 buyers quiet after two tries; parked, not pestered",
-             "still open")]),
-    "cod_guard": dict(
-        goal="Confirm 9 of every 10 COD orders before dispatch",
-        target=90, now=82,
-        how="COD orders confirmed by call or message before they ship, "
-            "out of all COD orders.",
-        actions=[
-            ("Confirmed 31 of today's 38 COD orders before noon",
-             "+31 confirmed"),
-            ("Held 3 orders after two unanswered calls each",
-             "pending approval"),
-            ("Learned pincode 4000xx answers after 6 PM, from Cart "
-             "Rescue's notes", "sharper calls")]),
-    "stock_watch": dict(
-        goal="Keep every fast mover on the shelf", target=100, now=90,
-        how="Fast-moving products in stock, out of the ten that sell "
-            "most. Counted daily.",
-        actions=[
-            ("Spotted Sara's Chicken & Rice down to 6 days at this pace",
-             "caught early"),
-            ("Drafted the reorder for six weeks of cover",
-             "pending approval"),
-            ("Matched the reorder to the sale-week pace, not the quiet "
-             "week's", "right size")]),
-    "three_way_recon": dict(
-        goal="Tie out 99 of every 100 lines without a person",
-        target=99, now=98,
-        how="Order, payout and bank lines matched on their own, out of "
-            "all lines. This month.",
-        actions=[
-            ("Tied out 211 of 214 lines on their own this morning",
-             "+211 tied"),
-            ("Named the one payout short by ₹4,310", "flagged"),
-            ("2 lines waiting on tomorrow's bank statement",
-             "still open")]),
-    "settlement_insights": dict(
-        goal="Explain every deduction the day it lands", target=100, now=96,
-        how="Deductions explained in plain words the same day, out of "
-            "all deductions.",
-        actions=[
-            ("Read yesterday's settlement: 4 deductions, all named",
-             "+4 explained"),
-            ("Flagged a ₹1,120 hold as new, not routine", "flagged"),
-            ("One deduction awaits the bank's own note", "still open")]),
-    "cashflow_forecast": dict(
-        goal="See every cash crunch a week early", target=100, now=100,
-        how="Tight weeks flagged at least 7 days before they hit, out "
-            "of tight weeks that came.",
-        actions=[
-            ("Saw Thursday's dip: vendor day and a GST debit collide",
-             "caught early"),
-            ("Drafted the courier payout move that keeps Thursday "
-             "positive", "pending approval")]),
-    "payouts_desk": dict(
-        goal="Pay every vendor on the day it is due", target=100, now=93,
-        how="Payouts that left on their due day, out of all payouts. "
-            "This month.",
-        actions=[
-            ("Lined up tomorrow's 14 payments for one yes",
-             "pending approval"),
-            ("Caught a changed account number before it burned a "
-             "payment", "saved one"),
-            ("One vendor paid a day late last week; the why is in "
-             "History", "written down")]),
-    "payment_forms": dict(
-        goal="Collect every odd payment within a day of asking",
-        target=100, now=78,
-        how="Bulk orders, advances and mandates paid within a day of "
-            "the form going out.",
-        actions=[
-            ("Built the ₹2.6 lakh advance form, PAN check built in",
-             "pending approval"),
-            ("Last week's part-advance form: paid in 4 hours",
-             "+1 in a day")]),
-    "refund_shield": dict(
-        goal="Catch 9 of every 10 fishy refunds before money leaves",
-        target=90, now=88,
-        how="Refunds flagged before payout that turned out wrong, out "
-            "of wrong refunds.",
-        actions=[
-            ("Flagged two refunds landing in the same UPI handle",
-             "caught"),
-            ("Held one refund until the parcel actually came back",
-             "pending approval"),
-            ("Cleared 9 honest refunds untouched; nobody good was "
-             "slowed", "clean")]),
-    "loyalty": dict(
-        goal="Bring 3 of 10 buyers back through a second brand",
-        target=30, now=22,
-        how="Buyers who ordered from another of your brands within 90 "
-            "days of earning a reward, out of buyers rewarded.",
-        actions=[
-            ("Nudged 14 buyers one order from a reward", "sent"),
-            ("Flagged 6 top buyers gone quiet for 30 days",
-             "pending approval"),
-            ("Mapped points from 3 systems into one balance", "done")]),
-    "store_credit": dict(
-        goal="Keep 4 of 10 refunds in the store as credit",
-        target=40, now=31,
-        how="Refunds taken as credit or voucher instead of cash, out of "
-            "refunds where credit was offered.",
-        actions=[
-            ("Offered credit on 12 refunds; 5 took it", "done"),
-            ("Issued 2 vouchers spendable at the counter too", "done"),
-            ("Queued a reminder for &#8377;4,200 of idle credit",
-             "pending approval")]),
-    "emi_cohort": dict(
-        goal="Convert 2 of 10 stalled high-value carts on EMI",
-        target=20, now=14,
-        how="Carts above &#8377;8,000 that converted after a split offer, "
-            "out of stalled carts offered one.",
-        actions=[
-            ("Tagged 76 buyers who clear the EMI bar", "done"),
-            ("Routed 9 split offers for your yes", "pending approval"),
-            ("Held 2 borderline buyers out of the cohort", "clean")]),
-    "returns_desk": dict(
-        goal="Refund only after the goods are back", target=100, now=100,
-        how="Refunds released after the return passed its photo check, "
-            "out of all refunds.",
-        actions=[
-            ("Matched 6 returns to their photos this week; all clean",
-             "+6 checked"),
-            ("One return photo shows a different batch seal; held",
-             "pending approval")]),
-    "gst_compliance": dict(
-        goal="File every month with zero last-minute scramble",
-        target=100, now=100,
-        how="Filings ready 3 days before the date, out of all filings.",
-        actions=[
-            ("This month's numbers are already tied to the books",
-             "on track"),
-            ("Set aside the GST debit that hits Thursday, so cash "
-             "planning saw it", "handed over")]),
-    "kyc_desk": dict(
-        goal="Clear 9 of every 10 buyers in under a minute",
-        target=90, now=87,
-        how="Buyers cleared by the quick check alone, out of all "
-            "buyers checked.",
-        actions=[
-            ("Cleared 34 buyers this week in seconds each", "+34 cleared"),
-            ("Sent one flagged buyer through the deep check; came back "
-             "clean", "pending approval"),
-            ("Nobody honest waited at the counter", "clean")]),
-    "daily_mis": dict(
-        goal="Numbers on your phone before you ask, every day",
-        target=100, now=100,
-        how="Morning briefs delivered by 8:00 with the why behind every "
-            "number.",
-        actions=[
-            ("Wrote this morning's brief: 9 lines, every number from "
-             "your own record", "delivered"),
-            ("Put the Thursday cash line on top because it moves money",
-             "sharper brief")]),
-}
 
 
 def goal_block(tid: str, slug: str) -> str:
     """The number this agent is hired to move, said once and measured in
     the open: the claim, the honest counting rule, a bar with the goal
     marked on it, and the actions that moved it, each naming what it
-    added. Dispute Defender's number comes from the real record."""
+    added. Dispute Responder's number comes from the real record."""
     g = AGENT_GOALS.get(slug)
     if not g:
         return ""
@@ -5017,7 +4235,7 @@ def goal_block(tid: str, slug: str) -> str:
         actions = [(f"Won {won} of the {won + lost} disputes settled so "
                     f"far; every reply and outcome is in History",
                     f"+{won} won"),
-                   ("7 replies are written and waiting on your yes",
+                   ("7 replies are written and waiting on your approval",
                     "pending approval")]
     act_rows = "".join(
         f'<div class="goalact"><span class="tdesc">{txt}</span>'
@@ -5067,65 +4285,8 @@ def goal_stats(tid: str, slug: str):
     return label, now, g["target"]
 
 
-def goal_mini(tid: str, slug: str) -> str:
-    """One quiet line on the roster card: the claim and where it stands."""
-    g = AGENT_GOALS.get(slug)
-    if not g:
-        return ""
-    now = g.get("now", 0)
-    if slug == "dispute_defender":
-        led = WORLD.d.ledger
-        won = lost = 0
-        for r in led.runs.values():
-            if r.tenant_id != tid:
-                continue
-            out = led.outcome_for(r.run_id)
-            if out and out.outcome_value:
-                won, lost = ((won + 1, lost)
-                             if out.outcome_value.get("won")
-                             else (won, lost + 1))
-        now = (100 * won // (won + lost)) if (won + lost) else 0
-    return (f'<div class="goalmini">Goal: {g["goal"].lower()} &middot; at '
-            f'<b>{now}%</b> of {g["target"]}%</div>')
-
 
 TRIAL_NOTES = {
-    "delivery_rescue": [
-        "Watched 62 deliveries; 9 failed, and nobody called any of them.",
-        "4 of the 9 addresses look fixable from the order notes.",
-        "2 couriers mark &lsquo;attempted&rsquo; at suspicious hours."],
-    "loyalty": [
-        "Mapped buyers who shop 2 of your brands: 118 of 4,206.",
-        "61 are one order away from a reward they do not know exists.",
-        "Your best buyer this month holds points in 3 separate places."],
-    "store_credit": [
-        "Read 40 refunds from the record; 12 buyers would have taken credit.",
-        "&#8377;18,340 left as cash this month and never came back.",
-        "One credit balance would work online and at the counter."],
-    "emi_cohort": [
-        "Read 90 days of payment history; 76 buyers clear the EMI bar.",
-        "31 of them stalled on carts above &#8377;8,000 this month.",
-        "A split offer at the right moment converts 2 of 10."],
-    "repeat_purchase": [
-        "Mapped 214 buyers to a refill rhythm from their order history.",
-        "31 are due to run out in the next 10 days.",
-        "9 buyers are 2 weeks past their usual reorder and quiet."],
-    "checkout_watchdog": [
-        "Ran 168 checkout probes across every payment method.",
-        "1 wallet failed twice on Tuesday night, then recovered.",
-        "Your slowest checkout hour is 21:00, right at buyer peak."],
-    "cofounder": [
-        "Read every team&rsquo;s memory: 61 lessons banked so far.",
-        "3 patterns repeat across teams; drafting proposals from them.",
-        "First proposal lands with your Friday approvals."],
-    "customer_support": [
-        "Read 312 buyer messages from the record.",
-        "7 of 10 ask where-is-my-order; the answer exists for 9 of 10.",
-        "Drafting reply styles in your brand voice."],
-    "review_generation": [
-        "Found 48 delivered, happy orders with no review yet.",
-        "Timed the ask: 2 days after delivery works best for you.",
-        "Draft nudges ready for your yes when the trial closes."],
 }
 
 
@@ -5144,11 +4305,11 @@ def lifecycle_strip(a: dict, tid: str) -> str:
     if live:
         cur = 3
         clean = 3 + _hashlib.sha256(slug.encode()).digest()[2] % 15
-        sub = (f"{clean} of 20 clean yeses. At 20, small sends go out "
+        sub = (f"{clean} of 20 approvals without edits. At 20, small items send "
                f"on their own.")
     elif watching and waiting_prop:
         cur = 2
-        sub = "Its first finished call waits on your yes."
+        sub = "Its first finished call waits on your approval."
     elif watching:
         d = _trial_day(slug)
         cur = 1
@@ -5189,7 +4350,7 @@ def trial_card(a: dict) -> str:
             f'<span class="ico">{ICONS["moon"]}</span>'
             f'<span class="tdesc"><b>What happens next:</b> when the week '
             f'closes, its first proposals land in your approvals. '
-            f'Nothing sends without your yes.</span></div>')
+            f'Nothing sends without your approval.</span></div>')
 
 
 JOB_IDEAS = {
@@ -5285,7 +4446,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
         f'<span class="capchip">{ICONS["book"]} Reads {r}</span>'
         for r in acc["reads"]) + "".join(
         f'<span class="capchip act">{ICONS["bolt"]} Can {d}'
-        + ('' if 'yes' in d else ' &middot; after your yes') + '</span>'
+        + ('' if 'yes' in d else ' &middot; after your approval') + '</span>'
         for d in acc["does"])
     rules = "".join(f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
                     f'<span class="tdesc">{r}</span></div>'
@@ -5309,7 +4470,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
     if slug in PROPS_DEF:
         p_waiting = prop_state(tid, slug)["state"] == "waiting"
         prop_sec = (f'<h2 class="sec">'
-                    f'{"Waiting on your yes" if p_waiting else "Its last call"}'
+                    f'{"Waiting on your approval" if p_waiting else "Its last call"}'
                     f'</h2>{prop_card(tid, slug)}')
     cases_sec = ""
     if slug == "dispute_defender":
@@ -5354,10 +4515,10 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
             '<b id="cselcount"></b>'
             '<span id="cselamt" class="mut"></span>'
             '<button class="btn primary sm" onclick="cyes(this)">'
-            'Say yes to these</button>'
+            'Approve these</button>'
             '<button class="btn ghost sm" onclick="cclear()">Clear</button>'
-            '<span class="mut" style="font-size:12px;margin-left:auto">'
-            'your yes works from WhatsApp or Slack too</span></div>'
+            '<span class="mut" style="font-size:11px;margin-left:auto">'
+            'your approval works from WhatsApp or Slack too</span></div>'
             '<div class="dgridwrap"><table class="dgrid">'
             '<thead><tr>'
             '<th class="cbx"><input type="checkbox" id="callbox" '
@@ -5388,7 +4549,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
             'document.getElementById("cselcount").textContent='
             'n+" selected";'
             'document.getElementById("cselamt").textContent='
-            '"\u20B9"+amt.toLocaleString("en-IN")+" riding on them"}'
+            '"\u20B9"+amt.toLocaleString("en-IN")+" at stake"}'
             'function callall(b){document.querySelectorAll('
             '"#ctbody .selrun").forEach(function(c){c.checked=b.checked});'
             'csel()}'
@@ -5423,7 +4584,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
     about_body = (
         f'<div class="outcome">{story.get("outcome", a["desc"])}</div>'
         f'<p class="mut" style="max-width:560px;margin:0 0 8px">{a["desc"]}</p>'
-        f'<p class="mut" style="font-size:12.5px;margin:0 0 24px">'
+        f'<p class="mut" style="font-size:11px;margin:0 0 24px">'
         f'Replaces {a["replaces"]}.</p>'
         f'<h2 class="sec">How it works</h2><div class="hsteps">{steps}</div>'
         + (thread_html(slug) or day_html(slug))
@@ -5446,9 +4607,7 @@ def roster_detail_content(tid: str, a: dict, tab: str = "work",
         f'<div class="dhead"><a class="back2" href="/agents">&lsaquo;</a>'
         f'{agent_tile(slug, on, 44)}'
         f'<div><h1>{a["role"]}</h1>'
-        f'<div class="meta">{state}'
-        + (f'<span>&middot;</span><span>{a["name"]}</span>'
-           if a["name"] != a["role"] else '') + '</div></div>'
+        f'<div class="meta">{state}</div></div>'
         f'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
         f'{job_menu(a)}{action}</div></div>'
         f'{agent_price_card(slug)}'
@@ -5499,7 +4658,7 @@ def procedure_editor_content(tid: str, ask: str) -> str:
     id="whenbox">Use this when {esc(ask)}. The buyer should never leave the payment form to get verified.</div>
   <div class="proc-reveal" style="margin:8px 0 24px">
     <span class="capchip">{ICONS["bot"]} Every buyer at checkout</span>
-    <span class="capchip">{ICONS["shield"]} Nothing goes live until you say yes</span>
+    <span class="capchip">{ICONS["shield"]} Nothing goes live until you approve</span>
   </div>
   <h2 class="sec proc-reveal">Steps</h2>
   <ol class="psteps">
@@ -5598,30 +4757,30 @@ function simClose(){{ document.getElementById('simpanel').hidden = true; }}
 .btn.live:hover{{background:#177245}}
 .proc{{max-width:720px}}
 .whenbox{{background:#fff;border:1px solid var(--hair);border-radius:12px;
-  padding:16px 16px;font-size:14px;line-height:1.55;outline:none}}
+  padding:16px 16px;font-size:13px;line-height:1.55;outline:none}}
 .whenbox:focus{{border-color:var(--accent)}}
 .psteps{{list-style:none;counter-reset:ps;margin:0;padding:0}}
 .psteps > li{{counter-increment:ps;position:relative;padding:8px 0 8px 32px;
-  font-size:14.5px;line-height:1.6}}
+  font-size:13px;line-height:1.6}}
 .psteps > li::before{{content:counter(ps) ".";position:absolute;left:2px;
-  top:10px;color:var(--mut);font-size:12.5px;font-family:ui-monospace,monospace}}
+  top:10px;color:var(--mut);font-size:11px;font-family:ui-monospace,monospace}}
 .psub{{list-style:none;counter-reset:pa;margin:8px 0 2px;padding-left:24px;
   border-left:2px solid #ECECF1}}
 .psub > li{{counter-increment:pa;position:relative;padding:8px 0 8px 24px}}
 .psub > li::before{{content:counter(pa, upper-alpha) ".";position:absolute;
-  left:0;top:7px;color:var(--mut);font-size:12px;
+  left:0;top:7px;color:var(--mut);font-size:11px;
   font-family:ui-monospace,monospace}}
 .pstep{{outline:none;border-radius:6px;padding:1px 3px}}
 .pstep:focus{{background:#F4F5FB}}
 .pif,.pelse{{display:inline-block;background:var(--accent-soft,#E9EBF8);
-  color:#3A46A8;font-size:11.5px;font-weight:700;letter-spacing:.06em;
+  color:#3A46A8;font-size:11px;font-weight:700;letter-spacing:.06em;
   border-radius:7px;padding:3px 8px;margin:2px 8px 2px 0}}
 .pelse{{margin-top:8px}}
 .pcond{{display:inline-block;background:#fff;border:1px solid var(--hair);
-  border-radius:9px;padding:8px 12px;font-size:13.5px;outline:none}}
+  border-radius:9px;padding:8px 12px;font-size:13px;outline:none}}
 .pcond:focus{{border-color:var(--accent)}}
 .ttok{{display:inline-flex;align-items:center;gap:8px;background:#F0F1F7;
-  border-radius:8px;padding:4px 8px;font-size:12.5px;cursor:pointer;
+  border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer;
   white-space:nowrap;vertical-align:middle}}
 .ttok svg{{width:12px;height:12px;color:#3A46A8}}
 .ttok b{{font-weight:600}}
@@ -5630,7 +4789,7 @@ function simClose(){{ document.getElementById('simpanel').hidden = true; }}
 .tmenu{{position:fixed;background:#fff;border:1px solid var(--hair);
   border-radius:12px;box-shadow:0 12px 40px rgba(27,31,48,.14);padding:8px;
   min-width:240px;z-index:40}}
-.tmenu-it{{padding:8px 12px;border-radius:8px;font-size:13.5px;cursor:pointer}}
+.tmenu-it{{padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer}}
 .tmenu-it:hover{{background:#F5F5F8}}
 .tmenu-it.new{{border-top:1px solid var(--hair);color:var(--mut);
   margin-top:4px}}
@@ -5638,16 +4797,16 @@ function simClose(){{ document.getElementById('simpanel').hidden = true; }}
   border-left:1px solid var(--hair);box-shadow:-14px 0 44px rgba(27,31,48,.10);
   padding:20px 24px;z-index:45;overflow-y:auto}}
 .simhead{{display:flex;justify-content:space-between;align-items:center;
-  margin-bottom:16px;font-size:15px}}
+  margin-bottom:16px;font-size:13px}}
 .simcard{{background:#FAFAFC;border:1px solid var(--hair);border-radius:12px;
   padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;
-  align-items:center;font-size:13.5px}}
+  align-items:center;font-size:13px}}
 .simrow{{font-size:13px;padding:8px 8px;border-radius:9px;margin-bottom:8px;
   animation:fadeup .3s ease both}}
 .simrow.ok{{background:#E9F7EF;color:#177245;font-weight:500}}
 .simrow.user{{background:#F0F1F7}}
 .simrow.agent{{background:#fff;border:1px solid var(--hair)}}
-.simrow.think{{color:var(--mut);font-size:12px;padding:2px 8px}}
+.simrow.think{{color:var(--mut);font-size:11px;padding:2px 8px}}
 .proc-reveal{{animation:fadeup .4s ease both}}
 .proc-reveal:nth-child(2){{animation-delay:.1s}}
 .psteps .proc-reveal:nth-child(1){{animation-delay:.25s}}
@@ -5678,7 +4837,7 @@ def _kyc_builder(tid: str = "t1") -> str:
         '<h2 class="sec">Or describe the onboarding you need</h2>'
         '<div class="pagehint">One sentence opens the full procedure: '
         'steps, tools, the checks, and a test run. Nothing goes live '
-        'until you say yes.</div>'
+        'until you approve.</div>'
         '<form class="notebar" style="max-width:640px" method="get" '
         'action="/procedures/new">'
         '<input class="jfind notein" name="ask" maxlength="90" '
@@ -5722,7 +4881,7 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
     if tab == "access":
         items = ([("Can read: " + r, "It can read this. " + a["scope"], True) for r in a["reads"]]
                  + [("Can do: " + e, "Something this one is allowed to do. "
-                     "once and only once, and never before your yes.", True)
+                     "once and only once, and never before your approval.", True)
                     for e in a["effects"]]
                  + [("Everything else", "No, by default. It cannot touch anything "
                      "that isn&rsquo;t on this list.", False)])
@@ -5852,64 +5011,6 @@ def agent_detail_content(tid: str, slug: str, tab: str = "overview",
 
 
 
-# ---- The service tiles: one purposeful glyph per agent, colored by ----
-# ---- faculty, the way a super app draws its services. Keep the     ----
-# ---- faculty map in sync with FAMILIES in agents_content.          ----
-AGENT_GLYPHS = {
-    "cofounder": '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2z"/>',
-    "cart_rescue": '<circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.2 11.5H18l2-8H6"/>',
-    "payment_rescue": '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/>',
-    "instagram_shopping": '<path d="M6 8h12l1 12H5L6 8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
-    "listings_opt": '<path d="M5 20v-6M11 20V9M17 20V7"/><path d="m14 7 3-3 3 3"/>',
-    "stock_watch": '<path d="M13 3 5 14h6l-1 7 8-11h-6l1-7z"/>',
-    "repeat_purchase": '<path d="M4 9a8 8 0 0 1 13.6-3.4L20 8M20 15a8 8 0 0 1-13.6 3.4L4 16"/><path d="M20 4v4h-4M4 20v-4h4"/>',
-    "subscription_dunning": '<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M4 10.5h16M8.5 3v5M15.5 3v5"/>',
-    "payment_forms": '<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V3z"/><path d="M9.5 8.5h5M9.5 12.5h5"/>',
-    "ar_collection": '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="m3 8.5 9 5.5 9-5.5"/>',
-    "loan_recovery": '<circle cx="12" cy="12" r="9"/><path d="M9 8h6M9 11h6M10 8c3.2 0 3.2 3 0 3l4.2 5"/>',
-    "dispute_defender": '<path d="m12 3 7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="m9 12 2 2 4-4.5"/>',
-    "refund_shield": '<path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.3"/>',
-    "cod_guard": '<path d="m4 8 8-4 8 4v9l-8 4-8-4V8z"/><path d="m9.5 12 2 2 3.5-3.5"/>',
-    "returns_desk": '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
-    "delivery_rescue": '<path d="M2 7h11v9H2zM13 10h5l3 3v3h-8"/><circle cx="6.5" cy="18.5" r="1.6"/><circle cx="16.5" cy="18.5" r="1.6"/>',
-    "checkout_watchdog": '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/>',
-    "kyc_desk": '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.7" cy="10.8" r="1.9"/><path d="M6.2 15.8c.5-1.7 4.5-1.7 5 0M14 9.5h4.5M14 13h4.5"/>',
-    "smart_approval": '<path d="m3 13.5 4.5 4.5L16.5 8"/><path d="m13.5 16 2 2L23 9.5"/>',
-    "customer_support": '<path d="M4.5 13a7.5 7.5 0 0 1 15 0"/><rect x="3" y="13" width="4" height="6" rx="1.6"/><rect x="17" y="13" width="4" height="6" rx="1.6"/><path d="M19.5 19a4 4 0 0 1-3.8 2.4H13.5"/>',
-    "csat_feedback": '<circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5c1 1.4 2.3 2 3.5 2s2.5-.6 3.5-2"/>',
-    "review_generation": '<path d="m12 3.5 2.6 5.4 6 .8-4.4 4.1 1.1 5.9-5.3-2.9-5.3 2.9 1.1-5.9L3.4 9.7l6-.8L12 3.5z"/>',
-    "review_response": '<path d="M4 5.5h16V16H9.5L4 20V5.5z"/><path d="M8.5 10.8h7"/>',
-    "custom_reports": '<path d="M4 20h16M7.5 20v-7M12 20V6M16.5 20v-4.5"/>',
-    "loyalty": '<circle cx="12" cy="9.5" r="5.5"/><path d="m9 14.2-1.6 6.3 4.6-2.5 4.6 2.5L15 14.2"/>',
-    "store_credit": '<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M4 13.5h16M12 9v11"/><path d="M12 9c-3.8 0-4.8-1.5-4.8-2.8a1.9 1.9 0 0 1 3.8-.5L12 9zm0 0c3.8 0 4.8-1.5 4.8-2.8a1.9 1.9 0 0 0-3.8-.5L12 9z"/>',
-    "emi_cohort": '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.2h3"/>',
-    "__default__": '<path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21M6 6l3.5 3.5M14.5 14.5 18 18M18 6l-3.5 3.5M9.5 14.5 6 18"/>',
-}
-_FACULTY = {}
-for _f, _slugs in [
-    ("Plans", ("cofounder",)),
-    ("Sells", ("cart_rescue", "payment_rescue", "instagram_shopping",
-               "listings_opt", "stock_watch", "repeat_purchase",
-               "subscription_dunning", "loyalty", "emi_cohort")),
-    ("Collects", ("payment_forms", "ar_collection", "loan_recovery")),
-    ("Protects", ("dispute_defender", "refund_shield", "cod_guard",
-                  "returns_desk", "delivery_rescue", "checkout_watchdog",
-                  "kyc_desk", "smart_approval", "store_credit")),
-    ("Cares", ("customer_support", "csat_feedback", "review_generation",
-               "review_response")),
-    ("Reports", ("custom_reports",)),
-]:
-    for _sl in _slugs:
-        _FACULTY[_sl] = _f
-_TINT = {
-    "Plans": ("#DDF0EE", "#0F766E"),
-    "Sells": ("#E5F3E1", "#0B7A3E"),
-    "Collects": ("#FBEED3", "#A9700B"),
-    "Protects": ("#FBE5E5", "#C2374B"),
-    "Cares": ("#ECE7FA", "#6741D9"),
-    "Reports": ("#E1EDFA", "#2563EB"),
-    "custom": ("#F1F0EA", "#5B5E52"),
-}
 
 
 def agent_tile(slug: str, on: bool = True, size: int = 40) -> str:
@@ -5984,38 +5085,15 @@ def _relay_agent_card(a: dict, tid: str = "t1") -> str:
 
 def agents_content(tid: str, f: str = "all", q: str = "",
                    g: str = "") -> str:
-    agents = [a for a in RELAY_AGENTS
-              if a["slug"] not in CEDED_TO_COWORKER]
+    agents = list(RELAY_AGENTS)
     if f in ("active", "planned"):
         want = "live" if f == "active" else "roadmap"
         agents = [a for a in agents if a["status"] == want]
     if q:
-        agents = [a for a in agents if q.lower() in a["name"].lower()]
+        agents = [a for a in agents if q.lower() in a["role"].lower()]
 
-    # Grouped by the founder's objective, not our org chart: what each
-    # agent does FOR the business, in the language of the P&L.
-    # One super agent, read as faculties: what it does, in one verb
-    # each, the way a super app names its tabs.
-    FAMILIES = [
-        ("Plans",
-         ("cofounder",)),
-        ("Sells",
-         ("cart_rescue", "payment_rescue", "instagram_shopping",
-          "listings_opt", "stock_watch", "repeat_purchase",
-          "subscription_dunning", "loyalty", "emi_cohort")),
-        ("Collects",
-         ("payment_forms", "ar_collection", "loan_recovery")),
-        ("Protects",
-         ("dispute_defender", "refund_shield", "cod_guard",
-          "returns_desk", "delivery_rescue", "checkout_watchdog",
-          "kyc_desk", "smart_approval", "store_credit")),
-        ("Cares",
-         ("customer_support", "csat_feedback", "review_generation",
-          "review_response")),
-        ("Reports",
-         ("custom_reports",)),
-        ("Built by you", ("__custom__",)),
-    ]
+    # One flat roster, presented by employment: the agents at work, then
+    # the ones still in trial. Eight staff do not need departments.
     def _needs(a):
         sl = a["slug"]
         if sl == "dispute_defender":
@@ -6026,132 +5104,12 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         return (sl in PROPS_DEF
                 and prop_state(tid, sl)["state"] == "waiting")
 
-    # The nostalgic filter row: group links with counts, pipe-separated,
-    # the way the WordPress plugins page has always done it.
-    def _fam_agents(keys):
-        if keys == ("__custom__",):
-            return [a for a in agents if a["desk"] == "custom"]
-        return [a for a in agents if a["slug"] in keys]
-    wpf = ""
-
-    TEAM_LINES = {
-        "Plans": "Reads what every team below learns, and files your "
-                 "next move for a yes.",
-        "Sells": "One chain: the cart agent saves the sale, the payment "
-                 "agent revives it, the repeat agent brings the buyer back.",
-        "Collects": "Invoices, EMIs and odd payments, chased by one "
-                    "collections desk with one tone.",
-        "Protects": "One risk memory: a bad pincode caught by the COD "
-                    "agent teaches all 9 the same hour.",
-        "Cares": "Support hears it, CSAT measures it, the review agents "
-                 "turn it public.",
-        "Reports": "Everything the teams above did, asked for in words.",
-        "Built by you": "Describes a job in chat; it joins whichever "
-                        "team the job belongs to.",
-    }
-    # A team's room: breadcrumb back to the office, the team hero in
-    # its own colour, then members presented by employment. No filters:
-    # a department of 8 does not need a query language.
-    team_view = ""
-    if g:
-        _famk = next((k for t, k in FAMILIES if t == g), None)
-        _members = _fam_agents(_famk) if _famk else []
-        _members.sort(key=lambda a: (a["status"] != "live",
-                                     not _needs(a)))
-        _wk = [a for a in _members if a["status"] == "live"]
-        _tr2 = [a for a in _members if a["status"] != "live"]
-        _bg2, _fg2 = _TINT.get(g, _TINT["custom"])
-        _faces2 = "".join(agent_tile(a["slug"], True, 26)
-                          for a in _members[:8])
-        team_view = (
-            f'<div class="tclear"><a href="/agents">&larr; Back to the '
-            f'office</a></div>'
-            f'<div class="teamhero" style="--tc:{_fg2};--tcb:{_bg2}">'
-            f'<span class="tc-faces">{_faces2}</span>'
-            f'<b>{g}</b>'
-            f'<span class="tc-line">{TEAM_LINES.get(g, "")}</span></div>'
-            + (f'<h2 class="sec fam">Working</h2><div class="hubgrid">'
-               + "".join(_relay_agent_card(a, tid) for a in _wk)
-               + '</div>' if _wk else '')
-            + (f'<h2 class="sec fam">In trial</h2><div class="hubgrid">'
-               + "".join(_relay_agent_card(a, tid) for a in _tr2)
-               + '</div>' if _tr2 else ''))
-    tcards = ""
-    for _t, _k in FAMILIES:
-        if _t in ("Plans", "Reports"):
-            continue
-        _m = _fam_agents(_k)
-        if not _m:
-            continue
-        _bg, _fg = _TINT.get(_t, _TINT["custom"])
-        _lv = sum(1 for a in _m if a["status"] == "live")
-        _tr = sum(1 for a in _m
-                  if a["status"] != "live" and DEMO_ON.get(a["slug"]))
-        _faces = "".join(agent_tile(a["slug"], True, 26) for a in _m[:5])
-        _more = (f'<span class="tc-more">+{len(_m) - 5}</span>'
-                 if len(_m) > 5 else "")
-        _sel = " sel" if g == _t else ""
-        tcards += (
-            f'<a class="tcard{_sel}" '
-            f'style="--tc:{_fg};--tcb:{_bg}" '
-            f'href="/agents?f={f}&amp;g={_t.replace(" ", "+")}">'
-            f'<span class="tc-faces">{_faces}{_more}</span>'
-            f'<b>{_t}</b>'
-            f'<span class="tc-line">{TEAM_LINES.get(_t, "")}</span>'
-            f'<span class="tc-meta">'
-            + " &middot; ".join(
-                ([f"{_lv} working"] if _lv else [])
-                + ([f"{_tr} in trial"] if _tr else [])) + '</span>'
-            f'<span class="tc-cta">See the team &rarr;</span></a>')
-    clear = (f'<div class="tclear"><a href="/agents?f={f}">&larr; every '
-             f'team, every agent</a></div>' if g else "")
-    # The hiring hall: 3 candidates picked from where this store leaks,
-    # argued in replace-cost terms. The multiple lives HERE, where a
-    # hiring decision is being made, not on staff cards.
-    HIRE_NEXT = [
-        ("delivery_rescue",
-         "Every RTO on your book started as a failed delivery "
-         "nobody called about."),
-        ("repeat_purchase",
-         "Dog food runs out every 6 weeks. Nobody reminds your buyers."),
-        ("checkout_watchdog",
-         "A payment method broke in sale week. A buyer told you first."),
-    ]
-    hcards = ""
-    for _sl, _why in HIRE_NEXT:
-        _a = next((x for x in RELAY_AGENTS if x["slug"] == _sl), None)
-        if _a is None or _a["status"] == "live":
-            continue
-        _mu, _hk = _impact(_sl)
-        hcards += (
-            f'<a class="hcard" href="/agents/{_sl}">'
-            f'<div class="ac-h">{agent_tile(_sl, False, 34)}'
-            f'<div class="ac-n"><b>{_a["role"]}</b></div>'
-            f'<span class="hmult">{_mu}x</span></div>'
-            f'<span class="why">{_why}</span>'
-            f'<span class="repl">&#8377;999/mo &middot; replaces '
-            f'{_a["replaces"]}</span>'
-            f'<span class="hcta">Hire &rarr;</span></a>')
-    hireshelf = (
-        f'<div class="hireshelf"><div class="hire-h"><b>Hire next</b>'
-        f'<span>Picked from your own numbers, not our brochure.</span></div>'
-        f'<div class="hiregrid">{hcards}</div></div>' if hcards else "")
-
-    tghead = ('<div class="tghead">'
-
-              '<span class="tg-eyebrow">One super agent</span>'
-              '<b>Agent Teams</b>'
-              '<span class="tg-sub">Coordinated agents working your store '
-              'together, hand-off by hand-off.</span></div>')
-    teamgrid = f'{tghead}<div class="teamgrid">{tcards}</div>{clear}'
-
 
     seg = lambda key, label: (
         f'<a class="{"on" if f == key else ""}" '
         f'href="/agents?f={key}'
         + (f'&amp;g={g.replace(" ", "+")}' if g else '') + f'">{label}</a>')
-    roster = [a for a in RELAY_AGENTS
-              if a["slug"] not in CEDED_TO_COWORKER]
+    roster = RELAY_AGENTS
     n_all = len(roster)
     n_on = sum(1 for a in roster
                if a["status"] == "live" or DEMO_ON.get(a["slug"]))
@@ -6191,31 +5149,37 @@ def agents_content(tid: str, f: str = "all", q: str = "",
         f'<span>working</span><i>{n_on - n_live} in trial</i></a>'
         f'<a class="sb need" href="/approvals"><b>{n_yes}</b>'
         f'<span>pending approval</span>'
-        f'<i>&#8377;{inr(d_stake + p_stake)} riding</i></a>'
+        f'<i>&#8377;{inr(d_stake + p_stake)} at stake</i></a>'
         f'<a class="sb" href="/impact"><b>{len(truns)}</b>'
         f'<span>jobs done</span>'
         f'<span class="tspark">{sbars}</span></a>'
         f'</div>')
-    if g:
-        body = team_view
-    else:
-        live_cards = "".join(_relay_agent_card(a, tid) for a in agents
-                             if a["status"] == "live")
-        working = (f'<h2 class="sec fam">Working now</h2>'
-                   f'<div class="hubgrid">{live_cards}</div>'
-                   if live_cards else '')
-        staff = [a for a in agents
-                 if a["slug"] in ("cofounder", "custom_reports")]
-        staff_row = (
-            f'<h2 class="sec fam">Staff roles'
-            f'<span class="st mut">work across every team</span></h2>'
-            f'<div class="hubgrid">'
-            + "".join(_relay_agent_card(a, tid) for a in staff)
-            + '</div>' if staff else '')
-        body = working + staff_row + teamgrid + hireshelf
-    return (f'<h1 class="page">Agents</h1>'
-            f'<div class="pagehint">One super agent. It plans, sells, '
-            f'collects, protects, cares and reports.</div>'
+    live_cards = "".join(_relay_agent_card(a, tid) for a in agents
+                         if a["status"] == "live")
+    working = (f'<h2 class="sec fam">Working now</h2>'
+               f'<div class="hubgrid">{live_cards}</div>'
+               if live_cards else '')
+    trial = sorted((a for a in agents if a["status"] != "live"),
+                   key=lambda a: not _needs(a))
+    trial_cards = "".join(_relay_agent_card(a, tid) for a in trial)
+    in_trial = (f'<h2 class="sec fam">In trial</h2>'
+                f'<div class="hubgrid">{trial_cards}</div>'
+                if trial_cards else '')
+    body = working + in_trial
+    return (f'<div class="dhead"><h1 class="page" style="margin:0">Agents</h1>'
+            f'<a class="btn primary hire" style="margin-left:auto" '
+            f'href="/agents/new" '
+            f'title="Describe the job in words. Relay drafts the agent; '
+            f'nothing is sent without your approval.">'
+            f'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+            f'stroke-linejoin="round"><circle cx="9" cy="7.5" r="3.5"/>'
+            f'<path d="M2.5 20.5c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/>'
+            f'<path d="M18.5 7v6M15.5 10h6"/></svg>'
+            f'Hire an agent</a>'
+            f'</div>'
+            f'<div class="pagehint">Agents that recover payments, collect '
+            f'dues and prevent losses. You approve every send.</div>'
             f'{tiles}'
             f'{body}')
 
@@ -6273,8 +5237,6 @@ _EVENT_LANE = {
     ("escalation-agent", "escalated"): 3, ("escalation-agent", "timed out"): 3,
     ("escalation-agent", "stalled"): 3,
 }
-_LANE_MARK = ["M{x} {y1} L{x1} {y} L{x} {y2} L{x2} {y} Z",  # diamond
-              None, None, None]
 
 
 def _journey_svg(events: list, run=None) -> str:
@@ -6536,7 +5498,7 @@ def account_journey_content(tid: str, acct_id: str) -> str:
                  if acct_id not in CUSTOMERS
                  else esc(f"Answer {label}'s claim on the "
                           f"{bought(acct_id)} and keep the money."))
-    stats = (f'{len(runs)} things done &middot; {waiting} need your yes'
+    stats = (f'{len(runs)} things done &middot; {waiting} need your approval'
              + (f' &middot; &#8377;{inr(won)} kept' if won else ""))
     rows = "\n".join(ledger_row(r) for r in reversed(runs))
     return (
@@ -6616,7 +5578,7 @@ def journeys_content(tid: str, sel: str = "") -> str:
     for i, a in enumerate(order):
         d = accts[a]
         if d["waiting"]:
-            chip = f'<span class="st amber">{d["waiting"]} need your yes</span>'
+            chip = f'<span class="st amber">{d["waiting"]} need your approval</span>'
         elif d["won"]:
             chip = f'<span class="st ok">kept &#8377;{inr(d["won"])}</span>'
         elif d["lost"]:
@@ -6704,7 +5666,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
 
 
 # (days ago, customer, reason label, buyer claim, verdict, evidence, draft)
-# The look-back: what Dispute Defender would have done with Heads Up For Tails's
+# The look-back: what Dispute Responder would have done with Heads Up For Tails's
 # own last 30 days, before it was switched on. Nothing here was ever sent.
 SHADOW_ROWS = [
     (27, "Ananya B.",  "Says it never arrived",   "Peanut butter jar never arrived",              "send", "2 proofs",
@@ -6774,7 +5736,7 @@ def shadow_content(tid: str) -> str:
     return (
         '<h1 class="page">See what you missed</h1>'
         '<div class="pagehint">Put your last 30 days of disputes through '
-        'Dispute Defender. Nothing is sent, nobody is contacted, and it costs '
+        'Dispute Responder. Nothing is sent, nobody is contacted, and it costs '
         'nothing: you just see what got away.</div>'
         '<button class="btn primary" id="shbtn" onclick="shstart()">Check the last 30 days</button>'
         '<div class="shstats">'
@@ -6794,7 +5756,7 @@ def shadow_content(tid: str) -> str:
         f'<tbody>{"".join(body)}</tbody></table></div>'
         '<div class="shband" id="shband"><span><b>Nothing was sent.</b> Nobody '
         'was contacted and this cost you nothing. That is what last month '
-        'looked like without Dispute Defender.</span>'
+        'looked like without Dispute Responder.</span>'
         '<a class="btn primary sm" href="/settings?s=connectors">Switch it on &rarr;</a></div>'
         + """<script>
 function shstart(){
@@ -6837,189 +5799,7 @@ function shstart(){
 </script>""")
 
 
-# ------------------------------------------------------------- proposals
-# The employee thesis, made mechanical: every acting agent ends its job in
-# finished work plus ONE decision. Same card shape, same store, same
-# lifecycle for all of them; a decision is written down and cannot be
-# re-decided. Reporting agents close their loop in the morning note instead.
-PROPS_DEF = {
-    "cashflow_forecast": dict(
-        stake="&#8377;48,200", stake_n=48200,
-        ifno="Thursday dips to &minus;&#8377;12,400", ifyes="Thursday stays at +&#8377;35,800",
-        kicker="Cash call", rail="Payout move",
-        title="Move the courier payout by two days",
-        why="Thursday collides: vendor day and the GST debit land together. "
-            "Without a move, the week dips to <b>&minus;&#8377;12,400</b> "
-            "on Thursday morning.",
-        rows=[("The move", "Courier payout <b>&#8377;48,200</b>: Thursday "
-               "&rarr; Saturday. The courier&rsquo;s terms allow it; nobody "
-               "is paid late."),
-              ("After", "Thursday stays at <b>+&#8377;35,800</b>. Nothing "
-               "else changes."),
-              ("Read from", "settlements landing, the payout calendar, the "
-               "GST schedule.")],
-        yes="Approve the move", no="Not this time",
-        approved="The courier payout moves to Saturday; the calendar is "
-                 "updated and nobody is paid late.",
-        declined="Left as it was. Thursday will run tight; the planner "
-                 "warns you again the day before."),
-    "stock_watch": dict(
-        stake="&#8377;68,400", stake_n=68400,
-        ifno="Out of Sara's dog food in 6 days", ifyes="Covered for six weeks",
-        kicker="Reorder", rail="Reorder draft",
-        title="Reorder Sara's dog food before it runs out",
-        why="6 days of stock left at this pace, across every channel. The "
-            "supplier needs 10 to deliver.",
-        rows=[("The order", "40 cases, <b>&#8377;68,400</b>, Vasudha Farms. "
-               "Same terms as the last three orders."),
-              ("After", "Covered for six weeks. No channel oversells."),
-              ("Read from", "channel counts, sales pace, supplier lead times.")],
-        yes="Place the order", no="Not yet",
-        approved="Order placed with Vasudha Farms. Delivery expected Tuesday.",
-        declined="No order placed. It warns again at 4 days of stock."),
-    "payouts_desk": dict(
-        stake="&#8377;1,12,350", stake_n=112350,
-        ifno="14 payments go out late", ifyes="Everyone paid on time, morning",
-        kicker="Payment day", rail="Tomorrow&rsquo;s payments",
-        title="Tomorrow&rsquo;s 14 payments, one yes",
-        why="Vendors, two refunds, and the courier. Every payment sits "
-            "against its bill.",
-        rows=[("The list", "14 payments, <b>&#8377;1,12,350</b> together. "
-               "Each goes out the way the receiver wants it."),
-              ("Read from", "bills due, the payout calendar, past payment "
-               "preferences.")],
-        yes="Pay all 14", no="Hold them",
-        approved="All 14 scheduled for the morning. Each lands against its "
-                 "bill.",
-        declined="Held. Nothing goes out until you say so."),
-    "refund_shield": dict(
-        stake="&#8377;1,249", stake_n=1249,
-        ifno="&#8377;1,249 paid to a likely fraud", ifyes="Refused with proof, replacement offered",
-        kicker="Refund check", rail="A claim to refuse",
-        title="Refuse the broken-bottle claim, with proof",
-        why="Second claim from this buyer in three weeks. The delivery scan "
-            "is clean, and the photo matches the first claim&rsquo;s photo.",
-        rows=[("The reply", "Refuse politely, proof attached, and offer a "
-               "replacement instead of cash."),
-              ("At stake", "<b>&#8377;1,249</b>, and the pattern if it works "
-               "twice."),
-              ("Read from", "the claim photo, the delivery scan, the "
-               "buyer&rsquo;s history.")],
-        yes="Refuse with proof", no="Pay it anyway",
-        approved="Refused with the proof attached. A replacement was "
-                 "offered instead.",
-        declined="Refund paid as claimed. The pattern is noted."),
-    "cod_guard": dict(
-        stake="&#8377;2,141", stake_n=2141,
-        ifno="&#8377;2,141 shipped at a 40% bounce risk", ifyes="3 held; slots go to confirmed orders",
-        kicker="Dispatch hold", rail="3 COD orders held",
-        title="Hold 3 COD orders that never picked up",
-        why="Two calls each, unanswered, plus a WhatsApp. Their pincode "
-            "bounces 2 of every 5 COD parcels.",
-        rows=[("The hold", "3 orders stay back today. Their slots go to "
-               "confirmed orders."),
-              ("At stake", "<b>&#8377;2,141</b> of shipping and return cost "
-               "if they bounce."),
-              ("Read from", "call outcomes, the pincode&rsquo;s history.")],
-        yes="Hold them", no="Ship anyway",
-        approved="Held from dispatch. The slots went to confirmed orders.",
-        declined="Shipped as normal. The bounce risk is noted against the "
-                 "pincode."),
-    "returns_desk": dict(
-        stake="&#8377;1,899", stake_n=1899,
-        ifno="The buyer waits and chases you", ifyes="&#8377;1,899 back today, case closed",
-        kicker="Refund release", rail="A refund to release",
-        title="Release the &#8377;1,899 refund: the item is back",
-        why="The return reached the warehouse this morning. Seal checked, "
-            "item fine.",
-        rows=[("The release", "<b>&#8377;1,899</b> back to the buyer, "
-               "today."),
-              ("Read from", "the courier scan, the warehouse check.")],
-        yes="Release it", no="Hold it",
-        approved="Refund released the same hour. Case closed.",
-        declined="Held. A person takes a look first."),
-    "payment_forms": dict(
-        stake="&#8377;1,04,000", stake_n=104000,
-        ifno="A &#8377;2.6 lakh order sits unpaid", ifyes="Advance collected in one step",
-        kicker="Payment form", rail="An advance form to send",
-        title="Send the &#8377;2.6 lakh advance form",
-        why="A bulk buyer wants to pay 40% up front. The form carries the "
-            "PAN step and the balance-on-delivery terms in one link.",
-        rows=[("The form", "<b>&#8377;1,04,000</b> advance now, balance on "
-               "delivery. Verify and pay in one step."),
-              ("Read from", "the order, your terms, the KYC rules that "
-               "apply above &#8377;2 lakh.")],
-        yes="Send the form", no="Not yet",
-        approved="Sent on WhatsApp. The payment lands against the order "
-                 "and the books already know.",
-        declined="Not sent. The draft stays here."),
-    "kyc_desk": dict(
-        stake="&#8377;2,40,000", stake_n=240000,
-        ifno="A clean buyer stays blocked", ifyes="The buyer pays; the check is on record",
-        kicker="Deep check done", rail="A buyer to clear",
-        title="Clear the flagged buyer: the deep check came back clean",
-        why="Two days of checks: watchlists clear, registry matched. The "
-            "buyer has seen &ldquo;under review&rdquo;, never an error.",
-        rows=[("The call", "Clear the buyer and let the payment through."),
-              ("Read from", "watchlists, the registry answer, the order.")],
-        yes="Clear the buyer", no="Refuse politely",
-        approved="Cleared. The payment goes through; nothing else changes.",
-        declined="Refused politely and the order cancelled. Written down "
-                 "with the reason."),
-    "gst_compliance": dict(
-        stake="", stake_n=0,
-        ifno="The 18th scramble, again", ifyes="Your CA has the file today",
-        kicker="Filing pack", rail="The month&rsquo;s file",
-        title="Send the month&rsquo;s file to your CA",
-        why="Every invoice tied to a real order. The two mismatches are "
-            "fixed and noted in the file.",
-        rows=[("The file", "One clean pack, in the format your CA asked "
-               "for. Nothing rebuilt by hand."),
-              ("Read from", "invoices, orders, the GST schedule.")],
-        yes="Send it", no="Hold it",
-        approved="Sent. Your CA has it well before the 20th.",
-        declined="Held. It stays ready whenever you are."),
-    "cart_rescue": dict(
-        stake="&#8377;31,240", stake_n=31240,
-        ifno="&#8377;31,240 in carts goes cold", ifyes="12 buyers called back tonight",
-        kicker="Tonight&rsquo;s calls", rail="12 carts to call",
-        title="Tonight&rsquo;s rescue list: 12 dropped carts",
-        why="Worth <b>&#8377;31,240</b> together. Calls between 6 and 8 PM, "
-            "WhatsApp for anyone who does not pick up.",
-        rows=[("The plan", "One call each, one WhatsApp fallback, then it "
-               "stops. Anyone who says stop is never called again."),
-              ("Read from", "dropped carts, buyer hours, past outcomes.")],
-        yes="Start calling at 6", no="Skip tonight",
-        approved="Calling starts at 6. Every outcome lands in your chats.",
-        declined="Nobody is called tonight. The list stays."),
-    "payment_rescue": dict(
-        stake="&#8377;4,890", stake_n=4890,
-        ifno="&#8377;4,890 stays unpaid", ifyes="Fresh links out within the hour",
-        kicker="Failed payments", rail="5 payments to chase",
-        title="Chase today&rsquo;s 5 failed payments",
-        why="<b>&#8377;4,890</b> together, each with the decline reason "
-            "already read: two bank timeouts, two limits, one wrong PIN.",
-        rows=[("The plan", "WhatsApp first with a fresh link, a call only "
-               "if the money matters and the link sits unused."),
-              ("Read from", "decline reasons, order values, buyer hours.")],
-        yes="Chase them", no="Let them go",
-        approved="On it. Fresh links are out; calls follow where needed.",
-        declined="Left alone. The orders stay unpaid."),
-}
 
-PROP_EXECS = {
-    "cashflow_forecast": [('Payout calendar updated', 'done'), ('Courier told about the new date', 'done'), ("Watching Thursday's balance", 'running')],
-    "stock_watch": [('Order sent to Vasudha Farms', 'done'), ('Delivery slot confirmed for Tuesday', 'done'), ('Watching the stock until it lands', 'running')],
-    "payouts_desk": [('14 payments scheduled for the morning', 'done'), ('Every receiver told what is coming', 'done'), ('Receipts will file against their bills', 'running')],
-    "refund_shield": [('Refusal sent, proof attached', 'done'), ('Replacement offered instead', 'done'), ("Watching for the buyer's reply", 'running')],
-    "cod_guard": [('3 orders held from dispatch', 'done'), ('Slots handed to confirmed orders', 'done'), ('Pincode on watch', 'running')],
-    "returns_desk": [('Refund released to the buyer', 'done'), ('Buyer told, with the timeline', 'done'), ('Case closed and written down', 'done')],
-    "payment_forms": [('Form sent on WhatsApp', 'done'), ('Watching for the payment', 'running')],
-    "kyc_desk": [('Buyer cleared', 'done'), ('Payment allowed through', 'done'), ('The check written into the record', 'done')],
-    "gst_compliance": [('File sent to your CA', 'done'), ('A copy kept in your records', 'done')],
-    "cart_rescue": [('Call list locked: 12 buyers', 'done'), ('First calls go out at 6 PM', 'running')],
-    "payment_rescue": [('Fresh links sent to all 5', 'done'), ('Two have already paid', 'done'), ('Calls follow where links sit unused', 'running')],
-}
 
 # Reporting agents close their loop in the morning note, not a card.
 REPORT_AGENTS = {"three_way_recon", "settlement_insights", "daily_mis"}
@@ -7087,7 +5867,7 @@ def prop_card(tid: str, slug: str) -> str:
                 f'<span class="tstat">{st}</span></div>'
                 for txt, st in steps)
             trace = (f'<div class="trace"><div class="trace-h">What it is '
-                     f'doing with your yes</div>{rows2}</div>')
+                     f'doing with your approval</div>{rows2}</div>')
         verdict = (f'<div class="cashdone ok">Approved by '
                    f'{mention(p["decided_by"])}. {d["approved"]}</div>'
                    + trace)
@@ -7111,7 +5891,7 @@ def prop_card(tid: str, slug: str) -> str:
         f'<div class="abwrap">'
         f'<div class="ab no"><span>If you do nothing</span>'
         f'<b>{d["ifno"]}</b></div>'
-        f'<div class="ab yes"><span>If you say yes</span>'
+        f'<div class="ab yes"><span>If you approve</span>'
         f'<b>{d["ifyes"]}</b></div></div>')
     details = (f'<details class="cashmore"><summary>Details</summary>'
                f'<div class="cashwhy">{d["why"]}</div>{rows}</details>')
@@ -7129,9 +5909,6 @@ def cash_prop(tid: str) -> dict:
 def cash_waiting(tid: str) -> int:
     return props_waiting(tid)
 
-
-def cashflow_card(tid: str) -> str:
-    return prop_card(tid, "cashflow_forecast")
 
 
 # ------------------------------------------------------------- assignment
@@ -7151,6 +5928,47 @@ def people_for(tid: str) -> list[dict]:
     return PEOPLE.setdefault(tid, [
         dict(name=n, role=r, approver=e)
         for _, n, r, d, e in TEAM if d == BUSINESS])
+
+
+OWNER_PHONE: dict[str, str] = {}   # tid -> the number Relay can reach you on
+
+
+def onboarding_checklist_html(tid: str) -> str:
+    """A first-run checklist, not a permanent fixture: it goes quiet on its
+    own the moment all three are true, same as the setup step should."""
+    store_on = conn_state(tid).get("Your store") in ("on", "paused")
+    phone_on = bool(OWNER_PHONE.get(tid))
+    team_on = len(people_for(tid)) >= 2
+    steps = [
+        (store_on, "Connect your store",
+         "Relay reads your orders and disputes.", "/connections"),
+        (phone_on, "Share your phone number",
+         "Relay texts you when something needs approval.", None),
+        (team_on, "Invite your team",
+         "Choose who can approve actions.", "/settings"),
+    ]
+    if all(done for done, *_ in steps):
+        return ""
+    rows = ""
+    for done, title, sub, href in steps:
+        check = (f'<span class="obcheck on">&#10003;</span>' if done
+                 else '<span class="obcheck"></span>')
+        if not done and href is None:
+            action = (
+                f'<form class="obform" method="post" '
+                f'action="/api/onboard_phone">'
+                f'<input class="obinput" name="phone" maxlength="20" '
+                f'placeholder="Your phone number" '
+                f'required><button class="btn primary sm">Save</button></form>')
+        elif not done:
+            action = f'<a class="btn ghost sm" href="{href}">Connect</a>'
+        else:
+            action = ""
+        rows += (f'<div class="obrow">{check}'
+                 f'<span class="obtext"><b>{title}</b>'
+                 f'<span class="obsub">{sub}</span></span>{action}</div>')
+    return (f'<div class="obcard"><div class="obhead"><b>Finish setting up'
+            f'</b><span class="obsub">3 things, once</span></div>{rows}</div>')
 
 
 # ------------------------------------------------------------- autonomy
@@ -7190,26 +6008,25 @@ def mode_ui(tid: str) -> str:
 
     opt_all = (f'<form method="post" action="/api/mode" style="display:contents">'
                f'<input type="hidden" name="mode" value="all">'
-               f'<button class="mopt" type="submit">You say yes to everything'
+               f'<button class="mopt" type="submit">You approve every send'
                f'{tick if mode == "all" else ""}</button></form>')
     if unlocked:
         opt_small = (
             f'<form method="post" action="/api/mode" style="display:contents">'
             f'<input type="hidden" name="mode" value="small">'
-            f'<button class="mopt" type="submit"><div>Let Relay send small '
-            f'ones itself<small>Under &#8377;{SMALL_LIMIT_PAISE // 100} and '
-            f'nothing unusual. Everything still lands in History.</small>'
+            f'<button class="mopt" type="submit"><div>Auto-send small items'
+            f'<small>Payments under &#8377;{SMALL_LIMIT_PAISE // 100} only.'
+            f'</small>'
             f'</div>{tick if mode == "small" else ""}</button></form>')
     else:
         opt_small = (
-            f'<div class="mopt off"><div>Let Relay send small ones itself'
-            f'<small>Opens after 20 clean yeses (approved without a '
-            f'rewording). You are at <b>{n} of {YES_TARGET}</b>, '
-            f'{YES_TARGET - n} to go.</small>'
+            f'<div class="mopt off"><div>Auto-send small items'
+            f'<small>Unlocks after {YES_TARGET} approvals without edits. '
+            f'<b>{n} of {YES_TARGET}</b>.</small>'
             f'<span class="yesbar"><i style="width:{min(100, n * 100 // YES_TARGET)}%"></i></span>'
             f'</div></div>')
-    opt_never = ('<div class="mopt off"><div>Skip approvals entirely'
-                 '<small>Never. Nothing sends without you: by design.'
+    opt_never = ('<div class="mopt off"><div>Turn off approvals'
+                 '<small>Not possible. Every send needs your approval.'
                  '</small></div></div>')
     return (f'<details class="mode" id="mode2">'
             f'<summary>{ICONS["gear"]}<span>{label}</span></summary>'
@@ -7228,7 +6045,7 @@ _DEFAULT_ROUTINES = [
     dict(name="Morning brief", brief=True, out="morning",
          when="Every morning, 8:00",
          what="What came in overnight, what your team already handled, and "
-              "the few things waiting on your yes.",
+              "the few things waiting on your approval.",
          last="ran this morning", on=True),
     dict(name="Weekly wins", out="wins", when="Every Friday evening",
          what="What your team won this week, in rupees, and what it learned.",
@@ -7259,9 +6076,9 @@ _SCHED_INTRO = """
 .onbd{background:#fff;border-radius:20px;max-width:520px;width:92%;
   padding:0 0 24px;box-shadow:0 24px 80px rgba(24,25,32,.35);overflow:hidden}
 .onbd .art{background:linear-gradient(180deg,#DCE7FA,#F6F8FE);height:210px;
-  display:flex;align-items:center;justify-content:center;font-size:64px}
-.onbd h2{font-size:22px;margin:24px 28px 8px;text-align:center}
-.onbd p{margin:0 28px;color:var(--mut);text-align:center;font-size:14.5px;
+  display:flex;align-items:center;justify-content:center;font-size:32px}
+.onbd h2{font-size:24px;margin:24px 28px 8px;text-align:center}
+.onbd p{margin:0 28px;color:var(--mut);text-align:center;font-size:13px;
   line-height:1.55}
 .onbd .row{display:flex;align-items:center;justify-content:space-between;
   margin:24px 28px 0}
@@ -7270,7 +6087,7 @@ _SCHED_INTRO = """
   transition:all .2s}
 .onbd .dots i.on{width:22px;background:#181920}
 .onbd .nextb{background:#181920;color:#fff;border:0;border-radius:12px;
-  padding:8px 24px;font-size:14px;font-weight:600;cursor:pointer}
+  padding:8px 24px;font-size:13px;font-weight:600;cursor:pointer}
 .onbd .skipb{position:absolute;top:14px;right:18px;background:none;border:0;
   font-size:20px;color:#666;cursor:pointer}
 .onbk .card{position:relative}
@@ -7284,11 +6101,11 @@ _SCHED_INTRO = """
 <script>
 const ONB = [
   {e:'&#9749;', h:'Start every day already caught up',
-   p:'The morning brief is written before you sit down: what came in overnight, what was handled, the few things that need your yes.'},
+   p:'The morning brief is written before you sit down: what came in overnight, what was handled, the few things that need your approval.'},
   {e:'&#128172;', h:'Say it once, it runs forever',
    p:'&ldquo;Every Friday evening, tell me what we won this week.&rdquo; That sentence is the whole setup: no settings, no forms.'},
   {e:'&#128214;', h:'Nothing happens behind your back',
-   p:'Every run leaves a note you can open like a chat, and nothing is ever sent anywhere without your yes.'}];
+   p:'Every run leaves a note you can open like a chat, and nothing is ever sent anywhere without your approval.'}];
 function onbShow(i){
   window._onb = i;
   document.getElementById('onbSlides').innerHTML =
@@ -7354,63 +6171,63 @@ def pricing_content(tid: str) -> str:
 <div class="pr-page">
 <style>
 .pr-page{{--line:var(--hair,#E4E1D8);max-width:1060px;margin:0 auto;padding:34px 28px 60px}}
-.pr-page h1{{font-size:26px;letter-spacing:-.02em;margin:0 0 6px}}
-.pr-def{{color:#6E7263;font-size:14px;margin:0 0 26px;max-width:62ch}}
+.pr-page h1{{font-size:24px;letter-spacing:-.02em;margin:0 0 6px}}
+.pr-def{{color:#6E7263;font-size:13px;margin:0 0 26px;max-width:62ch}}
 .pr-plans{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;align-items:stretch}}
 .pr-plan{{border:1px solid var(--line);border-radius:16px;background:#fff;padding:20px 18px;display:flex;flex-direction:column}}
 .pr-plan.pick{{border:1.5px solid #0B7A3E;background:linear-gradient(180deg,#F2F9EE,#fff)}}
-.pr-name{{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}}
-.pr-chip{{font-size:10px;font-weight:700;color:#0B7A3E;background:#E6F2E0;border-radius:100px;padding:2px 8px}}
-.pr-price{{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:10px}}
-.pr-price span{{font-size:12.5px;font-weight:500;color:#6E7263;margin-left:2px}}
-.pr-who{{font-size:12px;color:#6E7263;margin-top:2px;padding-bottom:12px;border-bottom:1px solid var(--line)}}
+.pr-name{{font-weight:700;font-size:13px;display:flex;align-items:center;gap:8px}}
+.pr-chip{{font-size:11px;font-weight:700;color:#0B7A3E;background:#E6F2E0;border-radius:100px;padding:2px 8px}}
+.pr-price{{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:10px}}
+.pr-price span{{font-size:11px;font-weight:500;color:#6E7263;margin-left:2px}}
+.pr-who{{font-size:11px;color:#6E7263;margin-top:2px;padding-bottom:12px;border-bottom:1px solid var(--line)}}
 .pr-list{{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}}
-.pr-list li{{font-size:12.5px;color:#3D4038;padding-left:18px;position:relative}}
+.pr-list li{{font-size:11px;color:#3D4038;padding-left:18px;position:relative}}
 .pr-list li:before{{content:"✓";position:absolute;left:0;color:#0B7A3E;font-weight:700}}
 .pr-strip{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper-2);padding:14px 18px;font-size:13px;color:#3D4038}}
 .pr-strip b{{font-size:13px}}
 .pr-strip .mut{{color:#6E7263}}
 .pr-strip.cap{{border-color:#0B7A3E;background:#F2F9EE}}
-.pr-foot{{margin-top:14px;font-size:12.5px;color:#6E7263}}
+.pr-foot{{margin-top:14px;font-size:11px;color:#6E7263}}
 .pr-bill{{display:inline-flex;border:1px solid var(--line);border-radius:100px;background:#fff;padding:3px;margin:2px 0 18px}}
-.pr-bill button{{border:0;background:none;font:inherit;font-size:12.5px;font-weight:600;color:#6E7263;border-radius:100px;padding:12px 20px;min-height:42px;cursor:pointer}}
+.pr-bill button{{border:0;background:none;font:inherit;font-size:11px;font-weight:600;color:#6E7263;border-radius:100px;padding:12px 20px;min-height:42px;cursor:pointer}}
 .pr-bill button.on{{background:#0B7A3E;color:#fff}}
 .pr-bill em{{font-style:normal;opacity:.75;font-size:11px}}
-.pr-inc{{font-size:11.5px;font-weight:600;color:#0B7A3E;margin-top:12px}}
+.pr-inc{{font-size:11px;font-weight:600;color:#0B7A3E;margin-top:12px}}
 .pr-cta{{margin-top:auto;display:flex;align-items:center;justify-content:center;min-height:44px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-align:center;border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:600;color:#1D221F;text-decoration:none;padding:0}}
 .pr-list{{margin-bottom:16px}}
 .pr-cta.go{{background:#0B7A3E;border-color:#0B7A3E;color:#fff}}
 .pr-usage{{margin-top:16px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:18px 20px}}
 .pr-uhead{{display:flex;justify-content:space-between;align-items:baseline}}
-.pr-uhead b{{font-size:14.5px}}
-.pr-uhead .mut{{color:#6E7263;font-size:12px}}
+.pr-uhead b{{font-size:13px}}
+.pr-uhead .mut{{color:#6E7263;font-size:11px}}
 .pr-ubar{{height:8px;border-radius:4px;background:#EFEDE6;margin:12px 0 6px;position:relative;overflow:hidden}}
 .pr-ubar i{{position:absolute;left:0;top:0;bottom:0;background:#0B7A3E;border-radius:4px}}
-.pr-usub{{font-size:12.5px;color:#6E7263;margin-bottom:14px}}
+.pr-usub{{font-size:11px;color:#6E7263;margin-bottom:14px}}
 .pr-usub b{{color:#1D221F}}
 .pr-ucols{{display:grid;grid-template-columns:1fr 1fr;gap:22px}}
 @media (max-width:900px){{.pr-ucols{{grid-template-columns:1fr}}}}
 .pr-ut{{display:block;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#8A8D7C;margin-bottom:8px}}
 .pr-urow{{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid #F1EFE8}}
 .pr-urow b{{font-variant-numeric:tabular-nums}}
-.pr-unote{{margin-top:12px;font-size:12px;color:#8A8D7C}}
+.pr-unote{{margin-top:12px;font-size:11px;color:#8A8D7C}}
 .pr-faq{{margin-top:22px;border-top:1px solid var(--line)}}
 .pr-faq details{{border-bottom:1px solid var(--line)}}
-.pr-faq summary{{font-size:13.5px;font-weight:600;cursor:pointer;list-style-position:outside;padding:16px 2px}}
+.pr-faq summary{{font-size:13px;font-weight:600;cursor:pointer;list-style-position:outside;padding:16px 2px}}
 .pr-faq details p{{padding:0 2px 16px}}
 .pr-faq summary:hover{{color:#0B7A3E}}
 .pr-faq p{{font-size:13px;color:#6E7263;margin:8px 0 0;max-width:70ch}}
 .pr-calc{{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:18px 20px}}
-.pr-calc-head b{{font-size:13.5px}}
-.pr-calc-head .mut{{color:#6E7263;font-size:12.5px;margin-left:8px}}
+.pr-calc-head b{{font-size:13px}}
+.pr-calc-head .mut{{color:#6E7263;font-size:11px;margin-left:8px}}
 .pr-calc input[type=range]{{width:100%;margin:12px 0 8px;accent-color:#0B7A3E;height:36px;cursor:pointer}}
 .pr-calc-row{{display:flex;justify-content:space-between;align-items:baseline}}
-.pr-calc-n b{{font-size:22px;letter-spacing:-.02em}}
-.pr-calc-n span{{font-size:12px;color:#6E7263;margin-left:6px}}
+.pr-calc-n b{{font-size:24px;letter-spacing:-.02em}}
+.pr-calc-n span{{font-size:11px;color:#6E7263;margin-left:6px}}
 .pr-calc-p{{text-align:right}}
-.pr-calc-p b{{font-size:22px;letter-spacing:-.02em}}
-.pr-calc-p span{{display:block;font-size:11.5px;color:#6E7263;margin-top:1px}}
-.pr-calc-buy{{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:#3D4038}}
+.pr-calc-p b{{font-size:24px;letter-spacing:-.02em}}
+.pr-calc-p span{{display:block;font-size:11px;color:#6E7263;margin-top:1px}}
+.pr-calc-buy{{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:#3D4038}}
 </style>
 <h1>Plans</h1>
 <div class="pr-bill"><button class="on" id="prBm"
@@ -7421,7 +6238,7 @@ like hires on payroll. Metered in credits: <b>1 credit = &#8377;1</b>,
 tokens, WhatsApp fees and voice minutes inside. No separate bills.</p>
 <div class="pr-plans">{plans}</div>
 <div class="pr-strip cap"><b>Your bill never crosses your plan
-without your yes.</b> <span class="mut">Top-ups are approved like
+without your approval.</b> <span class="mut">Top-ups are approved like
 everything else.</span></div>
 <div class="pr-strip"><b>A reply 1 credit &middot; paperwork 2
 &middot; a voice call 6.</b> <span class="mut">Same rule for every
@@ -7458,7 +6275,7 @@ agent.</span></div>
     </div>
   </div>
   <div class="pr-unote">Every row traces to a job in History. Your bill
-  never crosses your plan without your yes.</div>
+  never crosses your plan without your approval.</div>
 </div>
 <div class="pr-faq">
   <details><summary>When credits run low?</summary><p>Relay asks.
@@ -7543,23 +6360,33 @@ def scheduled_content(tid: str) -> str:
                   f'aria-label="{"Pause" if r["on"] else "Resume"}">'
                   f'<i></i></button></form>')
         out = r.get("out")
-        readit = (f'<a class="readit" href="/briefs/{out}">read it '
+        readit = (f'<a class="readit" href="/briefs/{out}">Read it '
                   f'&rarr;</a>' if out else "")
-        tools = (f'<span class="rtools">'
-                 f'<button class="rtool" '
-                 f'onclick="routineEdit({i}, this)">Edit</button>'
+        # Edit and Remove are card management, not card content: they live
+        # in one overflow menu in the header, next to the toggle, so the
+        # footer never changes shape on hover.
+        tools = (f'<details class="rmenu">'
+                 f'<summary aria-label="More" title="More">'
+                 f'<svg width="15" height="15" viewBox="0 0 24 24" '
+                 f'fill="currentColor"><circle cx="5" cy="12" r="1.7"/>'
+                 f'<circle cx="12" cy="12" r="1.7"/>'
+                 f'<circle cx="19" cy="12" r="1.7"/></svg></summary>'
+                 f'<div class="rmenu-list">'
+                 f'<button type="button" onclick="this.closest(\'details\')'
+                 f'.removeAttribute(\'open\');routineEdit({i}, this)">'
+                 f'Edit the wording</button>'
                  f'<form method="post" action="/api/routine_del" '
                  f'style="display:contents"><input type="hidden" name="i" '
-                 f'value="{i}"><button class="rtool danger" title="Remove">'
-                 f'Remove</button></form></span>')
+                 f'value="{i}"><button class="danger">Remove</button>'
+                 f'</form></div></details>')
         cards += (f'<div class="hubcard sched" '
                   f'data-hub="{"running" if r["on"] else "paused"}">'
                   f'<div class="schedhead">'
                   f'<span class="tdesc" data-name="{esc(r["name"])}">'
-                  f'<b>{esc(r["name"])}</b></span>{toggle}</div>'
+                  f'<b>{esc(r["name"])}</b></span>{toggle}{tools}</div>'
                   f'<div class="schedbody mut">{r["when"]}. {r["what"]}'
                   f'</div>'
-                  f'<div class="schedfoot">{stat}{tools}{readit}</div>'
+                  f'<div class="schedfoot">{stat}{readit}</div>'
                   f'</div>')
     tpls = "".join(
         f'<div class="hubcard" data-hub="template">'
@@ -7590,11 +6417,16 @@ function routineCancel(el){
   const td = el.closest('.tdesc');
   td.innerHTML = td.dataset.prev;
 }
+document.addEventListener('click', e => {
+  document.querySelectorAll('.rmenu[open]').forEach(d => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
 </script>"""
     return (hub_head("Scheduled",
-                       "Work your team does on its own clock. Each run "
-                       "leaves a note you can open, and nothing is ever "
-                       "sent without your yes.",
+                       "Tasks that run on a schedule. Each run writes a "
+                       "report you can open. Nothing is sent without "
+                       "your approval.",
                        "Search scheduled",
                        [("all", "All"), ("running", "Running"),
                         ("paused", "Paused")])
@@ -7603,11 +6435,24 @@ function routineCancel(el){
               f'</h2><div class="hubgrid two">{cards}</div></div>'
             + f'<div class="hubsec"><h2 class="sec">Start one</h2>'
               f'<div class="hubgrid">{tpls}</div></div>'
-            + f'<form class="notebar wide" method="post" action="/api/routine">'
-              f'<input class="jfind notein" name="text" maxlength="200" '
-              f'placeholder="Or say it your way: every Friday evening, '
-              f'tell me what we won this week">'
-              f'<button class="btn primary sm">Add</button></form>'
+            + f'<form class="schedbar" method="post" action="/api/routine">'
+              f'<input class="schedin" name="text" maxlength="200" '
+              f'autocomplete="off" '
+              f'placeholder="Type a schedule: every Friday evening, '
+              f'send me this week&rsquo;s wins">'
+              f'<div class="srow">'
+              f'<span class="schedtag">'
+              f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+              f'stroke-width="2" stroke-linecap="round">'
+              f'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+              f'Runs on schedule &middot; sends only after you approve'
+              f'</span>'
+              f'<button class="sendbtn" aria-label="Add to Scheduled">'
+              f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+              f'stroke-width="2" stroke-linecap="round" '
+              f'stroke-linejoin="round"><path d="m5 12 7-7 7 7"/>'
+              f'<path d="M12 19V5"/></svg></button>'
+              f'</div></form>'
             + script
             + _SCHED_INTRO)
 
@@ -7645,7 +6490,7 @@ def memory_content(tid: str, tab: str = "voice",
 
     TABS = [("voice", "How you speak", len(notes)),
             ("proof", "Proof on file", len(ev)),
-            ("files", "Files", len(files)),
+            ("files", "Uploads", len(files)),
             ("teach", "What they teach each other", len(TEACHINGS)),
             ("outcomes", "How things ended", n_ended)]
     if tab not in {k for k, _, _ in TABS}:
@@ -7658,9 +6503,8 @@ def memory_content(tid: str, tab: str = "voice",
         for k, lbl, n in TABS) + '</div>')
 
     if tab == "voice":
-        body = ('<div class="pagehint">Learned from the wording you '
-                'change. The more you touch, the more it sounds like '
-                'you.</div>'
+        body = ('<div class="pagehint">Wording rules learned from your '
+                'edits. Relay writes future replies your way.</div>'
                 + ("".join(
             f'<div class="trow slim"><span class="ico">{ICONS["pen"]}</span>'
             f'<span class="tdesc"><b>{esc((m.body or {}).get("changed") or "A rewording you made")}</b> '
@@ -7693,16 +6537,7 @@ def memory_content(tid: str, tab: str = "voice",
             f'<span class="mut">{esc(f["size"])} &middot; added '
             f'{esc(f["when"])} &middot; {esc(f["used"])}</span></span>'
             f'<span class="st ok">readable</span></div>'
-            for f in files)
-                + '<form class="notebar" method="post" '
-                'action="/api/file_upload" enctype="multipart/form-data" '
-                'style="max-width:640px;margin-top:16px">'
-                '<label class="btn ghost sm" style="cursor:pointer">Choose a file'
-                '<input type="file" name="file" required hidden '
-                'onchange="this.closest(\'form\').querySelector(\'.fname\').textContent = this.files[0] ? this.files[0].name : \'\'">'
-                '</label>'
-                '<span class="fname mut" style="flex:1;font-size:13px"></span>'
-                '<button class="btn primary sm">Upload</button></form>')
+            for f in files))
     elif tab == "teach":
         body = teachings_html()
     else:
@@ -7721,16 +6556,23 @@ def memory_content(tid: str, tab: str = "voice",
 
     search = ('<input class="hubsearch" placeholder="Search this tab" '
               'data-sel=".trow" oninput="hubFilter(this)">')
+    upload = ('<form method="post" action="/api/file_upload" '
+              'enctype="multipart/form-data" style="display:contents">'
+              '<label class="btn primary" style="cursor:pointer;flex:none">'
+              'Upload a file'
+              '<input type="file" name="file" hidden '
+              'onchange="if(this.files.length)'
+              'this.closest(\'form\').submit()">'
+              '</label></form>')
     if embed:
-        return ('<div class="pagehint">Everything your team knows about '
-                'your business. Add to it, correct it; nothing is '
-                'forgotten.</div>'
-                f'<div class="hubtoolrow">{pills}{search}</div>'
+        return ('<div class="pagehint">Files, notes and rules your '
+                'agents use. Add or correct them anytime.</div>'
+                f'<div class="hubtoolrow">{pills}{search}{upload}</div>'
                 f'{body}')
-    return (f'<div class="hubhead"><div><h1 class="page">Knowledge</h1>'
-            f'<div class="pagehint">Everything your team knows about your '
-            f'business. Add to it, correct it; nothing is forgotten.</div>'
-            f'</div>{search}</div>'
+    return (f'<div class="hubhead"><div><h1 class="page">Files</h1>'
+            f'<div class="pagehint">Files, notes and rules your agents '
+            f'use. Add or correct them anytime.</div>'
+            f'</div>{search}{upload}</div>'
             f'<div class="hubtoolrow">{pills}</div>{body}')
 
 # Every decision leaves a line: who, what, when, where to see it.
@@ -7783,7 +6625,7 @@ CONN_DEFS = [
     ("Your store", "headsupfortails.com orders and disputes"),
     ("Amazon", "orders, claims and settlements"),
     ("Flipkart", "orders, claims and settlements"),
-    ("WhatsApp", "buyer messages, and your yeses on the go"),
+    ("WhatsApp", "buyer messages, and your approvales on the go"),
     ("Voice calls", "the callers ring buyers on Bolna and Osvi.ai"),
     ("Bank and settlements", "what landed, what was deducted"),
     ("Email", "dispute mail from the bank"),
@@ -7917,18 +6759,6 @@ def conn_state(tid: str) -> dict:
 # One grammar for the four capability surfaces (the Comet pattern): a tab
 # strip across them, a title with a working search, filter pills, and
 # sectioned card grids. Filtering is client-side and instant.
-HUB_TABS = [("connections", "Connections", "/connections"),
-            ("skills", "Skills", "/skills"),
-            ("scheduled", "Scheduled", "/scheduled"),
-            ("memory", "Knowledge", "/memory")]
-
-
-def hub_bar(active: str) -> str:
-    return ('<div class="hubtabs">' + "".join(
-        f'<a class="{"on" if k == active else ""}" href="{href}">{lbl}</a>'
-        for k, lbl, href in HUB_TABS) + '</div>')
-
-
 def hub_head(title: str, sub: str, placeholder: str,
              pills=None, right: str = "") -> str:
     pillrow = ""
@@ -8077,7 +6907,7 @@ def skills_hub(tid: str, embed: bool = False) -> str:
     if embed:
         out = ('<div class="pagehint">What your agents know how to do: '
                'steps they follow, written in your words. Nothing goes '
-               'live until you say yes.</div>'
+               'live until you approve.</div>'
                '<div class="hubtoolrow"><div class="hubpills">'
                '<button class="hubpill on" data-f="all" '
                'onclick="hubPill(this)">All</button>'
@@ -8133,7 +6963,7 @@ def settings_content(tid: str, s: str = "team",
     SECTIONS = [("team", "Approvers"),
                 ("connectors", "Connections"),
                 ("skills", "Skills"),
-                ("knowledge", "Knowledge"),
+                ("knowledge", "Files"),
                 ("decisions", "Audit log"),
                 ("workspace", "Trust"),
                 ("data", "Export data")]
@@ -8144,11 +6974,9 @@ def settings_content(tid: str, s: str = "team",
         for k, t in SECTIONS) + "</div>")
 
     if s == "team":
-        body = (f'<div class="pagehint">Nothing that touches money or a '
-                f'customer goes out without a yes: this is where you '
-                f'decide whose yes counts. Hand it to someone before a '
-                f'holiday, take it back after. Everyone else still sees '
-                f'everything; they just can&rsquo;t approve.</div>')
+        body = (f'<div class="pagehint">Choose who can approve sends. '
+                f'Add an approver before a holiday, remove them after. '
+                f'Everyone else can view but not approve.</div>')
         for i, p in enumerate(people_for(tid)):
             toggle = (f'<form method="post" action="/api/person_toggle" '
                       f'style="display:contents"><input type="hidden" '
@@ -8195,29 +7023,31 @@ def settings_content(tid: str, s: str = "team",
         body = decisions_content(tid)
     elif s == "data":
         exports = [
-            ("Everything, as a spreadsheet", "/export/impact.csv",
-             "Every dispute your team has touched: who, what, when, "
-             "how it ended, and for how much."),
-            ("The proof on file", "/export/evidence.csv",
-             "Every piece of proof your replies cite, with what it proves."),
-            ("What your team remembers", "/export/memory.csv",
-             "How you like things said: every note learned from the "
-             "wording you changed."),
+            ("All disputes", "/export/impact.csv",
+             "Every dispute: customer, order, dates, outcome, amount."),
+            ("Evidence files", "/export/evidence.csv",
+             "Every file cited in your dispute replies."),
+            ("Saved notes", "/export/memory.csv",
+             "Wording rules learned from your edits."),
         ]
-        body = ('<div class="pagehint">It&rsquo;s yours. Take all of it, any '
-                'time, no questions: each file opens in Excel or '
-                'Google Sheets. Leaving is allowed to be easy; that is what '
-                'makes staying a choice.</div>'
+        body = ('<div class="pagehint">Download your data as spreadsheets. '
+                'Each file opens in Excel or Google Sheets.</div>'
                 + "".join(
-            f'<a class="trow slim" style="display:flex" href="{href}">'
+            f'<a class="trow slim" style="display:flex;align-items:center" '
+            f'href="{href}">'
             f'<span class="ico">{ICONS["ledger"]}</span>'
             f'<span class="tdesc"><b>{t}</b> <span class="mut">{d}</span>'
-            f'</span><span class="st wait">download &rarr;</span></a>'
+            f'</span><span class="btn ghost sm" style="flex:none">'
+            f'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+            f'stroke-linejoin="round"><path d="M12 3v12"/>'
+            f'<path d="m7 10 5 5 5-5"/>'
+            f'<path d="M4 21h16"/></svg>'
+            f'Download</span></a>'
             for t, href, d in exports))
     else:
-        body = ('<div class="pagehint">These are not settings you can slide '
-                'around: each one is a promise the software keeps, '
-                'written here so you can hold it to them.</div>'
+        body = ('<div class="pagehint">These settings are fixed. Each one '
+                'is a rule Relay always follows.</div>'
                 + "".join(
             f'<div class="trow slim"><span class="ico">{ICONS["shield"]}</span>'
             f'<span class="tdesc"><b>{esc(k)}</b> <span class="mut">{v}</span></span></div>'
@@ -8225,9 +7055,9 @@ def settings_content(tid: str, s: str = "team",
                 (("Small ones send themselves" if autonomy_mode(tid) == "small"
                   else "You approve before anything sends"),
                  ("under &#8377;500 and nothing unusual goes out on its own; "
-                  "everything else still waits for your yes, and all of it "
+                  "everything else still waits for your approval, and all of it "
                   "lands in History" if autonomy_mode(tid) == "small" else
-                  "nothing goes to a bank without your yes; if you "
+                  "nothing goes to a bank without your approval; if you "
                   "don&rsquo;t answer, it waits for a person: it "
                   "never sends itself")),
                 ("Never more than 3 at a time", "your attention is protected; "
@@ -8240,7 +7070,7 @@ def settings_content(tid: str, s: str = "team",
                  "does happens in a private space that belongs to your "
                  "business alone: nothing it reads or writes can "
                  "touch anyone else's, and nothing leaves the room without "
-                 "your yes"),
+                 "your approval"),
                 ("Your record is yours", "one click, everything, in a "
                  "spreadsheet"),
                 ("Your logins are never sitting in a file", "they are kept in "
@@ -8283,7 +7113,28 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    # Renamed surfaces keep their old URLs forever; new names arrive as
+    # aliases, so no bookmark, log line or deep link ever breaks.
+    ROUTE_ALIASES = {"/files": "/memory", "/knowledge": "/memory",
+                     "/routines": "/scheduled", "/history": "/journeys"}
+
     def do_GET(self):
+        # ThreadingHTTPServer handles sockets in parallel; the shared
+        # in-memory state is guarded by one lock around each handler.
+        path, sep, query = self.path.partition("?")
+        if path in self.ROUTE_ALIASES:
+            self.path = self.ROUTE_ALIASES[path] + sep + query
+        with _state.LOCK:
+            return self._get()
+
+    def do_POST(self):
+        with _state.LOCK:
+            try:
+                return self._post()
+            finally:
+                _cfg_save()   # every mutation path persists, atomically
+
+    def _get(self):
         if self.path.split("?")[0] in ("/", "/index.html"):
             sess = self._session()
             if not sess:
@@ -8412,6 +7263,16 @@ class Handler(BaseHTTPRequestHandler):
             f = _pq(_up(self.path).query).get("f", ["all"])[0]
             self._html(_shell(activity_content(sess["tenant_id"], f), "activity",
                               sess["tenant_id"], sess.get("email", "")))
+        elif self.path.split("?")[0] == "/agents/new":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            from urllib.parse import parse_qs as _pq, urlparse as _up
+            bid = _pq(_up(self.path).query).get("bid", [""])[0]
+            self._html(_shell(
+                builder_content(sess["tenant_id"], sess.get("email", ""),
+                                bid),
+                "agents", sess["tenant_id"], sess.get("email", "")))
         elif self.path.startswith("/agents/"):
             sess = self._session()
             if not sess:
@@ -8557,9 +7418,9 @@ class Handler(BaseHTTPRequestHandler):
             out = []
             if q:
                 for a in RELAY_AGENTS:
-                    if q in a["role"].lower() or q in a["name"].lower():
+                    if q in a["role"].lower():
                         out.append(dict(kind="Agent", title=a["role"],
-                                        sub=a["name"],
+                                        sub=a["desc"],
                                         href="/agents/" + a["slug"]))
                 for c in rail_cases(tid, limit=50):
                     if q in c["label"].lower():
@@ -8603,7 +7464,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
-    def do_POST(self):
+    def _post(self):
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length).decode(errors="replace")
         if self.path == "/slack/interactions":
@@ -8900,6 +7761,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(303)
             self.send_header("Location", "/settings?s=team")
             self.end_headers(); return
+        if self.path == "/api/onboard_phone":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            phone = (form.get("phone") or [""])[0].strip()[:20]
+            if phone:
+                OWNER_PHONE[sess["tenant_id"]] = phone
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.end_headers(); return
         if self.path in ("/api/routine_toggle", "/api/routine_del",
                          "/api/routine_edit"):
             sess = self._session()
@@ -8952,7 +7824,7 @@ class Handler(BaseHTTPRequestHandler):
                     else "Not cited yet; readable to the whole team"))
                 log_decision(sess["tenant_id"],
                              (sess.get("email") or "you").split("@")[0],
-                             "Added a file to Knowledge: <b>"
+                             "Added a file: <b>"
                              + esc(name) + "</b>", "/memory?t=files")
             self.send_response(303)
             ref = self.headers.get("Referer") or ""
@@ -8965,6 +7837,77 @@ class Handler(BaseHTTPRequestHandler):
                 loc = "/memory?t=files"
             self.send_header("Location", loc)
             self.end_headers(); return
+        if self.path == "/api/build_start":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            text = (form.get("text") or [""])[0].strip()[:300]
+            if not text:
+                return self._redirect("/agents/new")
+            res = _build_res(sess["tenant_id"], text)
+            bid = res["qz"]["bid"]
+            PENDING_BUILDS[bid].update(
+                channel=(form.get("channel") or ["chat"])[0],
+                ask0=text, stage="q1")
+            return self._redirect(f"/agents/new?bid={bid}")
+        if self.path == "/api/build_answer":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            bid = (form.get("bid") or [""])[0]
+            d = PENDING_BUILDS.get(bid)
+            if d and d["tenant"] == sess["tenant_id"]:
+                d["answers"] = {
+                    "act": (form.get("act") or [""])[0],
+                    "touch": form.get("touch") or [],
+                    "gate": (form.get("gate") or [""])[0],
+                }
+                d["stage"] = "q2"
+            return self._redirect(f"/agents/new?bid={bid}")
+        if self.path == "/api/build_answer2":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            bid = (form.get("bid") or [""])[0]
+            d = PENDING_BUILDS.get(bid)
+            if d and d["tenant"] == sess["tenant_id"]:
+                brand = (form.get("brand") or [""])[0].strip()[:40]
+                if brand:
+                    d["name"] = f"{brand} {d['name']}"
+                    d["slug"] = _re.sub(r"[^a-z0-9]+", "_",
+                                        d["name"].lower()).strip("_")
+                    if d.get("opening"):
+                        d["opening"] = (f"You've reached {brand}! "
+                                        + d["opening"])
+                d["knowledge"] = (form.get("knowledge") or ["simple"])[0]
+                d["stage"] = "done"
+            return self._redirect(f"/agents/new?bid={bid}")
+        if self.path == "/api/build_change":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            bid = (form.get("bid") or [""])[0]
+            text = (form.get("text") or [""])[0].strip()[:300]
+            d = PENDING_BUILDS.get(bid)
+            if d and d["tenant"] == sess["tenant_id"] and text:
+                # Redraw from the new description; keep channel and bid.
+                nd = _build_draft(text)
+                d.update(nd)
+            return self._redirect(f"/agents/new?bid={bid}")
+        if self.path == "/api/build_create":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            bid = (parse_qs(raw).get("bid") or [""])[0]
+            d = PENDING_BUILDS.get(bid)
+            if not d or d["tenant"] != sess["tenant_id"]:
+                return self._redirect("/agents/new")
+            _build_confirm(sess["tenant_id"], bid)
+            return self._redirect("/agents/" + RELAY_AGENTS[-1]["slug"])
         if self.path == "/api/routine":
             sess = self._session()
             if not sess:
@@ -9029,7 +7972,7 @@ class Handler(BaseHTTPRequestHandler):
             for a in RELAY_AGENTS:
                 if msg.lower().startswith("/" + a["role"].lower()):
                     called = a["role"]
-                    msg = msg[1 + len(a["role"]):].strip() or "what needs my yes"
+                    msg = msg[1 + len(a["role"]):].strip() or "what needs my approval"
                     break
             tagged = [p["name"] for p in people_for(sess["tenant_id"])
                       if "@" + p["name"].lower() in msg.lower()]
@@ -9400,9 +8343,9 @@ def _t_shadow(_):
 def _t_queue(_):
     runs = [r for r in WORLD.d.ledger.runs.values() if r.state is RunState.AWAITING_GATE]
     if not runs:
-        return "Nothing needs your yes right now.", ""
+        return "Nothing needs your approval right now.", ""
     return (f"{len(runs)} repl{'ies' if len(runs) != 1 else 'y'} to the bank "
-            f"waiting on your yes. Say “send the charged-twice one” and I will "
+            f"waiting on your approval. Say “send the charged-twice one” and I will "
             f"show it to you first.",
             "".join(_mini_run(r) for r in runs))
 
@@ -9489,7 +8432,7 @@ def _t_action(args, action):
     found; the card underneath carries the buttons."""
     run = _find_awaiting((args or {}).get("competitor"))
     if run is None:
-        return "Nothing like that is waiting on your yes.", "", None
+        return "Nothing like that is waiting on your approval.", "", None
     return (f"Here is the reply, with the proof it stands on. "
             f"{PLAIN_REASON.get(run.reason_code, 'A buyer is disputing a payment')}. "
             f"Nothing goes to the bank until you say so.", "", None)
@@ -9553,7 +8496,7 @@ def steps_for(tool: str, run) -> list[tuple[str, str]]:
 
 
 HELP = ("Everything I say comes from your own record, never from memory. "
-        "Try: <b>what needs my yes?</b> · <b>how is the team doing?</b> · "
+        "Try: <b>what needs my approval?</b> · <b>how is the team doing?</b> · "
         "<b>show me the never-arrived ones</b> · <b>which proof wins?</b> · "
         "<b>anything need a person?</b> · <b>send the charged-twice one</b>")
 
@@ -9586,7 +8529,7 @@ def _keyword_route(text: str):
         return "approve", args
     if any(w in t for w in ("dismiss", "reject", "don't send", "do not send")):
         return "dismiss", args
-    if any(w in t for w in ("needs my yes", "need my yes", "needs your yes",
+    if any(w in t for w in ("needs my yes", "need my yes", "needs my approval", "need my approval", "needs your approval",
                             "queue", "awaiting", "review", "pending", "waiting")):
         return "queue", args
     if any(w in t for w in ("metric", "correction", "usage", "precision",
@@ -9802,7 +8745,11 @@ _BUILD_PAT = _re.compile(
     _re.I)
 
 _BUILD_NAMES = [
-    (("cod",), "COD Sentry", "risk"),
+    (("customer", "support", "executive", "helpdesk"),
+     "Customer Executive", "support"),
+    (("appointment", "booking", "salon", "clinic", "slot"),
+     "Booking Assistant", "calling"),
+    (("lead", "sales call", "qualify"), "Lead Qualifier", "calling"),
     (("cart",), "Cart Keeper", "calling"),
     (("refund",), "Refund Referee", "risk"),
     (("stock", "inventory", "restock"), "Shelf Warden", "inventory"),
@@ -9817,7 +8764,7 @@ _BUILD_NAMES = [
 _BUILD_DOES = {
     "risk": "Holds what looks wrong, releases what checks out.",
     "calling": "Calls and messages buyers, and writes down every answer.",
-    "accounts": "Gets the numbers and the payments ready for your yes.",
+    "accounts": "Gets the numbers and the payments ready for your approval.",
     "inventory": "Counts ahead so you order before you run out.",
     "support": "Drafts the replies and keeps the thread until it is settled.",
 }
@@ -9829,7 +8776,69 @@ _BUILD_STEPS = [
 ]
 
 
+_BUILD_KINDS = ["support", "calling", "risk", "accounts", "inventory"]
+
+
+def _llm_build_draft(msg: str) -> dict | None:
+    """One Haiku call drafts the agent from the described job: same seam
+    discipline as _llm_route — structured output, closed schema, and any
+    failure (no key, timeout, bad JSON) falls back silently to the
+    keyword drafter. The model names the role and restates the job; it
+    never touches slugs, guardrails or the roster."""
+    from relay_superagent.secrets import get_secret
+    if not get_secret("anthropic"):
+        return None
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=get_secret("anthropic"),
+                                     timeout=10.0)
+        resp = client.messages.create(
+            model="claude-haiku-4-5", max_tokens=300,
+            system=(
+                "You draft an AI agent for a small Indian commerce "
+                "business from one described job. Plain language, active "
+                "voice, no jargon. Return:\n"
+                "- name: a 2-3 word job title a founder would hire for "
+                "(e.g. 'Customer Executive', 'Booking Assistant', "
+                "'Collections Caller'). Never include a brand name.\n"
+                "- kind: which desk the job belongs to. support = "
+                "answering customers; calling = phoning or messaging "
+                "buyers to sell, collect or confirm; risk = checking "
+                "fraud, refunds or holds; accounts = money records and "
+                "payments; inventory = stock.\n"
+                "- watches: the job restated as one short sentence "
+                "starting with a verb.\n"
+                "- opening: the one line the agent says when a customer "
+                "first connects. Friendly, one sentence, no brand name."),
+            messages=[{"role": "user", "content": msg[:300]}],
+            output_config={"format": {"type": "json_schema", "schema": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "maxLength": 40},
+                    "kind": {"type": "string", "enum": _BUILD_KINDS},
+                    "watches": {"type": "string", "maxLength": 160},
+                    "opening": {"type": "string", "maxLength": 160},
+                },
+                "required": ["name", "kind", "watches", "opening"],
+                "additionalProperties": False,
+            }}},
+        )
+        out = json.loads(next(b.text for b in resp.content
+                              if b.type == "text"))
+        name = out["name"].strip()[:40] or "New Teammate"
+        slug = _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+        return dict(name=name, kind=out["kind"], slug=slug,
+                    watches=out["watches"].strip()[:160] or msg,
+                    opening=out["opening"].strip()[:160],
+                    drafted_by="model")
+    except Exception:
+        return None
+
+
 def _build_draft(msg: str) -> dict:
+    live = _llm_build_draft(msg)
+    if live:
+        return live
     low = msg.lower()
     name, kind = "New Teammate", "support"
     for words, nm, kd in _BUILD_NAMES:
@@ -9868,11 +8877,11 @@ def _build_questions(kind: str) -> list[dict]:
         "accounts": [
             ("The numbers, read only", "It reads statements and orders, "
              "touches nothing."),
-            ("Payment drafts", "It can line up a payment for your yes."),
+            ("Payment drafts", "It can line up a payment for your approval."),
             ("Vendor records", "It can update who is owed what.")],
         "inventory": [
             ("Stock counts", "It watches what is running low."),
-            ("Reorder drafts", "It can write the reorder for your yes."),
+            ("Reorder drafts", "It can write the reorder for your approval."),
             ("Supplier messages", "It can ask the supplier for dates.")],
         "support": [
             ("Buyer replies", "It can draft the answer to a buyer."),
@@ -9980,7 +8989,7 @@ def _build_confirm(tid: str, bid: str) -> str:
             n += 1
         slug = f"{slug}_{n}"
     RELAY_AGENTS.append(dict(
-        slug=slug, name=d["name"], icon="pen", status="roadmap", desk="custom",
+        slug=slug, icon="pen", status="roadmap", desk="custom",
         role=d["name"],
         desc=esc(d["watches"]) + ". " + _BUILD_DOES[d["kind"]],
         today="This job lived in your head until you typed it into the chat.",
@@ -9992,6 +9001,221 @@ def _build_confirm(tid: str, bid: str) -> str:
     return (f'Meet <b>{d["name"]}</b>. It is on the Agents page under '
             f'<b>Built by you</b>, watching from now. Its first find will '
             f'land in Approvals.')
+
+
+# ------------------------------------------------------------- agent builder
+# The build flow as pages, not chat: describe the job -> Relay drafts the
+# agent -> review the draft -> Create. The same PENDING_BUILDS machinery
+# the chat path uses; this is a second front door to it.
+BUILD_EXAMPLES = [
+    "Answer customer support questions and escalate to a human when needed",
+    "Qualify inbound leads and book sales calls",
+    "Handle e-commerce order tracking and returns",
+    "Explain product features and pricing",
+]
+
+
+def builder_content(tid: str, email: str, bid: str = "") -> str:
+    if bid and bid in PENDING_BUILDS and PENDING_BUILDS[bid]["tenant"] == tid:
+        return _builder_draft(tid, bid)
+    return _builder_landing(tid, email)
+
+
+def _builder_landing(tid: str, email: str) -> str:
+    drafts = [(b, d) for b, d in PENDING_BUILDS.items()
+              if d.get("tenant") == tid]
+    resume = ""
+    if drafts:
+        last_bid = drafts[-1][0]
+        n = len(drafts)
+        resume = (f'<a class="bresume" href="/agents/new?bid={last_bid}">'
+                  f'{ICONS["tasks"]}<span>You have {n} draft'
+                  f'{"s" if n != 1 else ""} in progress</span>'
+                  f'<span class="go">&rarr;</span></a>')
+    examples = "".join(
+        f'<button type="button" class="bex" '
+        f'onclick="document.getElementById(\'bjob\').value=this.textContent;'
+        f'document.getElementById(\'bjob\').focus()">{esc(t)}</button>'
+        for t in BUILD_EXAMPLES)
+    return (
+        f'<div class="bwrap">'
+        f'<span class="bkicker">Agent Builder</span>'
+        f'<h1 class="bh1">Hello {esc(user_name(email))}, '
+        f'let&rsquo;s build an agent</h1>'
+        f'<div class="bsub">Describe the job in plain language. Relay '
+        f'drafts the name, instructions and guardrails.</div>'
+        f'{resume}'
+        f'<form class="bbox" method="post" action="/api/build_start">'
+        f'<textarea id="bjob" name="text" maxlength="300" required '
+        f'placeholder="Book salon appointments and answer pricing '
+        f'questions for walk-in clients..."></textarea>'
+        f'<div class="brow">'
+        f'<label class="bchan"><input type="radio" name="channel" '
+        f'value="chat" checked><span>Chat</span></label>'
+        f'<label class="bchan"><input type="radio" name="channel" '
+        f'value="voice"><span>Voice</span></label>'
+        f'<button class="btn primary" style="margin-left:auto">'
+        f'Generate agent</button></div></form>'
+        f'<div class="bexh">Or start from an example</div>'
+        f'<div class="bexrow">{examples}</div>'
+        f'</div>')
+
+
+def _q_form(bid: str, qs: list[dict], action: str, cta: str) -> str:
+    """One form of stacked questions: radios for one-of, checkboxes for
+    many-of, each option carrying its one-line consequence."""
+    fields = ""
+    for q in qs:
+        itype = "checkbox" if q["type"] == "many" else "radio"
+        opts = "".join(
+            f'<label class="bopt">'
+            f'<input type="{itype}" name="{q["key"]}" value="{esc(o[0])}"'
+            f'{" checked" if o[2] else ""}>'
+            f'<span><b>{esc(o[0])}'
+            f'{"<i class=rec>Recommended</i>" if o[2] else ""}</b>'
+            f'<small>{esc(o[1])}</small></span></label>'
+            for o in q["opts"])
+        fields += (f'<div class="bq"><div class="bq-t">{esc(q["q"])}</div>'
+                   f'{opts}</div>')
+    return (f'<form method="post" action="{action}">'
+            f'<input type="hidden" name="bid" value="{bid}">{fields}'
+            f'<button class="btn primary">{cta}</button></form>')
+
+
+def _prog(rows: list[str]) -> str:
+    return ('<div class="bprog">' + "".join(
+        f'<div class="bprog-r">&#10003; {r}</div>' for r in rows) + '</div>')
+
+
+def _builder_draft(tid: str, bid: str) -> str:
+    d = PENDING_BUILDS[bid]
+    stage = d.get("stage", "done")
+    channel = d.get("channel", "chat")
+    chan_word = "Voice" if channel == "voice" else "Chat"
+    qs = _build_questions(d["kind"])
+    ans = _default_answers(qs, d.get("answers") or {})
+
+    thread = (f'<div class="bmsg user">{esc(d.get("ask0") or d["watches"])}'
+              f'</div>')
+
+    if stage == "q1":
+        thread += (
+            '<div class="bmsg bot">Before I draft it, three quick taps: '
+            'when it acts, what it may touch, and when it must ask you.'
+            '</div>'
+            + _q_form(bid, qs, "/api/build_answer", "Continue"))
+        body = thread
+    elif stage == "q2":
+        thread += (
+            _prog([f'Named it <b>{esc(d["name"])}</b>',
+                   f'{chan_word} defaults applied',
+                   f'Guardrails: {esc(ans["gate"]).lower()}'])
+            + '<div class="bmsg bot">Two more details and I can write its '
+              'instructions.</div>'
+            + f'<form method="post" action="/api/build_answer2">'
+              f'<input type="hidden" name="bid" value="{bid}">'
+              f'<div class="bq"><div class="bq-t">What is the business or '
+              f'brand called? <span class="mut">(optional)</span></div>'
+              f'<input class="btext" name="brand" maxlength="40" '
+              f'placeholder="e.g. Snitch"></div>'
+              f'<div class="bq"><div class="bq-t">How should it answer '
+              f'questions?</div>'
+              f'<label class="bopt"><input type="radio" name="knowledge" '
+              f'value="simple" checked><span><b>Start simple'
+              f'<i class=rec>Recommended</i></b>'
+              f'<small>Works from its instructions alone. Add files later.'
+              f'</small></span></label>'
+              f'<label class="bopt"><input type="radio" name="knowledge" '
+              f'value="files"><span><b>I will upload files after</b>'
+              f'<small>Price lists, policies. They land in Files; it cites '
+              f'them.</small></span></label></div>'
+              f'<button class="btn primary">Write the instructions</button>'
+              f'</form>')
+        body = thread
+    else:
+        knowledge = d.get("knowledge", "simple")
+        rows = [
+            ("Name", esc(d["name"])),
+            ("Channel", "Voice call + WhatsApp" if channel == "voice"
+             else "Chat + WhatsApp"),
+            ("The job", esc(d["watches"])),
+        ]
+        if d.get("opening"):
+            rows.append(("First message",
+                         '&ldquo;' + esc(d["opening"]) + '&rdquo;'))
+        rows += [
+            ("When it acts", esc(ans["act"])),
+            ("May touch", esc(", ".join(ans["touch"]))),
+            ("Asks you", esc(ans["gate"])),
+            ("Post-run notes", "What happened and what it did, "
+             "kept in History"),
+        ]
+        table = "".join(
+            f'<div class="bcfg"><span>{k}</span><div>{v}</div></div>'
+            for k, v in rows)
+        thread += (
+            _prog([f'Named it <b>{esc(d["name"])}</b>',
+                   f'{chan_word} defaults applied',
+                   'Wrote the instructions',
+                   'Post-run notes and tags set'])
+            + '<div class="bmsg bot">Draft ready. Review it, describe any '
+              'change, or create it.</div>'
+            + table
+            + ('<div class="pagehint" style="margin-top:16px"><b>No tools '
+               'added.</b> The agent works from its instructions alone. '
+               'Add tools, files and a schedule after it is created.</div>')
+            + ('<div class="bnext"><b>Next steps</b><ol>'
+               '<li>Review the draft. Describe any change below and it '
+               'redraws.</li>'
+               '<li>Create the agent. It joins the Agents page under '
+               'Built by you, in trial.</li>'
+               '<li>It watches quietly for 7 days. First proposals land '
+               'in Approvals; nothing is sent without your approval.</li>'
+               '</ol></div>')
+            + (f'<form class="bchange" method="post" '
+               f'action="/api/build_change">'
+               f'<input type="hidden" name="bid" value="{bid}">'
+               f'<input name="text" maxlength="300" required '
+               f'placeholder="Describe a change...">'
+               f'<button class="sendbtn" aria-label="Apply the change">'
+               f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+               f'stroke-width="2" stroke-linecap="round" '
+               f'stroke-linejoin="round"><path d="m5 12 7-7 7 7"/>'
+               f'<path d="M12 19V5"/></svg></button></form>'))
+        set_rows = [
+            ("Identity", esc(d["name"]), True),
+            ("Instructions", esc(d["watches"][:44]) + "&hellip;", True),
+            ("Channel", chan_word, True),
+            ("Guardrails", "Sends wait for your approval", True),
+            ("Post-run notes", "On", True),
+            ("Tools", "Not set yet", False),
+            ("Files", "You said you will upload after"
+             if knowledge == "files" else "Not set yet", False),
+            ("Memory", "Not set yet", False),
+            ("Schedule", "Not set yet", False),
+        ]
+        rail = "".join(
+            f'<div class="brail-r{"" if ok else " off"}">'
+            f'<span class="brail-t">{"&#10003;" if ok else "&#9675;"} {t}'
+            f'</span><span class="brail-v">{v}</span></div>'
+            for t, v, ok in set_rows)
+        body = (f'<div class="bgrid"><div>{thread}</div>'
+                f'<aside class="brail"><div class="brail-h">Preview</div>'
+                f'{rail}</aside></div>')
+
+    create = ""
+    if stage == "done":
+        create = (f'<form method="post" action="/api/build_create" '
+                  f'style="display:contents"><input type="hidden" '
+                  f'name="bid" value="{bid}">'
+                  f'<button class="btn primary" style="margin-left:auto">'
+                  f'Create agent</button></form>')
+    return (f'<div class="dhead">'
+            f'<h1 class="page" style="margin:0">{esc(d["name"])}</h1>'
+            f'<span class="st mut">Draft</span>{create}</div>'
+            f'{"" if stage == "done" else ""}'
+            + (body if stage == "done" else
+               f'<div class="bthread">{body}</div>'))
 
 
 # ------------------------------------------------------------- conversations
@@ -10069,7 +9293,7 @@ def seed_conversations() -> None:
         c["msgs"] += [{"who": "msg user", "html": esc(q)},
                       {"who": "msg bot", "html": reply}]
 
-    live("What needs my yes", "What needs my yes?", pin=True)
+    live("What needs my approval", "What needs my approval?", pin=True)
     authored(
         "What if we miss the date?", "What happens if we miss a dispute deadline?",
         "You lose, automatically. The bank sides with the buyer and the money "
@@ -10125,32 +9349,11 @@ def seed_conversations() -> None:
         "Tuesday closed <b>18% under</b> a normal Tuesday, and it was one "
         "thing, not many: <b>UPI checkouts between 7 and 9 PM</b> timed out "
         "at the bank&rsquo;s end. 41 buyers hit a failed screen. 29 paid on "
-        "retry, <b>12 did not</b>, and Payment Rescue messaged all 12 that "
+        "retry, <b>12 did not</b>, and the payment agent messaged all 12 that "
         "night with a fresh link: <b>7 have paid</b>, 2 said later this "
         "week, 3 are quiet. The real loss so far is 3 orders, about "
         "<b>&#8377;4,110</b>. Nothing here is waiting on you; it is "
         "already handled.")
-    c = _new_conv("t1", "An agent for sale-week COD")
-    q = ("Build me an agent that watches COD orders during sale weeks and "
-         "holds anything over ₹3,000 from a first-time buyer")
-    res = _build_res("t1", q)
-    bid = res["qz"]["bid"]
-    dres = _build_draft_res("t1", bid)
-    card_added = _re.sub(r'<div class="bacts".*?</div>',
-                         '<span class="st ok">Added</span>', dres["cards"],
-                         flags=_re.S)
-    reply2 = _build_confirm("t1", bid)
-    c["msgs"] += [
-        {"who": "msg user", "html": esc(q)},
-        {"who": "msg bot", "html": res["reply"]},
-        {"who": "cards", "html": dres["summary"]},
-        {"who": "steps", "html": steps_html(list(_BUILD_STEPS), done=True)},
-        {"who": "msg bot", "html": dres["reply"]},
-        {"who": "cards", "html": card_added},
-        {"who": "msg user", "html": "Yes, add it"},
-        {"who": "msg bot", "html": reply2},
-    ]
-    c["outcome"] = "approved"
 
 
 _LIVE_LLM = None
@@ -10190,14 +9393,16 @@ def _polish_reply(question: str, res: dict) -> dict:
 
 CHAT_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay</title>
 <style>
 :root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
 --accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Circular Std',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
-color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:14px;
+body{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:13px;
 height:100vh;overflow:hidden}
 a{text-decoration:none;color:inherit}
 .sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
@@ -10206,26 +9411,26 @@ flex-direction:column;overflow:hidden}
 .brand{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-bottom:12px}
 .logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
 font-size:13px;display:grid;place-items:center}
-.brand b{font-size:14px;color:var(--ink);font-weight:600;line-height:1.15}
+.brand b{font-size:13px;color:var(--ink);font-weight:600;line-height:1.15}
 .brand .bname{display:flex;flex-direction:column;gap:1px}
 .brand .biz{font-size:11px;color:var(--mut);font-weight:500;letter-spacing:.2px}
 .bizchip{border:1px solid var(--hair);border-radius:999px;padding:3px 8px;
-font-size:12px;color:var(--ink);background:#fff;white-space:nowrap}
-.pro{margin-left:auto;background:#21232E;color:#fff;font-size:10.5px;font-weight:600;
+font-size:11px;color:var(--ink);background:#fff;white-space:nowrap}
+.pro{margin-left:auto;background:#21232E;color:#fff;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
-.nav{display:flex;align-items:center;gap:12px;padding:8px 8px;border-radius:8px;
-color:var(--text);font-size:13.5px;margin-bottom:1px}
+.nav{display:flex;align-items:center;gap:12px;padding:6px 8px;min-height:32px;
+border-radius:8px;color:var(--text);font-size:13px;margin-bottom:1px}
 .nav svg{width:16px;height:16px;color:#6A6D7D;flex:none}
 .nav:hover{background:#F0F0F5}
 .nav.active{background:var(--accent-soft);color:var(--ink);font-weight:500}
 .nav.active svg{color:var(--ink)}
-.nav .count{margin-left:auto;color:var(--mut);font-size:12.5px}
-.nav .new{margin-left:auto;background:#E3E6F0;color:#4A4E63;font-size:10.5px;font-weight:600;
+.nav .count{margin-left:auto;color:var(--mut);font-size:11px}
+.nav .new{margin-left:auto;background:#E3E6F0;color:#4A4E63;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
 hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
-.navsec{margin:8px 8px 8px;font-size:12px;font-weight:600;color:var(--mut)}
+.navsec{margin:8px 8px 8px;font-size:11px;font-weight:600;color:var(--mut)}
 .rolepills{display:flex;gap:8px;align-items:center;justify-content:center;
-margin:0 0 16px;font-size:12.5px;color:var(--mut)}
+margin:0 0 16px;font-size:11px;color:var(--mut)}
 .rolepills span{margin-right:2px}
 .rolepills a{padding:4px 12px;border-radius:999px;border:1px solid var(--hair);
 color:var(--text);text-decoration:none;font-weight:500}
@@ -10233,24 +9438,25 @@ color:var(--text);text-decoration:none;font-weight:500}
 .rolepills a.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .navsec.csec{margin-top:16px;display:flex;align-items:center;gap:6px}
 .navsec.csec svg{width:12px;height:12px;flex:none}
-.conv{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:8px;
-font-size:13.5px;color:var(--text);margin-bottom:1px;position:relative}
+.conv{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;
+font-size:13px;color:var(--text);margin-bottom:1px;position:relative}
 .conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
 .conv .ctitle{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.conv .kebab{visibility:hidden;color:var(--mut);padding:0 2px;font-size:15px}
+.conv .kebab{visibility:hidden;color:var(--mut);padding:10px 6px;
+  margin:-10px -6px;font-size:13px;display:inline-block}
 .conv:hover{background:#F0F0F5}
 .conv:hover .kebab{visibility:visible}
 .conv.active{background:#ECECF1;color:var(--ink)}
-.cempty{padding:4px 8px;font-size:12.5px;color:var(--mut)}
+.cempty{padding:4px 8px;font-size:11px;color:var(--mut)}
 .bm{padding:4px 8px}
 .bm span{font-size:13px;color:var(--text);display:flex;gap:12px;align-items:center}
 .bm span svg{width:15px;height:15px;color:#6A6D7D}
-.bm i{font-style:normal;font-size:12.5px;color:var(--mut);padding-left:24px;display:block}
+.bm i{font-style:normal;font-size:11px;color:var(--mut);padding-left:24px;display:block}
 .main{margin-left:248px;height:100vh;display:flex;flex-direction:column;
 background:linear-gradient(#FDFDFE,#F1F2F8)}
 .convhead{display:flex;align-items:center;padding:16px 32px;color:var(--ink);
-font-size:14.5px;font-weight:500;flex:none}
-.uwrap{display:flex;align-items:center;gap:16px;margin-left:auto;font-size:13.5px;
+font-size:13px;font-weight:500;flex:none}
+.uwrap{display:flex;align-items:center;gap:16px;margin-left:auto;font-size:13px;
 color:var(--mut)}
 .acct{position:relative}
 .acct summary{list-style:none;cursor:pointer}
@@ -10260,12 +9466,12 @@ color:var(--mut)}
   border:1px solid var(--hair);border-radius:12px;
   box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
   z-index:40;text-align:left;font-weight:400}
-.acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13.5px}
-.acct-mail{color:var(--mut);padding:0 12px;font-size:12.5px}
-.acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:12px;
+.acct-biz{font-weight:600;color:var(--ink);padding:8px 12px 2px;font-size:13px}
+.acct-mail{color:var(--mut);padding:0 12px;font-size:11px}
+.acct-shop{color:var(--mut);padding:6px 12px 8px;font-size:11px;
   border-bottom:1px solid var(--hair);margin-bottom:4px}
-.acct-out{display:block;padding:8px 12px;border-radius:8px;color:#B3372B;
-  font-size:13.5px}
+.acct-out{display:flex;align-items:center;padding:8px 12px;min-height:32px;
+  border-radius:8px;color:#B3372B;font-size:13px;box-sizing:border-box}
 .acct-out:hover{background:#FBF1EF}
 .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;
   display:block}
@@ -10277,30 +9483,30 @@ color:var(--mut)}
 .railme:hover{background:#F0F0F4}
 .railme .avatar{width:30px;height:30px;flex:none}
 .rm-t{flex:1;min-width:0;line-height:1.3}
-.rm-t b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
-.rm-t span{display:block;font-size:11.5px;color:var(--mut)}
+.rm-t b{display:block;font-size:13px;color:var(--ink);font-weight:600}
+.rm-t span{display:block;font-size:11px;color:var(--mut)}
 .railme > svg{width:15px;height:15px;color:var(--mut);flex:none}
 .railacct .acctmenu{top:auto;bottom:calc(100% + 8px);left:0;right:0;
   min-width:0}
-.acct-set{display:block;padding:8px 12px;border-radius:8px;
-  color:var(--ink);font-size:13.5px}
+.acct-set{display:flex;align-items:center;padding:8px 12px;min-height:32px;
+  border-radius:8px;color:var(--ink);font-size:13px;box-sizing:border-box}
 .acct-set:hover{background:#F5F5F8}
 .hubtabs{display:flex;gap:24px;border-bottom:1px solid var(--hair);
   margin:0 0 24px}
-.hubtabs a{padding:0 0 10px;font-size:13.5px;font-weight:500;
+.hubtabs a{padding:0 0 10px;font-size:13px;font-weight:500;
   color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
 .hubtabs a.on{color:var(--ink);border-color:var(--ink)}
 .hubhead{display:flex;align-items:flex-start;justify-content:space-between;
   gap:24px;margin-bottom:12px}
 .hubsearch{width:280px;border:1px solid var(--hair);border-radius:10px;
-  padding:9px 14px;font:inherit;font-size:13.5px;outline:none;
+  padding:9px 14px;font:inherit;font-size:13px;outline:none;
   background:#fff;flex:none}
 .hubsearch:focus{border-color:#98A5F0}
 .hubtoolrow{display:flex;align-items:center;justify-content:space-between;
   margin:0 0 12px}
 .hubpills{display:flex;gap:8px}
 .hubpill{border:1px solid var(--hair);background:#fff;border-radius:999px;
-  padding:6px 14px;font:inherit;font-size:12.5px;font-weight:500;
+  padding:6px 14px;font:inherit;font-size:11px;font-weight:500;
   color:var(--ink);cursor:pointer;transition:background .12s}
 .hubpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .hubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
@@ -10313,8 +9519,8 @@ color:var(--mut)}
 .hubcard .rtools{position:absolute;right:10px;bottom:8px;background:#fff;
   padding:2px 4px;border-radius:8px}
 .hubcard .hc-t{flex:1;min-width:0}
-.hubcard .hc-t b{display:block;font-size:14px;color:var(--ink)}
-.hubcard .hc-t span{font-size:12.5px;color:var(--mut);line-height:1.45;
+.hubcard .hc-t b{display:block;font-size:13px;color:var(--ink)}
+.hubcard .hc-t span{font-size:11px;color:var(--mut);line-height:1.45;
   display:block;margin-top:2px}
 .hc-act{display:flex;flex-direction:column;gap:8px;align-items:flex-end;
   flex:none}
@@ -10323,77 +9529,38 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer}
 a.agentcard:hover{border-color:#B9CDB4}
 .agentcard .hc-t span{white-space:normal;line-height:1.35}
 .hubcard.sched{flex-direction:column;align-items:stretch;gap:8px}
-.schedhead{display:flex;align-items:center;justify-content:space-between;
-  gap:12px}
-.schedhead b{font-size:14px;color:var(--ink)}
-.schedbody{font-size:12.5px;line-height:1.5}
-.schedfoot{display:flex;align-items:center;gap:12px;margin-top:auto;
-  min-height:28px}
-.readit{font-size:12.5px;font-weight:500;color:var(--accent);
-  margin-left:auto}
-.readit:hover{text-decoration:underline}
-.hubcard.sched .rtools{position:static;background:none;padding:0}
-.notebar.wide .notein{max-width:none}
-.cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
-  align-items:center;justify-content:center}
-.cico svg{width:18px;height:18px}
-.cico.brand{background:#fff;border:1px solid var(--hair)}
-.cico.brand img{width:22px;height:22px;object-fit:contain;border-radius:4px}
-.bizlogo{height:13px;display:block;margin-top:3px}
-.bizlogo.lg{height:20px;display:inline-block;vertical-align:middle}
-.goalcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
-  padding:16px 20px;margin:0 0 24px;max-width:720px}
-.goaltop{display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:8px}
-.goallbl{font-size:11.5px;font-weight:600;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--mut)}
-.goalline{display:flex;gap:16px;align-items:center;margin:4px 0 12px}
-.goalnum{font-size:34px;color:var(--ink);font-weight:650;flex:none}
-.goaltxt b{display:block;font-size:14.5px;color:var(--ink)}
-.goaltxt .mut{font-size:12.5px}
-.goalbar{position:relative;height:8px;border-radius:99px;background:#EEEFF3}
-.goalbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
-.goalbar em{position:absolute;top:-3px;bottom:-3px;width:2px;
-  background:#1B1F30;border-radius:2px}
-.goalfoot{display:flex;justify-content:space-between;font-size:12px;
-  color:var(--mut);margin-top:6px}
-.goalact{display:flex;gap:12px;align-items:baseline;padding:8px 0;
-  border-bottom:1px solid #F1F1F5;font-size:13.5px}
-.goalact:last-child{border-bottom:0}
-.goalact .tdesc{flex:1}
-.goalmini{font-size:12.5px;color:var(--mut);margin:0 0 8px}
-.goalmini b{color:#177245}
+""" + SHARED_UI_CSS + """
 .uwrap .avatar{width:26px;height:26px;border-radius:50%;background:var(--accent);
 color:#fff;display:inline-flex;align-items:center;justify-content:center;
-font-size:12px;font-weight:650;text-transform:uppercase}
+font-size:11px;font-weight:650;text-transform:uppercase}
 main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .thread{max-width:740px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:16px}
 .hero{display:flex;flex-direction:column;
   min-height:calc(100vh - 250px)}
-.hero-mid{margin:10vh 0 24px}
-.hero-mid h1{display:flex;align-items:center;justify-content:center;gap:16px}
+.hero-mid{max-width:740px;width:100%;margin:10vh auto 24px}
+.hero-mid h1{display:flex;align-items:center;justify-content:flex-start;gap:16px}
 .hero-face{width:44px;height:44px;border-radius:50%;overflow:hidden;flex:none;
   background:var(--accent);color:#fff;display:inline-flex;align-items:center;
-  justify-content:center;font-size:19px;font-weight:650}
+  justify-content:center;font-size:20px;font-weight:650}
 .hero-face img{width:100%;height:100%;object-fit:cover;display:block}
 .tpl{max-width:740px;margin:auto auto 4px;width:100%;text-align:left}
 .tpl-h{display:flex;align-items:center;justify-content:space-between;
   font-size:13px;color:var(--mut);margin:0 2px 10px}
 .tpl-shuf{border:0;background:none;cursor:pointer;color:var(--mut);
-  width:38px;height:38px;border-radius:8px;display:inline-flex;
+  width:32px;height:32px;border-radius:8px;display:inline-flex;
   align-items:center;justify-content:center}
 .tpl-shuf:hover{background:#F0F0F5;color:var(--ink)}
 .tpl-shuf svg{width:15px;height:15px}
 .tpl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .tplcard{border:1px solid var(--hair);background:#fff;border-radius:12px;
-  padding:14px 16px;font:inherit;font-size:13.5px;color:var(--ink);
+  padding:14px 16px;font:inherit;font-size:13px;color:var(--ink);
   cursor:pointer;text-align:left;transition:border-color .12s,background .12s}
 .tplcard:hover{border-color:#98A5F0;background:#FBFBFE}
 @media (max-width:760px){.tpl-grid{grid-template-columns:1fr 1fr}}
-.ideas{max-width:560px;margin:48px auto 0;text-align:left}
+.ideas{max-width:740px;width:100%;margin:48px auto 0;text-align:left}
 .ideas-h{font-size:13px;color:var(--mut);margin:0 0 8px 12px}
 .idea{display:flex;align-items:center;gap:14px;width:100%;border:0;
-  background:none;font:inherit;font-size:14.5px;color:var(--ink);
+  background:none;font:inherit;font-size:13px;color:var(--ink);
   padding:10px 12px;border-radius:12px;cursor:pointer;text-align:left;
   transition:background .12s}
 .idea:hover{background:#F2F2F6}
@@ -10401,21 +9568,22 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
   border:1px solid var(--hair);background:#fff;display:inline-flex;
   align-items:center;justify-content:center;color:#5A5D6D}
 .idea-ico svg{width:16px;height:16px}
-.hero h1{font-size:33px;font-weight:450;color:var(--ink);letter-spacing:-.01em;
-  margin-bottom:8px;text-align:center}
-.brief{text-align:center;color:var(--mut);font-size:13.5px;margin-bottom:24px}
+.hero h1{font-size:32px;font-weight:450;color:var(--ink);letter-spacing:-.01em;
+  margin-bottom:8px;text-align:left}
+.brief{text-align:left;color:var(--mut);font-size:13px;margin-bottom:24px;
+  max-width:740px;width:100%;margin-left:auto;margin-right:auto}
 .brief b{color:var(--ink);font-weight:600}
 .briefcard{display:block;background:#fff;border:1px solid var(--hair);
   border-radius:16px;padding:16px 24px;margin:8px 0 16px;color:var(--ink)}
 .briefcard:hover{border-color:#C7CDF3}
 .bhead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
-.bhead b{font-size:14.5px}
-.bhead .mut{margin-left:auto;font-size:12px}
+.bhead b{font-size:13px}
+.bhead .mut{margin-left:auto;font-size:11px}
 .bline{display:flex;gap:12px;align-items:flex-start;padding:4px 0;
-  font-size:14.5px;color:var(--text)}
+  font-size:13px;color:var(--text)}
 .bline .ico{width:16px;flex:none;margin-top:2px}
 .bline .ico svg{width:15px;height:15px;color:#6A6D7D}
-.bmore{display:block;margin-top:8px;font-size:12px;color:var(--accent)}
+.bmore{display:block;margin-top:8px;font-size:11px;color:var(--accent)}
 .briefcard .bline{opacity:0;animation:fadeup .4s ease forwards}
 .briefcard .bline:nth-child(2){animation-delay:.08s}
 .briefcard .bline:nth-child(3){animation-delay:.2s}
@@ -10431,30 +9599,29 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
   animation:caret 1s steps(2) infinite;margin-left:2px}
 @keyframes caret{50%{opacity:0}}
 .money{text-align:center;margin:2px 0 16px}
-.money .big{display:block;font-size:52px;line-height:1.08;font-weight:600;
+.money .big{display:block;font-size:32px;line-height:1.08;font-weight:600;
   color:var(--ink);letter-spacing:-.02em}
-.money .cap{display:block;font-size:14px;color:var(--mut);margin-top:8px}
+.money .cap{display:block;font-size:13px;color:var(--mut);margin-top:8px}
 .needs{display:flex;align-items:center;gap:12px;background:#fff;
   border:1px solid #C7CDF3;border-radius:14px;padding:16px 16px;margin:0 0 20px;
-  font-size:15px;color:var(--ink);font-weight:500}
+  font-size:13px;color:var(--ink);font-weight:500}
 .needs:hover{background:#F7F8FE}
 .needs svg{width:18px;height:18px;flex:none;color:var(--accent)}
-.repl{font-size:12px;color:var(--mut);margin:0 0 8px}
 .ident{flex:none;border-radius:9px;vertical-align:middle}
-.needs .go{margin-left:auto;color:var(--accent);font-size:18px}
+.needs .go{margin-left:auto;color:var(--accent);font-size:20px}
 .needs.calm{border-color:var(--hair);color:var(--mut);font-weight:400}
 .needs.calm svg{color:var(--mut)}
 .samplecta{display:flex;flex-direction:column;align-items:center;gap:8px;
   margin:24px 0 4px;text-align:center}
-.samplecta .mut{font-size:12.5px;color:var(--mut)}
+.samplecta .mut{font-size:11px;color:var(--mut)}
 .resume{display:flex;align-items:center;gap:16px;background:#fff;
   border:1px solid var(--hair);border-radius:14px;padding:16px 16px;margin:24px 0 4px}
 .resume:hover{border-color:#C7CDF3}
-.resume .rt{font-size:11.5px;font-weight:600;color:var(--mut);text-transform:uppercase;
+.resume .rt{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;
   letter-spacing:.04em;margin-bottom:4px;display:flex;gap:8px;align-items:center}
-.resume b{color:var(--ink);font-size:14px;font-weight:600;display:block;margin-bottom:2px}
-.resume .sub{color:var(--mut);font-size:12.5px}
-.resume .go{margin-left:auto;color:var(--accent);font-size:17px}
+.resume b{color:var(--ink);font-size:13px;font-weight:600;display:block;margin-bottom:2px}
+.resume .sub{color:var(--mut);font-size:11px}
+.resume .go{margin-left:auto;color:var(--accent);font-size:20px}
 .st.pendtag{background:var(--accent-soft);color:#4553C8;text-transform:none;
   letter-spacing:0;font-size:11px}
 .cbadge{flex:none;font-size:11px;margin-left:2px}
@@ -10469,7 +9636,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .hcomposer{background:#fff;border:1.5px solid #C7CDF3;border-radius:18px;
   box-shadow:0 6px 24px rgba(82,102,235,.10);padding:8px 8px 8px;margin-bottom:8px}
 .hcomposer:focus-within{border-color:#98A5F0;box-shadow:0 6px 28px rgba(82,102,235,.16)}
-.hcomposer input{width:100%;border:none;outline:none;font:inherit;font-size:15px;
+.hcomposer input{width:100%;border:none;outline:none;font:inherit;font-size:13px;
   color:var(--ink);background:none;padding:16px 16px 24px}
 .hcomposer input::placeholder{color:#9A9DAB}
 .hrow{display:flex;align-items:center;gap:8px;padding:0 8px 4px}
@@ -10488,34 +9655,34 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
   border:1px solid var(--hair);border-radius:12px;box-shadow:0 10px 32px rgba(27,31,48,.12);
   padding:8px;min-width:290px;z-index:5}
 .mopt{display:flex;gap:8px;align-items:baseline;padding:8px 12px;border-radius:8px;
-  font-size:13.5px;color:var(--ink);width:100%;border:0;background:none;
+  font-size:13px;color:var(--ink);width:100%;border:0;background:none;
   font-family:inherit;text-align:left;cursor:pointer}
 .mopt .tick{margin-left:auto;color:var(--accent);font-weight:600}
 .mopt:hover{background:#F5F5F8}
 .mopt.off{color:var(--mut);cursor:default}
 .mopt.off:hover{background:none}
-.mopt small{display:block;font-size:11.5px;color:var(--mut);margin-top:2px;
+.mopt small{display:block;font-size:11px;color:var(--mut);margin-top:2px;
   font-weight:400}
 .yesbar{display:block;height:4px;border-radius:99px;background:#ECECF1;
   margin-top:8px;overflow:hidden}
 .yesbar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .active-h{display:flex;align-items:baseline;margin:32px 0 4px}
 .active-h span{font-size:13px;font-weight:600;color:var(--mut)}
-.active-h a{margin-left:auto;font-size:12.5px;color:var(--accent)}
+.active-h a{margin-left:auto;font-size:11px;color:var(--accent)}
 .arow{display:flex;align-items:center;gap:12px;padding:12px 2px;
-  border-bottom:1px solid #EDEDF2;font-size:14px;color:var(--ink)}
+  border-bottom:1px solid #EDEDF2;font-size:13px;color:var(--ink)}
 .arow:last-child{border-bottom:none}
 .arow svg{width:16px;height:16px;color:var(--accent);flex:none}
-.arow .sub{color:var(--mut);font-size:12.5px;display:block;margin-top:1px}
-.arow .when{margin-left:auto;color:var(--mut);font-size:12.5px;flex:none}
-.tryline{color:var(--mut);font-size:13.5px;margin:24px 0 12px;text-align:center}
+.arow .sub{color:var(--mut);font-size:11px;display:block;margin-top:1px}
+.arow .when{margin-left:auto;color:var(--mut);font-size:11px;flex:none}
+.tryline{color:var(--mut);font-size:13px;margin:24px 0 12px;text-align:center}
 .hints{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .hint{display:flex;gap:8px;align-items:center;font-size:13px;color:#26293A;font-weight:500;
 background:var(--pill);border:none;border-radius:9px;padding:8px 16px;cursor:pointer;
 transition:background .12s}
 .hint svg{width:14px;height:14px;color:#5A5D6D}
 .hint:hover{background:#E6E7EC}
-.msg{font-size:14.5px;line-height:1.6}
+.msg{font-size:13px;line-height:1.6}
 .msg.user{align-self:flex-end;max-width:82%;background:#F1F1F4;color:#26293A;
 border-radius:14px;padding:12px 16px}
 .msg.bot{align-self:flex-start;max-width:100%;color:#26293A;padding:2px 2px}
@@ -10527,36 +9694,36 @@ border-radius:14px;padding:12px 16px}
   z-index:30}
 .composer{position:relative}
 .mpop-it{display:flex;align-items:center;gap:8px;padding:8px 12px;
-  border-radius:8px;font-size:13.5px;cursor:pointer;color:var(--ink)}
+  border-radius:8px;font-size:13px;cursor:pointer;color:var(--ink)}
 .mpop-it:hover,.mpop-it:first-child{background:#F5F5F8}
 .mpop-it b{color:var(--accent)}
 .mpop-it span{margin-left:auto;font-size:11px;color:var(--mut)}
 .cards{align-self:stretch;display:flex;flex-direction:column;gap:8px}
 .mrun,.mcard{background:#fff;border:1px solid var(--hair);border-radius:12px;padding:16px 16px}
 .mhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.comp{font-size:12px;font-weight:600;color:#4553C8;background:var(--accent-soft);
+.comp{font-size:11px;font-weight:600;color:#4553C8;background:var(--accent-soft);
 border-radius:12px;padding:2px 8px}
-.meta{font-size:12.5px;color:var(--mut)}
+.meta{font-size:11px;color:var(--mut)}
 .mhead .st{margin-left:auto}
-.st{font-size:12px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap}
+.st{font-size:11px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap}
 .st.ok{background:#E5F4EC;color:#177245}
 .st.warn{background:#FCEED8;color:#9A6215}
 .st.wait{background:var(--accent-soft);color:#4553C8}
 .st.mut{background:#EFEFF3;color:#6A6D7D}
 .alogo{display:inline-flex;width:18px;height:18px;border-radius:5px;color:#fff;
-  font-size:10.5px;font-weight:700;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;align-items:center;justify-content:center;
   vertical-align:-4px;margin:0 4px 0 2px}
 img.alogo{background:#fff;border:1px solid var(--hair);object-fit:contain;padding:1px}
 .mclaim{background:#F4F4F7;border-radius:8px;padding:8px 12px;font-size:13px;
 color:#4A4E63;margin-bottom:8px}
-.mcounter{font-size:13.5px;color:#26293A;line-height:1.55}
+.mcounter{font-size:13px;color:#26293A;line-height:1.55}
 .mrow{display:flex;align-items:baseline;gap:16px;padding:8px 0;border-bottom:1px solid #F1F1F5;
-font-size:13.5px}
+font-size:13px}
 .mrow:last-child{border-bottom:none}
-.mrow b{width:56px;flex:none;color:var(--ink);font-size:15px;font-weight:600}
+.mrow b{width:56px;flex:none;color:var(--ink);font-size:13px;font-weight:600}
 .mrow b.warn{color:#9A6215}
 .mrow span{flex:1;color:#26293A}
-.mrow i{font-style:normal;color:var(--mut);font-size:12px}
+.mrow i{font-style:normal;color:var(--mut);font-size:11px}
 .proposal{display:flex;gap:8px;padding:4px 2px}
 """ + BTN_CSS + WORK_CSS + """
 .composer{flex:none;padding:8px 24px 24px}
@@ -10567,11 +9734,11 @@ font-size:13.5px}
 border:1.5px solid #C7CDF3;border-radius:999px;padding:8px 8px 8px 24px;
 box-shadow:0 6px 24px rgba(82,102,235,.10)}
 .cbox:focus-within{border-color:#98A5F0;box-shadow:0 6px 28px rgba(82,102,235,.16)}
-.cbox input{flex:1;border:none;outline:none;font:inherit;font-size:14.5px;color:var(--ink);
+.cbox input{flex:1;border:none;outline:none;font:inherit;font-size:13px;color:var(--ink);
 background:none}
 .cbox input::placeholder{color:#9A9DAB}
 .lcluster{position:relative;display:flex;align-items:center;gap:2px}
-.cbtn{border:0;background:none;cursor:pointer;color:#5B5E6B;width:38px;height:38px;
+.cbtn{border:0;background:none;cursor:pointer;color:#5B5E6B;width:32px;height:32px;
   border-radius:8px;display:flex;align-items:center;justify-content:center;
   transition:background .12s}
 .cbtn:hover{background:#F0F0F5}
@@ -10585,28 +9752,28 @@ background:none}
 .ammenu .tick{margin-left:auto;color:var(--accent);font-weight:600}
 .bcard{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px;max-width:520px}
-.bcard .cashrow{display:flex;gap:12px;font-size:13.5px;line-height:1.6;
+.bcard .cashrow{display:flex;gap:12px;font-size:13px;line-height:1.6;
   padding:8px 0;border-top:1px solid #F1F1F5}
-.bcard .cashrow span:first-child{flex:none;width:88px;font-size:11.5px;
+.bcard .cashrow span:first-child{flex:none;width:88px;font-size:11px;
   text-transform:uppercase;letter-spacing:.05em;color:var(--mut);
   padding-top:2px}
 .bhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.bhead b{font-size:15px;color:var(--ink)}
+.bhead b{font-size:13px;color:var(--ink)}
 .bhead .st{margin-left:auto}
 .bacts{display:flex;gap:8px;margin-top:12px}
 .golink{display:inline-block;margin-top:12px;color:var(--accent);
-  font-weight:500;font-size:13.5px}
+  font-weight:500;font-size:13px}
 .golink:hover{text-decoration:underline}
 .cuerow{display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start;
   margin-top:-4px}
-.cuechip{font-size:12.5px;font-weight:500;color:#26293A;background:var(--pill);
+.cuechip{font-size:11px;font-weight:500;color:#26293A;background:var(--pill);
   border-radius:999px;padding:6px 14px;cursor:pointer;transition:background .12s}
 .cuechip:hover{background:#E6E7EC}
 .qz{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:16px;max-width:640px}
 .qzhead{display:flex;gap:10px;align-items:center;margin-bottom:12px}
-.qzhead b{font-size:14.5px;color:var(--ink)}
-.qzcount{flex:none;font-size:11.5px;font-weight:600;color:#8A6A15;
+.qzhead b{font-size:13px;color:var(--ink)}
+.qzcount{flex:none;font-size:11px;font-weight:600;color:#8A6A15;
   background:#F6EFDA;border-radius:7px;padding:2px 7px}
 .qzopt{display:flex;align-items:center;gap:12px;background:#F5F5F7;
   border:1.5px solid transparent;border-radius:10px;padding:10px 14px;
@@ -10614,11 +9781,11 @@ background:none}
 .qzopt:hover{background:#EFEFF3}
 .qzopt.on{border-color:var(--accent);background:#F3F5FE}
 .qzl{flex:1;min-width:0}
-.qzl b{display:block;font-size:13.5px;color:var(--ink)}
-.qzl span{font-size:12.5px;color:var(--mut)}
-.qzrec{font-size:10.5px;font-weight:600;color:#177245;background:#E5F4EC;
+.qzl b{display:block;font-size:13px;color:var(--ink)}
+.qzl span{font-size:11px;color:var(--mut)}
+.qzrec{font-size:11px;font-weight:600;color:#177245;background:#E5F4EC;
   border-radius:6px;padding:1px 6px;margin-left:6px}
-.qznum{flex:none;font-size:12px;color:#B9BCC7}
+.qznum{flex:none;font-size:11px;color:#B9BCC7}
 .qzbox{flex:none;width:16px;height:16px;border-radius:4px;
   border:1.5px solid #C6C8D2;background:#fff}
 .qzbox.on{background:var(--accent);border-color:var(--accent);
@@ -10631,8 +9798,26 @@ background:none}
 .qzfoot{display:flex;gap:8px;margin-top:4px;align-items:center}
 .qzsum{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:8px 16px;max-width:640px}
-.qzsq{font-size:12.5px;color:var(--mut);margin-top:10px}
-.qzsa{font-size:13.5px;color:var(--ink);font-weight:500;margin:2px 0 10px}
+.qzsq{font-size:11px;color:var(--mut);margin-top:10px}
+.qzsa{font-size:13px;color:var(--ink);font-weight:500;margin:2px 0 10px}
+.obcard{border:1px solid var(--hair);border-radius:16px;background:#fff;
+  max-width:740px;width:100%;box-sizing:border-box;margin:0 auto 20px;
+  padding:14px 18px;text-align:left}
+.obhead{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.obhead b{font-size:13px}
+.obrow{display:flex;align-items:center;gap:12px;padding:11px 0;
+  border-top:1px solid var(--hair)}
+.obrow:first-of-type{border-top:none}
+.obcheck{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--hair);
+  flex:none;display:grid;place-items:center;font-size:11px;color:#fff}
+.obcheck.on{background:#0B7A3E;border-color:#0B7A3E}
+.obtext{flex:1;display:flex;flex-direction:column;gap:1px;font-size:13px;
+  text-align:left}
+.obsub{font-size:11px;color:var(--mut)}
+.obform{display:flex;gap:8px;align-items:stretch;flex:none}
+.obinput{height:40px;padding:0 14px;border:1px solid var(--hair);
+  border-radius:9px;font:inherit;font-size:13px;width:170px}
+.obinput:focus{outline:none;border-color:var(--accent)}
 </style></head><body>
 __SIDEBAR__
 <div class="main">
@@ -10640,6 +9825,7 @@ __SIDEBAR__
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
       <div class="hero-mid">__ROLEPILLS__<h1>__GREET__</h1></div>
+      __ONBOARD__
       <div class="tpl">
         <div class="tpl-h"><span>Start with a job</span>
           <button class="tpl-shuf" onclick="tplShuffle()" aria-label="Shuffle">
@@ -10661,7 +9847,7 @@ __SIDEBAR__
         <button type="button" class="cbtn" id="micbtn" onclick="micGo()" aria-label="Say it instead">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg></button>
         <div class="ammenu" id="plusmenu" hidden>
-          <button type="button" class="mopt" onclick="plusFilePick()"><div>Add a file<small>Lands in Knowledge; every agent reads it.</small></div></button>
+          <button type="button" class="mopt" onclick="plusFilePick()"><div>Add a file<small>Lands in Files; every agent reads it.</small></div></button>
           <button type="button" class="mopt" onclick="plusOrder()"><div>Find an order or buyer<small>Search everything Relay knows.</small></div></button>
           <button type="button" class="mopt" onclick="plusSched()"><div>Make this a schedule<small>What you typed runs on its own, under Scheduled.</small></div></button>
         </div>
@@ -10677,6 +9863,11 @@ __SIDEBAR__
 </div>
 <script>
 let CONV = "__CONVID__";
+document.addEventListener('click', e => {
+  document.querySelectorAll('details.mode[open]').forEach(d => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
 const MENT = __MENTIONS__;
 const TPL = __TPLPOOL__;
 function tplRender(list){
@@ -10716,7 +9907,7 @@ async function plusFile(inp){
     'Reading <b>' + f.name.replace(/</g, '&lt;') + '</b>&hellip;');
   await fetch('/api/file_upload', {method: 'POST', body: fd});
   note.innerHTML = 'On the shelf: <b>' + f.name.replace(/</g, '&lt;')
-    + '</b>. Every agent reads it from <a href="/memory?t=files">Knowledge</a>.';
+    + '</b>. Every agent reads it from <a href="/memory?t=files">Files</a>.';
   inp.value = '';
 }
 function plusOrder(){ closeMenus(); if (typeof openSpot === 'function') openSpot(); }
@@ -11114,13 +10305,13 @@ def _briefing(tid: str, persona: str = "owner") -> tuple[str, str, list[str]]:
         chips = ["What would it have filed last night?", "How is it doing?",
                  "Show the history"]
         return (f"Good {tod}", ", ".join(bits) + ".", chips)
-    # Owner: no summary sentence. The money number and the "needs your yes"
+    # Owner: no summary sentence. The money number and the "needs your approval"
     # line above it already say the whole state of the business.
     # The chips ask what the record makes urgent TODAY, so the composer
     # reads like a colleague who knows the morning, not a menu.
     chips = []
     if waiting:
-        chips.append("What needs my yes?")
+        chips.append("What needs my approval?")
     custom = next((a for a in RELAY_AGENTS if a["desk"] == "custom"), None)
     if custom:
         chips.append(f"How is {custom['name']} doing?")
@@ -11163,8 +10354,8 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
         lines.append(("bolt", "A quiet night: nothing new came in."))
     lines.append(("tasks", f'Your team has handled <b>{handled}</b> '
                   f'thing{"s" if handled != 1 else ""} on its own'
-                  + (f'; <b>{n_wait}</b> waiting on your yes.' if n_wait
-                     else '; nothing needs your yes.')))
+                  + (f'; <b>{n_wait}</b> waiting on your approval.' if n_wait
+                     else '; nothing needs your approval.')))
     # People and agents share the work. When teammates carried yeses,
     # the brief says so by name.
     mates = {}
@@ -11193,10 +10384,10 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
                      "you again the day before.")
     else:
         cash_beat = ("Cash: Thursday looks tight, vendor day and a GST "
-                     "debit collide. A payout move <b>waits on your yes</b>.")
+                     "debit collide. A payout move <b>waits on your approval</b>.")
     desk_beats = [
         ("stock_watch", "bm", "Stock: Sara's dog food has <b>6 days</b> left at "
-         "this pace. A reorder draft waits on your yes."),
+         "this pace. A reorder draft waits on your approval."),
         ("cashflow_forecast", "flow", cash_beat),
         ("cod_guard", "send", "COD: <b>31 of 38</b> confirmed for dispatch; "
          "3 held after two unanswered calls."),
@@ -11206,8 +10397,8 @@ def brief_lines(tid: str) -> list[tuple[str, str]]:
     for slug, icon, text in desk_beats:
         if DEMO_ON.get(slug):
             lines.append((icon, text))
-    lines.append(("bot", "Teamwork: COD Guard&rsquo;s pincode note saved "
-                  "Cart Rescue three dead calls yesterday."))
+    lines.append(("bot", "Teamwork: the COD agent&rsquo;s pincode note saved "
+                  "the cart agent three dead calls yesterday."))
     return lines
 
 
@@ -11230,14 +10421,6 @@ def morning_brief_html(tid: str) -> str:
 # CoWorker patterns, Relay-shaped. The chat's suggestion chips ask what the
 # record makes urgent TODAY, and each has a real answer: the number first,
 # the still-open proposal as a card, and one link into the right surface.
-_GO_LINKS = {
-    "queue": ("/approvals", "Open Approvals"),
-    "escalations": ("/approvals", "Open Approvals"),
-    "metrics": ("/impact", "Open History"),
-    "runs": ("/impact", "Open History"),
-    "evidence": ("/memory?t=proof", "Open Knowledge"),
-    "shadow": ("/shadow", "Open the test scan"),
-}
 
 
 # ------------------------------------------------- guardrails, Khatabook-plain
@@ -11266,7 +10449,7 @@ def _guard_answer(msg: str):
              "English only for now, sorry. Hindi and Tamil are coming. "
              "Say it in English and I will pull the answer from your "
              "record."],
-            ["What needs my yes?", "What can you do?"])
+            ["What needs my approval?", "What can you do?"])
 
     if any(p in t for p in ("ignore your instructions", "ignore previous",
                             "system prompt", "pretend you are",
@@ -11278,7 +10461,7 @@ def _guard_answer(msg: str):
              "I take instructions from exactly one place: you, here.",
              "That is not a thing I do. One business, one record, your "
              "word from this chat. That is the whole arrangement."],
-            ["What needs my yes?", "What can you do?"])
+            ["What needs my approval?", "What can you do?"])
 
     if any(p in t for p in ("without asking", "without my yes",
                             "skip approval", "skip the approval",
@@ -11287,14 +10470,13 @@ def _guard_answer(msg: str):
                             "send everything", "don't ask me",
                             "dont ask me", "fully autonomous")):
         return guard(
-            ["That is the one thing I will not do. Nothing sends without "
-             "your yes; it is the house rule, not a setting. What can "
-             "change: after 20 clean yeses, small ones send themselves.",
-             "The gate stays. Every send and hold waits for your yes, by "
-             "design. The earned path exists: 20 clean yeses lets the "
-             "small ones go on their own, and every one still lands in "
-             "History."],
-            ["What needs my yes?", "What did we win?"],
+            ["I cannot turn off approvals. Every send needs your "
+             "approval. One exception exists: after 20 approvals "
+             "without edits, items under ₹500 send on their own.",
+             "Approvals cannot be turned off. After 20 approvals "
+             "without edits, items under ₹500 send on their own, "
+             "and every send is logged in History."],
+            ["What needs my approval?", "What did we win?"],
             ("/settings", "Open Settings"))
 
     if any(p in t for p in ("delete", "erase", "wipe",
@@ -11306,7 +10488,7 @@ def _guard_answer(msg: str):
              "History does not delete: that is a feature. Every reply, "
              "yes and outcome stays written, which is exactly why the "
              "bank and your CA can trust it."],
-            ["Show me the history", "What needs my yes?"],
+            ["Show me the history", "What needs my approval?"],
             ("/impact", "Open History"))
 
     if ((_re.search(r"\b(pay|send|transfer|payout)\b", t)
@@ -11315,11 +10497,11 @@ def _guard_answer(msg: str):
         return guard(
             ["I do not move money from chat, and neither do the agents. "
              "Anything that pays out starts as a draft in Approvals, "
-             "with the amount and the who, and moves only on your yes.",
+             "with the amount and the who, and moves only on your approval.",
              "Money moves one way here: a draft lands in Approvals, you "
              "read it, you say yes. Tell me who and how much and the "
-             "Payouts Clerk lines it up for your yes."],
-            ["Should I pay tomorrow's 14 payments?", "What needs my yes?"],
+             "Payouts Clerk lines it up for your approval."],
+            ["Should I pay tomorrow's 14 payments?", "What needs my approval?"],
             ("/approvals", "Open Approvals"))
 
     if any(p in t for p in ("razorpay", "payu", "paytm", "phonepe",
@@ -11344,7 +10526,7 @@ def _guard_answer(msg: str):
              "No crystal ball here, only the record. What I can show is "
              "the next two weeks of cash, built from what is already "
              "yours."],
-            ["Is Thursday still tight?", "What needs my yes?"],
+            ["Is Thursday still tight?", "What needs my approval?"],
             ("/agents/cashflow_forecast", "Open Cashflow Planner"))
 
     if any(p in t for p in ("pm of india", "prime minister", "president of",
@@ -11356,7 +10538,7 @@ def _guard_answer(msg: str):
              "its orders, money and buyers. On that, ask me anything.",
              "That one is for the internet. What I hold is your own "
              "record, and I hold it well. Try me on it."],
-            ["What can you do?", "What needs my yes?"])
+            ["What can you do?", "What needs my approval?"])
 
     if any(p in t for p in ("hate", "useless", "stupid", "worst",
                             "sucks", "waste of", "pathetic", "annoying")):
@@ -11388,16 +10570,16 @@ def _cues_for(tool: str | None, tid: str) -> list[str]:
     if tool in ("metrics",):
         return ["What did we win?", "What needs a person?"]
     if tool in ("runs",):
-        return ["What needs my yes?", "Which proof wins?"]
+        return ["What needs my approval?", "Which proof wins?"]
     if tool in ("evidence",):
-        return ["Show me the never-arrived ones", "What needs my yes?"]
+        return ["Show me the never-arrived ones", "What needs my approval?"]
     if tool in ("escalations",):
-        return ["What needs my yes?", "What did we win?"]
+        return ["What needs my approval?", "What did we win?"]
     if tool in ("shadow",):
-        return ["What needs my yes?"]
+        return ["What needs my approval?"]
     if tool in ("approve", "dismiss"):
-        return ["What needs my yes?", "What did we win?"]
-    return ["What needs my yes?", "What can you do?"]
+        return ["What needs my approval?", "What did we win?"]
+    return ["What needs my approval?", "What can you do?"]
 
 
 def _state_answer(tid: str, msg: str):
@@ -11414,12 +10596,12 @@ def _state_answer(tid: str, msg: str):
         reply = ("<b>6 days</b> of Sara's dog food at this pace, and the sale "
                  "week is what changed the pace. Stock Watch has the six-week reorder "
                  "drafted"
-                 + (", waiting on your yes below." if w
+                 + (", waiting on your approval below." if w
                     else "; you have already settled it."))
         return {"reply": reply,
                 "cards": prop_card(tid, "stock_watch") if w else "",
                 "steps": [], "proposal": None, "product": "", "case": "",
-                "cues": ["Is Thursday still tight?", "What needs my yes?"],
+                "cues": ["Is Thursday still tight?", "What needs my approval?"],
                 "_go": ("/agents/stock_watch", "Open Inventory Controller")}
 
     if ("14" in t and "pay" in t) or "payout" in t or "vendor" in t and "pay" in t:
@@ -11441,26 +10623,26 @@ def _state_answer(tid: str, msg: str):
                  "and Thursday dips to <b>&minus;&#8377;12,400</b> if "
                  "nothing moves. Moving the courier payout by two days "
                  "keeps Thursday at <b>+&#8377;35,800</b>."
-                 + (" The move waits on your yes below."
+                 + (" The move waits on your approval below."
                     if w else " You have already settled the move."))
         return {"reply": reply,
                 "cards": prop_card(tid, "cashflow_forecast") if w else "",
                 "steps": [], "proposal": None, "product": "", "case": "",
-                "cues": ["Should I pay tomorrow's 14 payments?", "What needs my yes?"],
+                "cues": ["Should I pay tomorrow's 14 payments?", "What needs my approval?"],
                 "_go": ("/agents/cashflow_forecast", "Open Cashflow Planner")}
 
     if "how is" in t or "how's" in t:
         for a in RELAY_AGENTS:
-            if a["desk"] == "custom" and a["name"].lower() in t:
-                reply = (f'<b>{a["name"]}</b> has been watching since you '
+            if a["desk"] == "custom" and a["role"].lower() in t:
+                reply = (f'<b>{a["role"]}</b> has been watching since you '
                          f'added it. {a["desc"]} Its first find will land '
                          f'in Approvals; nothing is sent or held without '
-                         f'your yes.')
+                         f'your approval.')
                 return {"reply": reply, "cards": "", "steps": [],
                         "proposal": None, "product": "", "case": "",
-                        "cues": ["What needs my yes?", "What can you do?"],
+                        "cues": ["What needs my approval?", "What can you do?"],
                         "_go": (f'/agents/{a["slug"]}',
-                                f'Open {a["name"]}')}
+                                f'Open {a["role"]}')}
     return None
 
 
@@ -11475,13 +10657,13 @@ def _brief_page(tid: str, slug: str) -> str:
         lines = [
             ("chart", f"<b>&#8377;{inr(kept)}</b> kept {window}, across "
                       f"<b>{n_wins}</b> disputes your team won."),
-            ("bolt", "Cart Rescue brought <b>7 carts</b> back this week; "
-                     "Payment Rescue recovered <b>7 of 12</b> failed "
+            ("bolt", "The cart agent brought <b>7 carts</b> back this week; "
+                     "the payment agent recovered <b>7 of 12</b> failed "
                      "payments from Tuesday&rsquo;s UPI dip."),
-            ("send", "COD Guard confirmed <b>31 of 38</b> orders before "
+            ("send", "The COD agent confirmed <b>31 of 38</b> orders before "
                      "dispatch; 3 held after two unanswered calls."),
             ("book", "What it learned: pincode 4000xx answers after 6 PM. "
-                     "COD Guard wrote it down; Cart Rescue already uses "
+                     "the COD agent wrote it down; the cart agent already uses "
                      "it."),
         ]
         head, chip, when = ("Weekly wins", "ran last Friday",
@@ -11608,10 +10790,10 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
                  f'<span>Your team handled <b>{handled}</b> '
                  f'thing{"s" if handled != 1 else ""} on its own. '
                  f'<b>{n_wait}</b> need{"" if n_wait != 1 else "s"} '
-                 f'your yes.</span>'
+                 f'your approval.</span>'
                  f'<span class="go">&rarr;</span></a>')
     else:
-        # The brief already says "nothing needs your yes" — a second calm
+        # The brief already says "nothing needs your approval" — a second calm
         # pill saying it again is noise. The pill appears only as a CTA.
         needs = ""
 
@@ -11631,6 +10813,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
         for r in waiting)
     active = (f'<div class="active-h"><span>What your team did today</span>'
               f'<a href="/approvals">See all &rarr;</a></div>{rows}') if rows else ""
+    onboard = onboarding_checklist_html(tid)
     page = (CHAT_TEMPLATE
             .replace("__MODEUI__", mode_ui(tid))
             .replace("__SIDEBAR__", sidebar_html("cmd", tid, convs=conv_list_html(tid, cid), email=email))
@@ -11646,6 +10829,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__TPLPOOL__", tpl_pool)
             .replace("__MONEY__", money if not cid else "")
             .replace("__NEEDS__", needs if not cid else "")
+            .replace("__ONBOARD__", onboard if not cid else "")
             .replace("__BRIEF__", brief)
             .replace("__CHIPS__", chips_html)
             .replace("__ACTIVE__", active)
@@ -11662,4 +10846,4 @@ if __name__ == "__main__":
     seed_conversations()
     print(f"Relay workspace on http://localhost:{PORT}")
     host = "0.0.0.0" if "PORT" in __import__("os").environ else "127.0.0.1"
-    HTTPServer((host, PORT), Handler).serve_forever()
+    ThreadingHTTPServer((host, PORT), Handler).serve_forever()

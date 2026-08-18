@@ -9,3 +9,4 @@ uv.lock
 .env.*
 .vercel
 demo/.demo_cfg.json
+demo/.demo_state.json
