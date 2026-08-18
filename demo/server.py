@@ -1071,6 +1071,36 @@ BTN_CSS = """
 # Card chrome shared by the hub and chat shells: schedule cards,
 # overflow menus, goal numbers. One copy, injected into both.
 SHARED_UI_CSS = """
+/* --- run inspector (/runs/<id>) --- */
+.irid{font-family:ui-monospace,monospace;font-size:20px;
+  background:var(--pill,#EEEFF2);border-radius:8px;padding:2px 10px}
+.ivitals{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;
+  background:var(--hair);border:1px solid var(--hair);border-radius:14px;
+  overflow:hidden;margin:16px 0 8px}
+@media (max-width:900px){.ivitals{grid-template-columns:repeat(3,1fr)}}
+.ivital{background:#fff;padding:12px 14px;font-size:11px}
+.ivital span{display:block;color:var(--mut);margin-bottom:3px}
+.ivital b{font-size:13px;font-weight:600;color:var(--ink)}
+.istep{display:flex;align-items:baseline;gap:12px;padding:12px 0;
+  border-bottom:1px solid #EEEFF3;font-size:13px}
+.istep-n{flex:none;width:22px;height:22px;border-radius:50%;
+  background:var(--pill,#EEEFF2);color:#5A5D6D;font-size:11px;
+  font-weight:700;display:inline-flex;align-items:center;
+  justify-content:center;align-self:center}
+.istep-w{flex:none;width:170px}
+.istep-w b{display:block;color:var(--ink);font-weight:600}
+.istep-w code{font-size:11px;color:var(--mut);
+  font-family:ui-monospace,monospace}
+.istep-d{flex:1;min-width:0;color:var(--text)}
+.istep-t{flex:none;color:var(--mut);font-size:11px;
+  font-family:ui-monospace,monospace}
+.runchip{font-size:11px;font-weight:600;color:var(--accent);
+  border:1px solid var(--hair);border-radius:100px;padding:4px 10px;
+  margin-left:8px;vertical-align:2px}
+.runchip:hover{border-color:#98A5F0}
+.bcfg code{font-family:ui-monospace,monospace;font-size:11px;
+  background:var(--pill,#EEEFF2);border-radius:6px;padding:1px 6px;
+  white-space:pre-wrap;word-break:break-all}
 /* --- agent builder (/agents/new) --- */
 .bthread{max-width:640px}
 .bmsg{border-radius:14px;padding:12px 16px;font-size:13px;
@@ -2026,6 +2056,107 @@ def case_status(runs: list) -> tuple[str, str]:
     return ("done", "Done")
 
 
+def run_inspector_content(tid: str, rid: str) -> str:
+    """One run, every step: the engineering view of what the case page
+    tells in plain words. Everything on this page is read straight off
+    the ledger — the trace events, the refs, the gate record, the cost.
+    Nothing is stored for display; if it is not in the ledger, it is not
+    here."""
+    led = WORLD.d.ledger
+    run = next((r for r in led.runs.values()
+                if r.tenant_id == tid and
+                (r.run_id == rid or r.run_id.startswith(rid))), None)
+    if run is None:
+        return ('<h1 class="page">No such run</h1>'
+                '<div class="pagehint">Nothing in the ledger under that '
+                'id.</div>')
+    lbl, cls = STATE_META.get(run.state, (run.state.value, "mut"))
+    short = run.run_id[:8]
+    who = customer_of(run.order_id) if run.order_id else ""
+
+    # Vitals: the run's own timestamps and the gate record, verbatim.
+    def _t(dt):
+        return dt.strftime("%-d %b, %H:%M:%S") if dt else "&mdash;"
+    gate_v = "&mdash;"
+    if run.gate_action:
+        lat = ""
+        if run.gate_latency_ms:
+            secs = run.gate_latency_ms // 1000
+            lat = (f" &middot; {secs}s wait" if secs < 120
+                   else f" &middot; {secs // 60}m wait" if secs < 7200
+                   else f" &middot; {secs // 3600}h wait")
+        gate_v = (f'{run.gate_action.value} by {esc(run.gate_actor or "?")}'
+                  f'{lat}')
+    vitals = [
+        ("Received", _t(run.occurred_at)),
+        ("Surfaced", _t(run.surfaced_at)),
+        ("Gate", gate_v),
+        ("Acted", _t(run.acted_at)),
+        ("Deadline", _t(run.deadline_at)),
+        ("Credits", str(run.cost_tokens) if run.cost_tokens else "0"),
+    ]
+    vrow = "".join(f'<div class="ivital"><span>{k}</span><b>{v}</b></div>'
+                   for k, v in vitals)
+
+    # The trace, step by step, raw: worker · kind · detail · clock.
+    events = led.trace_for(run.run_id)
+    steps = "".join(
+        f'<div class="istep">'
+        f'<span class="istep-n">{i + 1}</span>'
+        f'<span class="istep-w"><b>{worker_name(e["agent"])}</b>'
+        f'<code>{esc(e["agent"])}</code></span>'
+        f'<span class="istep-d"><span class="st '
+        f'{"ok" if e["kind"] in ("confirmed", "qualified", "drafted", "passed", "approved", "filed", "resolved", "signal", "surfaced") else "wait"}'
+        f'">{esc(e["kind"])}</span> {esc(e["detail"])}</span>'
+        f'<span class="istep-t">{e["ts"].strftime("%H:%M:%S")}</span>'
+        f'</div>'
+        for i, e in enumerate(events)) or (
+        '<div class="pagehint">No trace events recorded for this run.'
+        '</div>')
+
+    # What the run read and wrote: refs, the decision, the citations.
+    d = run.decision or {}
+    refs = json.dumps(run.retrieved_refs, indent=1) \
+        if run.retrieved_refs else "{}"
+    cited = ", ".join(d.get("cited_evidence_ids") or []) or "&mdash;"
+    conf = d.get("confidence")
+    io_rows = [
+        ("Trigger", f'{esc(run.trigger_source)} &middot; '
+                    f'<code>{esc(run.trigger_ref)}</code>'),
+        ("Reason code", f'<code>{esc(run.reason_code or "—")}</code>'),
+        ("Claim", esc(run.claim_text or "—")),
+        ("Retrieved", f'<code>{esc(refs)}</code>'),
+        ("Cited", f'<code>{cited}</code>'),
+        ("Confidence", f'{conf:.2f}' if isinstance(conf, (int, float))
+         else "&mdash;"),
+        ("Draft", esc((d.get("counter_text") or "—")[:220])),
+    ]
+    if run.gate_diff:
+        io_rows.append(("Your rewording",
+                        f'<code>{esc(json.dumps(run.gate_diff)[:220])}'
+                        f'</code>'))
+    if run.suppressed_reason:
+        io_rows.append(("Suppressed", esc(run.suppressed_reason)))
+    io = "".join(f'<div class="bcfg"><span>{k}</span><div>{v}</div></div>'
+                 for k, v in io_rows)
+
+    case_link = (f'<a class="mut" href="/cases/{esc(run.order_id)}">'
+                 f'{esc(who)} &middot; {esc(bought(run.order_id))} '
+                 f'&rarr;</a>' if run.order_id else "")
+    return (
+        f'<div class="dhead"><a class="back2" '
+        f'href="/cases/{esc(run.order_id or "")}">&lsaquo;</a>'
+        f'<div><h1 class="page" style="margin:0">Run '
+        f'<code class="irid">{short}</code></h1>'
+        f'<div class="meta"><span class="st {cls}">{lbl}</span>'
+        f'<span>&middot;</span>{case_link}</div></div></div>'
+        f'<div class="pagehint">Every line below is read straight off '
+        f'the ledger. Nothing is edited or summarised.</div>'
+        f'<div class="ivitals">{vrow}</div>'
+        f'<h2 class="sec">Steps</h2>{steps}'
+        f'<h2 class="sec">What it read and wrote</h2>{io}')
+
+
 def case_content(tid: str, order_id: str) -> str:
     """One order, one case, one shared history. Every agent that touched
     this order writes into the same timeline, in the order it happened.
@@ -2163,8 +2294,12 @@ def case_content(tid: str, order_id: str) -> str:
                  f'{work_product(latest, mode="page")}')
     story = (
         f'<div class="casegrid">'
-        f'<div><h2 class="sec">What happened, start to finish</h2>'
-        f'<ol class="ctimeline">{tl}</ol></div>'
+        f'<div><h2 class="sec">What happened, start to finish'
+        + "".join(
+            f' <a class="runchip" href="/runs/{r.run_id}">'
+            f'Inspect run {r.run_id[:8]} &rarr;</a>'
+            for r in runs)
+        + f'</h2><ol class="ctimeline">{tl}</ol></div>'
         f'<div><h2 class="sec">Where it stands</h2>'
         f'<div class="cdecide">{"".join(decided)}</div>'
         f'<h2 class="sec" id="proof">The proof on file</h2>'
@@ -7378,6 +7513,14 @@ class Handler(BaseHTTPRequestHandler):
             self._html(_shell(account_journey_content(sess["tenant_id"],
                                                       self.path.rsplit("/", 1)[-1]),
                               "projects", sess["tenant_id"], sess.get("email", "")))
+        elif self.path.startswith("/runs/"):
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            rid = self.path.split("?")[0].rsplit("/", 1)[-1]
+            self._html(_shell(
+                run_inspector_content(sess["tenant_id"], rid),
+                "activity", sess["tenant_id"], sess.get("email", "")))
         elif self.path.startswith("/cases/"):
             sess = self._session()
             if not sess:
