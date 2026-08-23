@@ -9579,13 +9579,6 @@ def conv_list_html(tid: str, active: str = "") -> str:
                f'{"<span class=cbadge-on></span>" if a["status"] == "live" else ""}'
                f'</a>'
                for a in RELAY_AGENTS))
-    recents = sorted(mine, key=lambda c: -c["seq"])[:6]
-    if recents:
-        out += (f'<div class="navsec csec" data-st="chat">{ICONS["chat"]}<span>Conversations</span></div>'
-                + "".join(row(c) for c in recents))
-    if not out:
-        out = (f'<div class="navsec csec" data-st="chat">{ICONS["chat"]}<span>Conversations</span></div>'
-               '<div class="cempty" data-st="chat">Conversations appear here.</div>')
     return out
 
 
