@@ -3561,7 +3561,7 @@ def workflows_content(tid: str) -> str:
                        f'<span class="mut">{len(runs)} runs &middot; {waiting} '
                        f'waiting &middot; {resolved} resolved</span>']),
         _trow2(PCOLS, ["<b>the COD agent, the payment agent, the cart agent, Settlement "
-                       "Clarity, the refund agent, Loan Recovery, Due Diligence</b>",
+                       "Clarity, Due Diligence</b>",
                        '<span class="mut">Relay&rsquo;s other seven agents. '
                        'see the full fleet on the Agents console.</span>',
                        '<span class="st mut">not yet wired in this demo</span>',
@@ -4200,7 +4200,6 @@ def agent_settings_content(tid: str, a: dict, note=("", "")) -> str:
                         ["Cashfree", "Your store"]],
         "payment_rescue": [["Voice calls", "WhatsApp"], ["Cashfree"]],
         "cod_guard": [["Voice calls", "WhatsApp"], ["Your store"]],
-        "refund_shield": [["Cashfree", "Your store"], ["Cashfree"]],
     }
 
     def _via(tool_text, idx=None):
@@ -8944,8 +8943,6 @@ _BUILD_PAT = _re.compile(
 _BUILD_NAMES = [
     (("customer", "support", "executive", "helpdesk"),
      "Customer Executive", "support"),
-    (("appointment", "booking", "salon", "clinic", "slot"),
-     "Booking Assistant", "calling"),
     (("lead", "sales call", "qualify"), "Lead Qualifier", "calling"),
     (("cart",), "Cart Keeper", "calling"),
     (("refund",), "Refund Referee", "risk"),
@@ -8996,7 +8993,7 @@ def _llm_build_draft(msg: str) -> dict | None:
                 "business from one described job. Plain language, active "
                 "voice, no jargon. Return:\n"
                 "- name: a 2-3 word job title a founder would hire for "
-                "(e.g. 'Customer Executive', 'Booking Assistant', "
+                "(e.g. 'Customer Executive', "
                 "'Collections Caller'). Never include a brand name.\n"
                 "- kind: which desk the job belongs to. support = "
                 "answering customers; calling = phoning or messaging "

@@ -20,14 +20,6 @@ deleting its entries here; lookups in server.py all fall back safely.
 # risk lead and no ops lead. One person wears every hat, and that person is
 # the only reader this copy is written for.
 RELAY_AGENTS = [
-    dict(slug="appointment_booking", icon="chart",
-        status="roadmap", desk="calling",
-        role="Appointment Booking Agent",
-        desc="Books the slot, collects the fee, and reminds the customer "
-             "so they actually turn up.",
-        today="Bookings live in WhatsApp threads and a paper diary. "
-              "No-shows cost you the slot and the fee.",
-        replaces="the front-desk person juggling the diary, &#8377;15&ndash;22k a month"),
     dict(slug="subscription_dunning", icon="chart",
         status="roadmap", desk="calling",
         role="Subscription Dunning Agent",
@@ -35,23 +27,7 @@ RELAY_AGENTS = [
              "customer before they cancel.",
         today="Failed subscription payments are not retried today.",
         replaces="manual payment follow-up"),
-    dict(slug="loan_recovery", icon="chart",
-        status="roadmap", desk="calling",
-        role="EMI Collections Agent",
-        desc="Calls on every bounced EMI, politely: sends the link if they "
-             "can pay, books the follow-up if they can&rsquo;t, and hands "
-             "disputes to a person.",
-        today="A bounced EMI waits for a telecaller shift. Half the book "
-              "never gets a call at all.",
-        replaces="the collections calling team, &#8377;15&ndash;22k a month per seat"),
     # --- Your risk manager -----------------------------------------------
-    dict(slug="refund_shield", icon="moon",
-        status="roadmap", desk="risk",
-        role="Refund Risk Agent",
-        desc="Checks every refund claim for fraud before you pay it.",
-        today="Refund claims are paid without checks. Checking each one "
-              "by hand costs more than the fraud.",
-        replaces="a fraud reviewer you almost certainly never hired"),
     # --- Your support manager --------------------------------------------
     dict(slug="dispute_defender", icon="shield",
         status="live", desk="support",
@@ -130,10 +106,6 @@ AGENT_THREADS = {
 # to watch one shift. Three or four beats, real objects, real amounts, and
 # the gate visible wherever money would move.
 AGENT_DAYS = {
-    "refund_shield": [
-        ("4:40 PM", "Refund claim: &ldquo;bottle arrived broken&rdquo;, &#8377;1,249.", ""),
-        ("4:41 PM", "Checked the photo, the delivery scan, the history: second claim in 3 weeks.", "flagged"),
-        ("4:41 PM", "Held for a person. The buyer sees &ldquo;being reviewed&rdquo;, not a no.", "held")],
     "cod_guard": [
         ("10:00 AM", "38 COD orders lined up for dispatch today.", ""),
         ("10:20 AM", "31 confirmed on call, 4 more on WhatsApp.", "confirmed"),
@@ -148,11 +120,6 @@ AGENT_DAYS = {
 # One outcome, three-or-four steps. The Razorpay Agent Studio grammar:
 # say what you get, then how, in one glance — never a wall of rows.
 AGENT_STORY = {
-    "refund_shield": dict(
-        outcome="Refund fraud caught before the money leaves",
-        steps=[("Check", "every claim against the order and delivery"),
-               ("Score", "what looks wrong, and why"),
-               ("Hold", "the doubtful ones for your call")]),
     "dispute_defender": dict(
         outcome="Every dispute answered before the deadline",
         steps=[("Read", "the dispute the moment the bank sends it"),
@@ -209,32 +176,22 @@ AGENT_SEED = {
 # writes. AGENT_LINKS is the edge list: what each agent hands the others
 # and what it borrows, all keyed off the same order.
 AGENT_LINKS = {
-    "refund_shield": dict(
-        gives=[("dispute_defender", "claim patterns and reused photos")],
-        uses=[("cod_guard", "the address history")]),
     "dispute_defender": dict(
-        gives=[("refund_shield", "which proof banks actually accept")],
+        gives=[("cod_guard", "which buyers dispute after delivery")],
         uses=[("cod_guard", "the confirmation call, as proof")]),
     "cart_rescue": dict(
         gives=[("payment_rescue", "buyers who got stuck mid-payment")],
         uses=[("cod_guard", "which pincodes to offer prepaid instead")]),
     "payment_rescue": dict(
-        gives=[("loan_recovery", "which rails work per buyer"),
-               ("subscription_dunning", "which decline codes mean try again")],
+        gives=[("subscription_dunning", "which decline codes mean try again")],
         uses=[("cart_rescue", "what the buyer wanted in the first place")]),
     "subscription_dunning": dict(
         gives=[("payment_rescue", "which buyers fail on the same day monthly")],
         uses=[("payment_rescue", "the decline-code playbook")]),
-    "loan_recovery": dict(
-        gives=[("cod_guard", "which numbers answer, and when")],
-        uses=[("payment_rescue", "which rails work per buyer")]),
-    "appointment_booking": dict(
-        gives=[("cart_rescue", "buyers who booked but never paid")],
-        uses=[("cod_guard", "which numbers answer, and when")]),
     "cod_guard": dict(
         gives=[("cart_rescue", "the pincode truth"),
                ("dispute_defender", "confirmation calls, kept as proof")],
-        uses=[("refund_shield", "which addresses keep claiming refunds")]),
+        uses=[("dispute_defender", "which buyers dispute after delivery")]),
 }
 
 # What one agent learned and another now uses: the exchange itself,
@@ -242,14 +199,6 @@ AGENT_LINKS = {
 TEACHINGS = [
     ("cod_guard", "Pincode 400013 bounces 2 of every 5 COD parcels",
      ["cart_rescue"], "offers those buyers prepaid with a discount instead"),
-    ("dispute_defender", "Banks accept the courier scan plus the WhatsApp "
-     "thread, and little else",
-     ["refund_shield"], "asks for exactly that proof, first"),
-    ("payment_rescue", "This buyer&rsquo;s card fails but UPI works",
-     ["loan_recovery", "subscription_dunning"],
-     "send UPI first, before trying the card again"),
-    ("cod_guard", "This number answers after 6 PM, never in the morning",
-     ["appointment_booking"], "times its reminder calls for the evening"),
 ]
 
 # ------------------------------------------------------------- agent goals
@@ -296,18 +245,6 @@ AGENT_GOALS = {
              "pending approval"),
             ("Learned pincode 4000xx answers after 6 PM, from Cart "
              "Rescue's notes", "sharper calls")]),
-    "refund_shield": dict(
-        goal="Catch 9 of every 10 fishy refunds before money leaves",
-        target=90, now=88,
-        how="Refunds flagged before payout that turned out wrong, out "
-            "of wrong refunds.",
-        actions=[
-            ("Flagged two refunds landing in the same UPI handle",
-             "caught"),
-            ("Held one refund until the parcel actually came back",
-             "pending approval"),
-            ("Cleared 9 honest refunds untouched; nobody good was "
-             "slowed", "clean")]),
 }
 
 # ---- The service tiles: one purposeful glyph per agent, colored by ----
@@ -317,10 +254,7 @@ AGENT_GLYPHS = {
     "cart_rescue": '<circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.2 11.5H18l2-8H6"/>',
     "payment_rescue": '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h4"/>',
     "subscription_dunning": '<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M4 10.5h16M8.5 3v5M15.5 3v5"/>',
-    "appointment_booking": '<rect x="4" y="6" width="16" height="15" rx="2"/><path d="M4 10.5h16M8.5 3v5M15.5 3v5M9 15.5l2 2 4-4"/>',
-    "loan_recovery": '<circle cx="12" cy="12" r="9"/><path d="M9 8h6M9 11h6M10 8c3.2 0 3.2 3 0 3l4.2 5"/>',
     "dispute_defender": '<path d="m12 3 7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="m9 12 2 2 4-4.5"/>',
-    "refund_shield": '<path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.3"/>',
     "cod_guard": '<path d="m4 8 8-4 8 4v9l-8 4-8-4V8z"/><path d="m9.5 12 2 2 3.5-3.5"/>',
     "__default__": '<path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21M6 6l3.5 3.5M14.5 14.5 18 18M18 6l-3.5 3.5M9.5 14.5 6 18"/>',
 }
@@ -328,10 +262,8 @@ AGENT_GLYPHS = {
 _FACULTY = {}
 
 for _f, _slugs in [
-    ("Sells", ("cart_rescue", "payment_rescue", "appointment_booking",
-               "subscription_dunning")),
-    ("Collects", ("loan_recovery",)),
-    ("Protects", ("dispute_defender", "refund_shield", "cod_guard")),
+    ("Sells", ("cart_rescue", "payment_rescue", "subscription_dunning")),
+    ("Protects", ("dispute_defender", "cod_guard")),
 ]:
     for _sl in _slugs:
         _FACULTY[_sl] = _f
@@ -352,23 +284,6 @@ _TINT = {
 # lifecycle for all of them; a decision is written down and cannot be
 # re-decided. Reporting agents close their loop in the morning note instead.
 PROPS_DEF = {
-    "refund_shield": dict(
-        stake="&#8377;1,249", stake_n=1249,
-        ifno="&#8377;1,249 paid to a likely fraud", ifyes="Refused with proof, replacement offered",
-        kicker="Refund check", rail="A claim to refuse",
-        title="Refuse the broken-bottle claim, with proof",
-        why="Second claim from this buyer in three weeks. The delivery scan "
-            "is clean, and the photo matches the first claim&rsquo;s photo.",
-        rows=[("The reply", "Refuse politely, proof attached, and offer a "
-               "replacement instead of cash."),
-              ("At stake", "<b>&#8377;1,249</b>, and the pattern if it works "
-               "twice."),
-              ("Read from", "the claim photo, the delivery scan, the "
-               "buyer&rsquo;s history.")],
-        yes="Refuse with proof", no="Pay it anyway",
-        approved="Refused with the proof attached. A replacement was "
-                 "offered instead.",
-        declined="Refund paid as claimed. The pattern is noted."),
     "cod_guard": dict(
         stake="&#8377;2,141", stake_n=2141,
         ifno="&#8377;2,141 shipped at a 40% bounce risk", ifyes="3 held; slots go to confirmed orders",
@@ -414,7 +329,6 @@ PROPS_DEF = {
 }
 
 PROP_EXECS = {
-    "refund_shield": [('Refusal sent, proof attached', 'done'), ('Replacement offered instead', 'done'), ("Watching for the buyer's reply", 'running')],
     "cod_guard": [('3 orders held from dispatch', 'done'), ('Slots handed to confirmed orders', 'done'), ('Pincode on watch', 'running')],
     "cart_rescue": [('Call list locked: 12 buyers', 'done'), ('First calls go out at 6 PM', 'running')],
     "payment_rescue": [('Fresh links sent to all 5', 'done'), ('Two have already paid', 'done'), ('Calls follow where links sit unused', 'running')],

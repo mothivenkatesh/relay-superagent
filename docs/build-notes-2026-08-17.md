@@ -4,7 +4,7 @@ One session, captain-directed throughout. Decisions D28–D30 in
 decisions.md carry the reasoning; this is the change inventory.
 
 ## Roster (D28)
-- Cut 34 agents → **8**: Appointment Booking, COD Confirmation,
+- Cut 34 agents → **8**, then **5** (Aug 19): COD Confirmation,
   Dispute Responder, Abandoned Cart Recovery, Failed Payment Recovery,
   EMI Collections, Subscription Dunning, Refund Risk.
 - Codenames retired entirely: `role` is the one identity. `name=`
