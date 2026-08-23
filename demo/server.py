@@ -1074,6 +1074,51 @@ BTN_CSS = """
 # Card chrome shared by the hub and chat shells: schedule cards,
 # overflow menus, goal numbers. One copy, injected into both.
 SHARED_UI_CSS = """
+
+/* --- home dashboard --- */
+.hdash{max-width:740px;width:100%;margin:0 auto 28px}
+.htabs{display:flex;gap:22px;border-bottom:1px solid var(--hair);margin:0 0 18px}
+.htab{font-size:13px;color:var(--mut);padding:0 0 10px;min-height:32px;
+  display:inline-flex;align-items:center;border-bottom:2px solid transparent;
+  margin-bottom:-1px}
+.htab.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.hi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media (max-width:760px){.hi-grid{grid-template-columns:1fr}}
+.hi-card{border:1px solid var(--hair);border-radius:14px;background:#fff;
+  padding:16px 18px;text-align:left}
+.hi-top{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px}
+.hi-sev{font-size:11px;font-weight:600;border-radius:100px;padding:6px 12px}
+.hi-sev.red{background:#FBE5E5;color:#C2374B}
+.hi-sev.blue{background:var(--accent-soft,#E9EBF8);color:#3A46A8}
+.hi-sev.green{background:#E5F4EC;color:#177245}
+.hi-card>b{display:block;font-size:13px;color:var(--ink);font-weight:600}
+.hi-card p{font-size:13px;color:var(--mut);margin:4px 0 0;line-height:1.55}
+.hl{display:block;font-size:11px;color:var(--mut);margin-bottom:6px}
+.hbig{display:block;font-size:24px;font-weight:600;color:var(--ink);
+  letter-spacing:-.02em}
+.hrow2{display:flex;justify-content:space-between;font-size:13px;
+  padding:8px 10px;background:var(--pill,#EEEFF2);border-radius:8px;
+  margin-top:6px;color:var(--ink)}
+.hrow2 b{font-weight:500;color:var(--mut)}
+.hkpi{border:1px solid var(--hair);border-radius:14px;background:#fff;
+  margin-bottom:12px;overflow:hidden}
+.hkrow{display:grid;grid-template-columns:repeat(4,1fr);padding:16px 18px 12px;
+  border-bottom:1px solid var(--hair)}
+.hk span{display:block;font-size:11px;color:var(--mut);margin-bottom:4px}
+.hk b{font-size:24px;font-weight:600;color:var(--ink);letter-spacing:-.02em}
+.hchart{position:relative;padding:8px 10px 6px}
+.hchart svg{width:100%;height:150px;display:block}
+.htip{position:absolute;pointer-events:none;background:#fff;
+  border:1px solid var(--hair);border-radius:10px;padding:8px 12px;
+  font-size:11px;color:var(--ink);box-shadow:0 8px 24px rgba(27,31,48,.12);
+  white-space:nowrap}
+.htip b{display:block;font-size:13px}
+.agentrow .aglyph{width:18px !important;height:18px !important;border-radius:5px}
+.agentrow .aglyph svg{width:11px;height:11px}
+.agentrow .pres{display:none}
+.cbadge-on{width:6px;height:6px;border-radius:50%;background:#10b981;
+  margin-left:auto;flex:none}
 /* --- run inspector (/runs/<id>) --- */
 .irid{font-family:ui-monospace,monospace;font-size:20px;
   background:var(--pill,#EEEFF2);border-radius:8px;padding:2px 10px}
@@ -9345,6 +9390,127 @@ def _builder_draft(tid: str, bid: str) -> str:
                f'<div class="bthread">{body}</div>'))
 
 
+# ------------------------------------------------------------- home dashboard
+# The home brief as a dashboard: what needs attention (two insight cards),
+# the four numbers that matter with a 14-day line, then how work got
+# handled. Every figure is computed off the ledger at render time.
+def home_dashboard_html(tid: str) -> str:
+    led = WORLD.d.ledger
+    runs = [r for r in led.runs.values() if r.tenant_id == tid]
+    waiting = [r for r in runs if r.state is RunState.AWAITING_GATE]
+    due_soon = [r for r in waiting if _days_left(r) <= 2]
+    timed = [r for r in runs if r.state.value in ("timed_out", "escalated")]
+    done = [r for r in runs if r.state in (RunState.ACTED, RunState.RESOLVED)]
+    ended = [led.outcome_for(r.run_id) for r in runs]
+    ended = [o for o in ended if o is not None]
+    won = sum(1 for o in ended if (o.outcome_value or {}).get("won"))
+    win_rate = f"{round(100 * won / len(ended))}%" if ended else "&mdash;"
+    lat = [r.gate_latency_ms for r in runs
+           if r.gate_latency_ms and r.gate_action
+           and r.gate_actor != "system"]
+    if lat:
+        m = sum(lat) / len(lat) / 60000
+        avg_wait = f"{int(m)}m" if m < 120 else f"{int(m // 60)}h"
+    else:
+        avg_wait = "&mdash;"
+    pending = len(waiting) + props_waiting(tid)
+    clean = sum(1 for r in runs if r.gate_action
+                and r.gate_action.value == "approve" and not r.gate_is_material)
+    gated = sum(1 for r in runs if r.gate_action and r.gate_actor != "system")
+    as_written = f"{round(100 * clean / gated)}%" if gated else "&mdash;"
+
+    # insight cards: severity chip, title, one-line fact, one action
+    def card(sev, title, fact, cta, href, tone="red"):
+        return (f'<div class="hi-card"><div class="hi-top">'
+                f'<span class="hi-sev {tone}">{sev}</span>'
+                f'<a class="btn ghost sm" href="{href}">{cta}</a></div>'
+                f'<b>{title}</b><p>{fact}</p></div>')
+    cards = []
+    if due_soon:
+        n = len(due_soon)
+        cards.append(card("High severity",
+                          f"{n} dispute repl{'ies' if n != 1 else 'y'} due within 48 hours",
+                          "Missing the bank&rsquo;s deadline loses the case. "
+                          "Each reply is written and waiting on your approval.",
+                          "Approve now", "/approvals"))
+    if timed:
+        n = len(timed)
+        cards.append(card("Medium severity",
+                          f"{n} case{'s' if n != 1 else ''} timed out at the gate",
+                          "Nobody answered within 24 hours, so a person has "
+                          "them now. Nothing was sent.",
+                          "See cases", "/journeys", tone="blue"))
+    if len(cards) < 2:
+        cards.append(card("All clear", "Nothing is overdue",
+                          "Every reply that needed you is either approved "
+                          "or still inside its window.",
+                          "Open History", "/journeys", tone="green"))
+    cards = cards[:2]
+
+    # 14-day line: jobs per day, real counts, with a hover readout
+    today = WORLD.d.clock.now().date()
+    counts = [0] * 14
+    for r in runs:
+        d = (today - r.occurred_at.date()).days
+        if 0 <= d < 14:
+            counts[13 - d] += 1
+    mx = max(counts) or 1
+    W, H, PL, PB = 600, 150, 8, 18
+    pts = []
+    for i, c in enumerate(counts):
+        x = PL + i * (W - 2 * PL) / 13
+        y = (H - PB) - (c / mx) * (H - PB - 14)
+        pts.append((round(x, 1), round(y, 1)))
+    line = " ".join(f"{x},{y}" for x, y in pts)
+    area = f"{pts[0][0]},{H - PB} " + line + f" {pts[-1][0]},{H - PB}"
+    days = [(today - timedelta(days=13 - i)) for i in range(14)]
+    dots = "".join(
+        f'<circle cx="{x}" cy="{y}" r="9" fill="transparent" '
+        f'data-d="{d.strftime("%-d %b")}" data-n="{c}"/>'
+        for (x, y), d, c in zip(pts, days, counts))
+    chart = (f'<div class="hchart"><svg viewBox="0 0 {W} {H}" '
+             f'preserveAspectRatio="none">'
+             f'<polygon points="{area}" fill="#EEF1FD"/>'
+             f'<polyline points="{line}" fill="none" stroke="#5266EB" '
+             f'stroke-width="2" stroke-linejoin="round"/>'
+             f'{dots}</svg><div class="htip" hidden></div></div>')
+
+    kpis = [("Jobs done", str(len(done))),
+            ("Pending approval", str(pending)),
+            ("Win rate", win_rate),
+            ("Avg. wait for your approval", avg_wait)]
+    kpi = "".join(f'<div class="hk"><span>{k}</span><b>{v}</b></div>'
+                  for k, v in kpis)
+
+    # channels, the way ElevenLabs lists languages: where the work happened
+    chans: dict = {}
+    for r in runs:
+        ch = channel_of(r.order_id) if r.order_id else "Other"
+        chans[ch] = chans.get(ch, 0) + 1
+    chan_rows = "".join(
+        f'<div class="hrow2"><span>{esc(k[:1].upper() + k[1:])}</span><b>{v}</b></div>'
+        for k, v in sorted(chans.items(), key=lambda kv: -kv[1])[:4])
+
+    tabs = "".join(
+        f'<a class="htab{" on" if i == 0 else ""}" href="{h}">{t}</a>'
+        for i, (t, h) in enumerate([("General", "/"), ("Approvals", "/approvals"),
+                                    ("History", "/journeys"),
+                                    ("Scheduled", "/scheduled"),
+                                    ("Agents", "/agents")]))
+    return (
+        f'<div class="hdash">'
+        f'<div class="htabs">{tabs}</div>'
+        f'<div class="hi-grid">{"".join(cards)}</div>'
+        f'<div class="hkpi"><div class="hkrow">{kpi}</div>{chart}</div>'
+        f'<div class="hi-grid">'
+        f'<div class="hi-card"><span class="hl">Approved as written</span>'
+        f'<b class="hbig">{as_written}</b>'
+        f'<p>Replies you approved without changing a word.</p></div>'
+        f'<div class="hi-card"><span class="hl">Where the work happened</span>'
+        f'{chan_rows or "<p>No cases yet.</p>"}</div>'
+        f'</div></div>')
+
+
 # ------------------------------------------------------------- conversations
 # Server-side chat history: pinned + recents, per tenant. In-memory like the
 # rest of the demo world; rows are (who, html) exactly as rendered.
@@ -9373,8 +9539,6 @@ def _touch(c: dict) -> None:
 
 def conv_list_html(tid: str, active: str = "") -> str:
     mine = [c for c in CONVS.values() if c["tenant"] == tid]
-    pinned = sorted((c for c in mine if c["pinned"]), key=lambda c: -c["seq"])
-    recents = sorted((c for c in mine if not c["pinned"]), key=lambda c: -c["seq"])[:8]
 
     def row(c):
         cls = "conv active" if c["id"] == active else "conv"
@@ -9390,10 +9554,17 @@ def conv_list_html(tid: str, active: str = "") -> str:
                 f'<span class="kebab" onclick="convMenu(event, \'{c["id"]}\', {str(bool(c["pinned"])).lower()})" '
                 f'title="Options">&#8942;</span></a>')
 
-    out = ""
-    if pinned:
-        out += (f'<div class="navsec csec" data-st="chat">{ICONS["pin"]}<span>Pinned</span></div>'
-                + "".join(row(c) for c in pinned))
+    # The roster, always visible: every agent one click away, live ones
+    # marked. Pinned conversations are gone; recents stay below.
+    out = (f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>Agents</span></div>'
+           + "".join(
+               f'<a class="conv agentrow" data-st="chat" href="/agents/{a["slug"]}">'
+               f'{agent_tile(a["slug"], a["status"] == "live" or DEMO_ON.get(a["slug"], False), 18)}'
+               f'<span class="ctitle">{esc(a["role"].replace(" Agent", ""))}</span>'
+               f'{"<span class=cbadge-on></span>" if a["status"] == "live" else ""}'
+               f'</a>'
+               for a in RELAY_AGENTS))
+    recents = sorted(mine, key=lambda c: -c["seq"])[:6]
     if recents:
         out += (f'<div class="navsec csec" data-st="chat">{ICONS["chat"]}<span>Conversations</span></div>'
                 + "".join(row(c) for c in recents))
@@ -9952,6 +10123,7 @@ __SIDEBAR__
   <main id="main"><div class="thread" id="thread">__THREAD__
     <div class="hero" id="empty">
       <div class="hero-mid">__ROLEPILLS__<h1>__GREET__</h1></div>
+      __DASH__
       __ONBOARD__
       <div class="tpl">
         <div class="tpl-h"><span>Start with a job</span>
@@ -9990,6 +10162,17 @@ __SIDEBAR__
 </div>
 <script>
 let CONV = "__CONVID__";
+document.addEventListener('mousemove', e => {
+  const c = e.target.closest && e.target.closest('.hchart circle');
+  const tip = document.querySelector('.htip');
+  if (!tip) return;
+  if (!c) { tip.hidden = true; return; }
+  const box = c.closest('.hchart').getBoundingClientRect();
+  tip.innerHTML = c.dataset.d + '<b>' + c.dataset.n + ' jobs</b>';
+  tip.hidden = false;
+  tip.style.left = (e.clientX - box.left + 14) + 'px';
+  tip.style.top = (e.clientY - box.top - 44) + 'px';
+});
 document.addEventListener('click', e => {
   document.querySelectorAll('details.mode[open]').forEach(d => {
     if (!d.contains(e.target)) d.removeAttribute('open');
@@ -10956,6 +11139,7 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__TPLPOOL__", tpl_pool)
             .replace("__MONEY__", money if not cid else "")
             .replace("__NEEDS__", needs if not cid else "")
+            .replace("__DASH__", home_dashboard_html(tid) if not cid else "")
             .replace("__ONBOARD__", onboard if not cid else "")
             .replace("__BRIEF__", brief)
             .replace("__CHIPS__", chips_html)
