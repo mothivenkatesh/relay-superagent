@@ -1470,6 +1470,8 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
       <a class="nav" href="/?new=1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New task</span></a>
+      <a class="nav{' on' if active == 'tasks' else ''}" href="/approvals">{ICONS["tasks"]}<span>Approvals</span></a>
+      <a class="nav{' on' if active == 'activity' else ''}" href="/journeys">{ICONS["ledger"]}<span>History</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
       <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Files</span></a>
@@ -9514,14 +9516,8 @@ def home_dashboard_html(tid: str) -> str:
         f'<div class="hrow2"><span>{esc(k[:1].upper() + k[1:])}</span><b>{v}</b></div>'
         for k, v in sorted(chans.items(), key=lambda kv: -kv[1])[:4])
 
-    tabs = "".join(
-        f'<a class="htab{" on" if i == 0 else ""}" href="{h}">{t}</a>'
-        for i, (t, h) in enumerate([("General", "/"), ("Approvals", "/approvals"),
-                                    ("History", "/journeys"),
-                                    ("Scheduled", "/scheduled")]))
     return (
         f'<div class="hdash">'
-        f'<div class="htabs">{tabs}</div>'
         f'<div class="hi-grid">{"".join(cards)}</div>'
         f'<div class="hkpi"><div class="hkrow">{kpi}</div>{chart}</div>'
         f'<div class="hi-grid">'
