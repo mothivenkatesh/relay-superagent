@@ -59,6 +59,8 @@ PORT = int(__import__("os").environ.get("PORT", "8790"))
 # the domain model.
 BUSINESS = "Heads Up For Tails"
 HUFT_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXoAAAA/CAYAAADuQgP7AAAAJGVYSWZJSSoACAAAAAEAPAECAAkAAAAaAAAAAAAAAGltYWdlcnk0AAAnPYy6AAAYyklEQVR4Ae2dTXIbOZbHH5BU9OyKfYKSdxPRtkwvJybKIk9g+QSWTyBrWWE5TIWtqaWsE0g+gaQTiFJNRy/NsqsjZlesEzRrN1UigH5/5IcyyfxiMpOkVfhF0CapZCaQCTw8vPeAR9QQP77rdK/ePeySw+FwOFZKixrCSPXCM2KT3w7onnF19LeO1N4OORwOR4No0oPem58H099f9Tvt//gLtcPP//87jXv94Rjf4zPeh3/7xw+dzUYE/RWf2Ci1a9+zVp9W0K8aLdpCmm/J4XA4moRlTer3G2rnVtELQ9QhEiOvZQb87b7H3xtDpyyDH/S+H45+PNp6+4dS/bkFPUaHW6VxMlsAQXKoWjTEScNjPK26JngvSXbpnmn1wcA1IIfD4VgBvddfzvi/s+ujR79oKZ/H5S9L5bGnFIT9S82yGt+UFvTQ0vFjHh26/rn87w0pkoro5v2jAX84efrmywUL+bd31zQdcjgcDsdSEGSG+F8qfa7J/CRZ65dlfgghL7W6YgHezToGfzOCzm+OHp/yh83YVR+Tw+FwOJaGMuaQZW+bPK+Pz4WCPhTyCeGdgzF6lxwOh8PROMLQKP5ZaRqzgB/DvKxJPfcPEiNRdKKbo0enbI/fpaoIGm2//vKAHA6Hw7EScjV6FvK7Cwl5mh1xHA6Hw7FccgV9wqlaFeEEvcPhcKySTEF/837ruKxdvoBrcjgcDsfKaPlhk3qHbSyPQ8GOIHxDpk31sM2vM3I4HA7HSmgFYZObZKgR8kIyHQ6Hw9E8sibzTDZ8/nD/BYfD4XAsH7kUZ+lGw4OJw+FwODJhjV407iz1SLltEBwOh2NFSG30GTWNEc5043A4HCtC2qWyhp5jmSw1hDHOdONwOByrwsbR9958udh+/fmBFvSSSAypZgRCNx0Oh8OxElL3ukFsPSm9IwXtsTq+SQtfRYwwkJDD4XA4lk7hpmZXR492JYm31QW+GGtjXnr8DnvV04pBGkC63RjFU205HA7HfaYw8QgymbCGP5BaX80t7FmT19rsS0nYTmHE36xc0HskO8azWVf6VBGsC2h5NBNJNJE07r0eJkxfmB21JrM+ikmLRvGsMFnnzOO7N8NBmeNwbq+lsUFdW5Mc9Er+Dgnes/7Gz3T8xy1VGjDDuhqhO2GmMiAEjYWRw7L1mubvR52O1pRw/Kc9kzLHFT2PReofp4nnbrPAaeoarTfxGfeVjBwpRYOi8qbdmzgtbrf/lchmVA3sissygcsifiUhx0KXD/Oe7jtxqrb1rHrP00/nbbeZ/UDKEe5H1X6QRqkMU6goC6yeVOoTfywVQcNThYHS5iQQ8ptYfbsO+WOF9kYk1AtaAORlZAf26cz3xqYX7CW+0+qYfR8zicQ9DX/I3dYQWefM4/rd1uH2m8/9ouNkS18ZMh08FElqj7/6a9FvMEBppa6y/s5l5fNyGd4/GrMgueD7+rFMw/zxaGtPG9XXYTuKzSmxONsIZbOVPT340qM5mZA65/Ntxr+Txvqcnsx7HISFJnOcda2p+g+4/idVOqb0dF8LszfPb1hIvnzqp5JLcMXCyjPqeDYLHN4rW16+tx/UxDtME/gQPBPDfTxnnv+HCupMNOTjPqaVowx3u+Jy6Yzi517+t1LRJf+3k/Y3r6XO7Wr8oK1znR4UDW5o6xOVXu/S/dRfj1TaPI1crtwPXqX2g+B+VO0HaZTKMAXsqGbESdFxEPCI4hFCDNjGn8g2JYU8pjXAiMWigNC4tXf7IO64Rp25Az2fPlbdei+FdXL72PvDv53uINE5YwvYtBGHcJBrEvtc6ENuASfC5qoVtuFqaUZUADo/USKdYxsDbtHv8LxRHgjx6EskMBB0Zl935Wij02qhrrhh5j5fbJTHZrwP+A3Oi3rZAACum38dv16GqoXj6lvvSaK8xhzqiexlHBd7JlyOqeOeHnz+MP2MUeeg/hfiLmcw6r/j13/rFc1bZiX7/nVi3+GZx5771P1m99nsc//f/9l6IU2YBY6P47YSniN+T/jvrzDwp61Wh0C0zxzXjRDj5DMP6oyMcizwqtTZL4ix9UI5/bbNbd2/biSUdfhdou0TZij/SjslBPbUlittz1PdoqJEbT1Rb7os309ND22KSoIsfPybPvn94Cx83tP9oE7mGEf5RrKAkELMankIzdT6kh/KoCXFY64EHn5qZ0XF+Ga9pBVx8+7RjuFZRh3JUFiwRekV8bCzZisQttLY2ZAVFnmjdOKcnvcgc4oKX4PcGPcKptF3iWMgsHyBj8bEz+A5leD6/dYZ/+5F8LsZTZLbRJ/bRLSdNdfvA9dvf/o8MANBGOYd49fr0S5pZMip5s8pKm9aeTBIZ10v7xn72deSJk098f5axZzDWnK029T2wZfMfpk2K7blUOoX+wHm0lv5ZLoM1tcW10RZqGTNBoM8FKf+6ZL91b+WPo8pD2Ou84O6fF78/D6F505r/zZQ5HduHynX4xnuB7Kzo1hbL+hvcfLqPXOto0e/hEpsXj/Nu4Ymvd87+OeHtOMW7QfTlNbogd/AxNCOOoHGILnxC5I8EonH0ODDkSrrHBA6uEn2ga0CSc+WngxFUu0jdO/1P4dlGtedkNKRtsTPoFt6/6GCe8Vtoq9jmhA0xrRzc6PeCd8rYy4zz8eCeaHGXenZmkrPx2qCMjkTwNSeGiRNmfCUigQ4ypMmBHFfrWYcMqe5KDqP1X5lXEloUwmtuSyi4Fng+pmDijTP8F+irVP5tm7NumUxlbXuZ9E7byOznS/cD6YoJegx5YZNCTdMI+ksdyYhxbeIxtGs4bNN6TQQKGWFh9VAoC1h6gftquzDwHFwNuGF34XvS/0WUzseaBTbFqkGDBxJa4x1pkLrYC3PCggjwnq3axVIE3lGsSk37Nszx4h42/iKVkoLKhQ8MZMGGS02aYnEzRUoR97gr1v2OYW0fbNePlyfmTZurxEzXXiSVv48bV18DXs81dbT2+OCiIrKAZnV3KtSzlhMg3h625Ut9YRv4Igde3u+h2exvY2DBspeZ9UOHVt8C0fTN9HabCEoDPbIV204hCzCdw4B/i3+C51E8Cf85Ak5+O8gkiJKcg4zk5QD+hNgJDudjW2UA3xmrfqCB2dfkzME88YZ1QA0LJ5yX4YmE0pbIGds0mKLh/UZaxCBVQZjxG9RO2+1RqnH2AG/pn2+59xkkJ393fDKXNaf8o6FgPb7mC9sgj2ohlQFq9H6V07zGSwbNqHton2F/ohEWyer6X+gNSDeVvjZweS5FDN2KY1eCW0dIlp4faIazRCwJ3oy7sRoY1Cxjp7Yy9rbfDto0WgYOol2eTA6RgQBN+x/XR9t/WJtmDzia60/lrWnfe2Emp7SNkohnPbPPaUtg4gJDBY4M5oiOl68XDDfwV55H7aw5oH02/C9JlNNcFaENe7oXotSg0Rsq5OKe1D5ZtfARh/OFldNYLZZRltfhPjeYqEZG/2AGqZceCXbgynoyFwoxHzWAjTNQMvANOsFNUMwE7BXHLLdq08NwP6J4xtfW5rBKF2pkcH2euPPVGYocjD5U1m1aT8ob3BXGJ7SBvbZYEpbj6YjeBZmovezER3c8diReBg5bv2Q21OeJZ5ym8IgcFk1VG+VWNNJFM7IQu/g82IzFZ7a3xx1dtP+pOSsaQbbi0TdURSbEzBbvpsBzG9GQLz5RE1OyVefZ3wUq2DpbX0B0A+u3z084XsXzqxtP2AZeGxnI9q7fPpmWPtsdy5nrEUvptHb8EKEsyEc8dazTjz2WvdpCVS2q5U6uWwbITbTXkn7dHmyzodXkYZip7IU2G1jzqu4Zh1MaZeGddwijGxqAz2EJyISYVnaTR3g/t+86+xYc2AAzxbrmIa3rc8r5SUn9duaCxH6GSK3+HWOmbGNsye5CV+dje5Zg9mxZ3QX/69TW89j+83Pr1L6gQ1TZjP2eRP9oKSN/g4lvZE0iqqAxoHOPv09Ggu0OnR4ahA7hWto0RY6eWZ4ZTz8bZ5zIoKiakfCVNbA7DbleFatIbWUH/8eTGnr3g4iL6qp52vtZwgPlVrssr/kWRSeGGg37Pj/9rvXnw9pzUAoJQs7Cn1FoZvKLg4U3n7vYFiH2QZbhqSHviqvVrOQkGVs6wIz+MA85M8FeBYxYBX5rPdmPbYRMZE1QCSiuaz2HPgkmmrrVYn6gR+yzv4Fsd1kP5hb0NtQwTnlvO0IvpAfZB2DhUVyQ3dq2UQtB0kSg8mA7jHxqSxip7mx38VPTz28Jqa03Eh/KzomMAe+wmt6PyWE6HIHuF4H2y8LtW8iU6WBs9/AqTw22vyqhRyRUIOgLjVdkMa9g4r1ntPmXsqJaswJNFC8tUJJSp5dGMxkOlgtv2qN3t+A0U9sBL/cdc6ivXUx38QJ2jhelNoP+p2TOganuQV9YFOf6zfK0ElRp0VluCG9TF2QVSfCvOCb17/Pm5qFEQh2JWsQcZPA1xi6wYdaIhJsWKEIND4Sgzl+Gmk38cVJnpDovANaNTE7NuLHGxds89rN7T42wU9L5H2wq8LDgQuzu0Jk1E+sn8XfCsUGNgTx+yu10XtK7/hbPCyvrTeF3Ves37lghfdTKOyDMOgzWpD5NXqfKESrDB7s1CVAQ8L+DlPLmOumTd6kFiGCaIua/NL1Epht0PDTVvdhCstOULuMvK4pLWu+25H8EBXDV1kh4EJ3/RMunsMgHpEyeyl1135LCTxmMtnkf0fULHMJehvnLiKTSu49C7TfTf+TGJZ85onyxIMnmjSFliU025Ru63wP1jnqDs/k5v3WCZfVzkzqWpcxvzOWkqF05SjvCCmKBa6DQFu8l8QWjkShZtOgMcUX+UhPv8o5ZaHgmVm087qarVqQFwmetIU6pc4RW+CUJ/gMibvwwK94djcdtpq34hwx99HvhCnctwqwHf+bmWsacxadM7b9xbKJh3lir7W0Y2baek0ObdPkor9Y9FRd4bqVBL2ZM6E4GiC89iW3PWi805klr05L26a4DtIib8JoG0s81GyKxDMUOnsgjkUMpWnIVmOKRZ4oz0uNPMEAVBRJYISKysECbEAVUEbfxfND8GFPIJotM896Ik2Qvmb82UjUZ7APTVq7CAZjXyhjcFsglHUmRr3EJnlNALNN9EFmt/WEkzZn64fELK+IlBDiNKafBfbaytv+O2A7eteqxwFfyXSjlfzA06G5RnJE1LBtb4cr+jwvAQk6uHVINMiyF7XEKdIE/L9HK+e63ChG/vcscLHU3Og22dhp0RVG4W9JG2lgtimamifvs+iUmoKzf4OF9Tehts3a3rfGsA3RDpxirIXa733/ZZT2U2yfGyyUems1LO1dijthwXVTz8Kta7GhVFWHZDzSAp+lkVdc5v1wHxO79zdNXvCbTQg8JeXaRffMg/Vtcf3uNiwzHbmhPmH6j739cW+F1I+1Upi1tWuLfY/FqGNXWh5IavFfJHwImgr6ShBtg4Er59owJcYiBduZbd32L5obb6I63E83bZkkyh/0USwcFHbweBCVmWdAPKB0uB+M2OJ2Qca7jvoBfktqO+wHNkqxJjOToIpwZzqjCoucyuz0tnhWq8XLkIe/A6Y4DhZihY1xHOwKmdBoMZOxZoJ4XeA40mY/PuDFzrlJpRHD7YPPTzJ/n7GTYca1EuW3mrrvFIrXMa0MiEQZQpPPu6dxR2veubTRJ2khuPNgQzfJO8+7lzYSLKfM2IPJ+Kk0E8+Y7+l4+tktwvW7rT4LmBfTzw3/aWLnb0kz2BU/U1nQforqnPHMbZ2xO20YfeNfb3Yn27zdQouw7QO+vKk2iWtP34fMtp4SjrxQW/cdvIfxOs3dT6fSqJbuB6QOs3a2rEJVZyy2Y33FN2d7HsFkNbUSAvYuxvTRDvZFqdM5W7YMeShMp7Q6nBkmUxaTKe2dsLa6mTzWzEzJMs+Zixzm/95QmlZftvw88ykoD5tJSqZlxEpeK4x40MNMIFFKbX7TUvC55EWv/3lh0x3CHREdwnXsSm34eiKyMyv4gEqERCpPXvDvx7P1N7VNpwELJx4weGY23T7AHLueBjsdXlgBTLIbv8dl62zLk/rMDbKsDJPXw0rnTk/SZCe8vyrXfJKPso5400699m3SAa5gkpQpbT2lX6cfS4m2HsyKMuqdrNPc/VTrUfxjfj8Qv1prg5KDOvpBnMoaPbCaE0+NqWSkQFVNOlhw1KcatklYVJt3OByOr42FBD1IS76QcaGF02ItKvBXnfTE4XA4VkGlqJs4seQLH/OOqyNsEtfaPviym7ZfShl4avlVO94cDoejCgsLelBSANdmc4INH4NLIj9oAUVJGRwOh+O+UougDwkFcBVte+5rsdBG3lOb8aoEy1iI5XA4HOtIrYIeWFPOLZKJiKSHX0TJhOu9Hra+LSHs01b4ORwOx5+B2gU9QLiSnsBunxD2201leQnirgt8BM1ugexwOBzrSiOCHqQI+3bBnioLgbj+ApNRe1VLtR0Oh2OVNCbogRX2nkQSBd8RK8xeY1o9rlWQ4QdLtcnhcDj+ZDQq6IGNdDEi3CmvHWz+38y13vw8ELnbD5vOTU5iAofD4biPNC7ogW7Js/C9IdOlBlEFjlmDjEbldtF0OByOe8FSBL3V6kWwX4WghRNK5F6rUKtP7svtcDgc952lCHqQlzC6gatF+09jEZddyBVD6eb3vHc4HI51ofLulWsNMrSE+0pLb+CnP9vas9losHf1wedatph11MvNUTyJeQwjfnp68Dl1y1YkcTBSvbBZtfzsUpdZW+UiEMDbUEkfjUHOVe/66ZthpTbx47uHfH2RuveS0Objdxl7/MN8yDNL5AO4ztvaN3b+meOic2iuc8a2yTbZi6HHTw++7Kf9/e9HnY4itYftQfJWjueV48ejrT02yXbcPlLry9I0+ggjlqZNx7c9EOSn57LbsDrWEiRcMEbsIKlK/MUD93ba8djbWwt1ZY8hPz0gn+OUB/VPqdFdf6F2yjV2jVDnmYNMUZml2LTnnCozXpOcJDMQ0H5Z6DgvEi06P46b8i0hs1dw7czFiFzXrhHZa0i09u9JkA83EwxYSKQxXV4MJNqYD0qbX8mxtixNo2cF2zZGIZrP7mRT3rGtSIm7RVT2+jaF2uczcqwt3D4uymiGN++3juHYt1l4Dr70w++v3j3sS0FvPT8D2n7GNfbjWimS6EDYsSCtnNEnLelFFjatn/UTYY2J6fAsA4L4rOBnbR4cMBtBuDK06Le6ocQ8WfCg+lIa+YnLi0HxOQQ+97K3/iz57hk41o+laPRolBTsWZ+VxLdWZJCMPEgaEORobLM6/5EcXz2+gDGv7IxtKhsVPuN7G11Vcs2GEIHzvkCrrQsbDMCmJqwxsYEDpnjbbWzgh9XdSFqBgYKFPLb+KJXguy5s4hIjDv1yPOx6Lf3W1qOO1ISORmlMo0cna23oPTaV7EaaxxI0akwluSFuxs02gQ03EebpWE9sInk2ycS/m05/1/KooykvST2c8aZLG8jBSTMzSEHim38EZpDJhAVVoJXSpHrmKE+pUy53/Kthll0cSbrDTGcsuE94BnJelLOXTSMnnhBtPvbUz3xly9unltqjJWLzRW/oFyiH4X5dZ15TR3M0Iuiv2MEjSZ1rYztahDaqUQ0kmBKHCa8vo++U2uW3l3U1yChvpCMVtpqdZDlPCzF3ydEjfk9GSU0kjWWZJM56kqrRw6b8h1J++WzqHTGyeUlLpETMAkndQz9QHqEiwte9DgabIZdlzEIc7XaQ91sMeFKpT1aLNrqHdHPXycGlcWzavXcPX9p8sTWYbFxfymehvhSjdkHvZ5xS5zQl5K0G87q+ZLdxro8e/cLXa5Oymd5t5+ap/VvuVNss+Ds22a4na9tnx+aNnExchEEWrdaIKlLKRo8coi0keE530hph9iC8WQgNUn/PJg+eESBKBQmu36Iz9Q7KJeHOAmaYUopEYKaB0/gPv70GX1MXfSfvHHYG8H7rkJ1Qm3naf9Pg2hhgeGAb0IK4vlTAAn0pcRqqmwkLVp7XRQukCKOSGalbb58aA2oZMriLMRqfH4VgEE2wYzPfC7lf5/QyONeIHCvBapUs8CSZY0TLhKGBNnyS7ca+SUFnRlcJKYa913YQGLC5ZRtKwdXR30olz16EYHbZDbbVHsT/Bg1ZTuz2IP28c/Rq0O7WCdeXlkPtgj7MRk9LZPv15wfT31398J+b+L/3/f+NyHHvgMBjE0JbknjL5ozd66OtERm1CYsOnJTTTtosQnOIJHnOA8WTRcw3RdiQSt+2/mH6OjxgXfCAg03/PjRZhiww0EybgbTnPXD29/vB/VwwRU7Af43YFczaG5U9HsKcteQzaMJsxvlWkfiJzRrDTLMG2/r1Bl8jiMay58BM4IfOE0IkzF+s2W8uIatwLq1eTvsRUo9FxJk2l2mCnM+zn1aG6Pxe+hTeT98pM2ci2sgzHgAzFa+JYmf1BqWbTnLqNO+zcqyWfwO6IZWEdG/UrgAAAABJRU5ErkJggg=="
+RELAY_ICON = ("data:image/svg+xml;base64," + __import__("base64").b64encode(
+    (Path(__file__).parent / "assets" / "relay-icon.svg").read_bytes()).decode())
 HUFT_FAV = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAJGVYSWZJSSoACAAAAAEAPAECAAkAAAAaAAAAAAAAAGltYWdlcnk0AAAnPYy6AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAKvSURBVHgB7VZJchMxFP0ey2PF2bHsnABnx9K+QXKC2CcgN4DcgJwAZ8USOEHaO3aYEyB27GjKQ7k88p6RKNnIbbXTUJWqvCrZGvpLT/r/P0nkMaFer180AEkRubjBarXaLBaLz+bz+Xe2C4XCu+VyeYp2KCkh7+oslUpBNpu9X6/XAduVSiXKZDI9tJtofpMUkd23OKqB1d3A4tesgMiJ/EsCWPzVzuK7UJIiNi6Arzv6uJ+jXMh/RIY/8PEP/PlGt5pMJmeSEjYugF8HCWwCSREbAkitLv7ufI0gBYGkhA2B6XTKY+0g509xGiSjYmwUdOBBYmSL2VYWRMB4PO6tVqv2HhLsC1E68gDMZrNrU3cq4WKxiHAaP+V3RlCEPqGEKKL7XmCcJ/FFjgAU9Qq2H1l3KiE1H2mpUL1FOUGdi7bsb9DXQ/q2QOoun88r3R2JziZsIjDfYnzA02WdQidWxmVcBGq1WouT4qi+Sjx4OkpL9CGQQIjShM0NXb2XgAH0gQQC1xjvBvz1SQAxcy/+oHvPzIlkJTmiXC53iR10uYvRaBSi70MC+4YdhIcIOAVqOBxuLYgddSUZmr4EXFHeQPC9tXNZH2cknrBv1FgC2Nkb18QIuo7s3B1wS5epKn5QXgS4M0za3iXBAMSQsvvoFsREGwHJiypO1hV04MaLAIFJB5j03L6w0N4rQEbW8a5wqilO79Ym75UFnBREzkXvDJMHh2yYHS5Jh613rDgBbejx/eD7OubDFt+vTUE7iWb8DS5MAnxF+drg+9c2CSqtGUssRDowB+bF7AOdTX8ePrC9OpqAniCRH43sIvovdar2jyagfc8LRfna6BtwYKLfXESJCZTL5ZfmhsRuQl87PvVBuK997/302wKjmRGsi8/1u9k5vv3MogPwvTxhB78A/aEpZNY+R1sAAAAASUVORK5CYII="
 BUSINESS_TAG = "Pet care &middot; Gurugram"
 BUSINESS_CHANNELS = ("headsupfortails.com, Amazon, Flipkart and quick commerce")
@@ -673,6 +675,7 @@ def auth_page(mode: str, error: str = "") -> str:
             else ('New here? <a href="/signup">Create a workspace</a>'))
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -684,8 +687,7 @@ body{{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-se
 .card{{background:#fff;border:1px solid #E6E7EE;border-radius:14px;
   padding:36px 32px;width:360px}}
 .brand{{display:flex;align-items:center;gap:8px;margin-bottom:24px;font-weight:650}}
-.logo{{display:inline-flex;width:26px;height:26px;border-radius:7px;background:#5266EB;
-  color:#fff;align-items:center;justify-content:center;font-size:13px;font-weight:700}}
+.logo{{display:block;width:28px;height:28px;object-fit:contain}}
 h1{{font-size:20px;font-weight:600;margin-bottom:16px}}
 label{{display:block;font-size:11px;color:#5a5e6e;margin-bottom:12px}}
 input{{display:block;width:100%;margin-top:4px;padding:8px 12px;font:inherit;
@@ -702,7 +704,7 @@ input:focus{{outline:none;border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,
 .demo{{margin-top:8px;text-align:center}}
 </style></head><body>
 <div class="card">
-  <div class="brand"><span class="logo">C</span>Relay</div>
+  <div class="brand"><img class="logo" src="{RELAY_ICON}" alt="Relay">Relay</div>
   <h1>{'Create your workspace' if signup else 'Welcome back'}</h1>
   {err}
   <form method="post" action="/auth/{mode}">
@@ -726,6 +728,7 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
     style = auth_page("login").split("<style>")[1].split("</style>")[0]
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -735,7 +738,7 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
 .hint{{font-size:11px;color:#5a5e6e;margin-bottom:16px}}
 </style></head><body>
 <div class="card">
-  <div class="brand"><span class="logo">C</span>Relay</div>
+  <div class="brand"><img class="logo" src="{RELAY_ICON}" alt="Relay">Relay</div>
   <h1>Check your inbox</h1>
   <div class="hint">We sent a 6-digit code to <b>{esc(email)}</b>. Enter it to
   finish signing in.</div>
@@ -1396,7 +1399,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
   <button class="burger" aria-label="Menu"
     onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
   <aside class="sidebar">
-    <div class="brand"><span class="logo">R</span>
+    <div class="brand"><img class="logo" src="{RELAY_ICON}" alt="Relay">
       <span class="bname"><b>Relay</b><img class="bizlogo" src="{HUFT_LOGO}" alt="{BUSINESS}"></span></div>
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
@@ -2413,6 +2416,7 @@ def render(tid: str = "t1", email: str = "") -> str:
 
 TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2428,8 +2432,7 @@ a{text-decoration:none;color:inherit}
 border-right:1px solid #ECECF1;padding:16px 12px;display:flex;
 flex-direction:column;overflow:hidden}
 .brand{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-bottom:12px}
-.logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
-font-size:13px;display:grid;place-items:center}
+.logo{width:28px;height:28px;object-fit:contain;display:block}
 .brand b{font-size:13px;color:var(--ink);font-weight:600;line-height:1.15}
 .brand .bname{display:flex;flex-direction:column;gap:1px}
 .brand .biz{font-size:11px;color:var(--mut);font-weight:500;letter-spacing:.2px}
@@ -9517,6 +9520,7 @@ def _polish_reply(question: str, res: dict) -> dict:
 
 CHAT_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
+<link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9533,8 +9537,7 @@ a{text-decoration:none;color:inherit}
 border-right:1px solid #ECECF1;padding:16px 12px;display:flex;
 flex-direction:column;overflow:hidden}
 .brand{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-bottom:12px}
-.logo{width:26px;height:26px;border-radius:8px;background:#21232E;color:#fff;font-weight:700;
-font-size:13px;display:grid;place-items:center}
+.logo{width:28px;height:28px;object-fit:contain;display:block}
 .brand b{font-size:13px;color:var(--ink);font-weight:600;line-height:1.15}
 .brand .bname{display:flex;flex-direction:column;gap:1px}
 .brand .biz{font-size:11px;color:var(--mut);font-weight:500;letter-spacing:.2px}
