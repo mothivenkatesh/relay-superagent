@@ -569,6 +569,27 @@ def _rebase_world() -> None:
     for r in led.runs.values():
         if r.gate_latency_ms and r.gate_latency_ms > 48 * 3_600_000:
             r.gate_latency_ms = (5 + sum(map(ord, r.run_id)) % 1150) * 60_000
+    # Everything not in the queue spreads across the fortnight before now,
+    # in its original order, so the 14-day line reads as two weeks of work.
+    # A run, its trace and its outcome move by one delta: waits, deadlines
+    # and order stay true.
+    rest = sorted((r for r in led.runs.values()
+                   if r.state is not RunState.AWAITING_GATE),
+                  key=lambda r: r.occurred_at)
+    n = max(len(rest) - 1, 1)
+    now = WORLD.d.clock.now()
+    for i, r in enumerate(rest):
+        back = 13 - round(i * 12 / n)                       # 13 .. 1 days ago
+        target = (now.replace(hour=9 + (i * 5) % 9, minute=(i * 17) % 60)
+                  - timedelta(days=back))
+        d3 = target - r.occurred_at
+        shift(r, d3)
+        for e in led.events.get(r.run_id, []):
+            if isinstance(e.get("ts"), datetime):
+                e["ts"] = e["ts"] + d3
+        o = led.outcome_for(r.run_id)
+        if o:
+            shift(o, d3)
 
 
 _rebase_world()
@@ -1445,10 +1466,10 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
   <aside class="sidebar">
     <div class="brand"><img class="logo" src="{RELAY_ICON}" alt="Relay">
-      <span class="bname"><b>Relay</b><img class="bizlogo" src="{HUFT_LOGO}" alt="{BUSINESS}"></span></div>
+      <span class="bname"><b>Relay</b></span></div>
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
-      <a class="nav" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New task</span></a>
+      <a class="nav" href="/?new=1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New task</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
       <a class="nav{' on' if active == 'memory' else ''}" href="/memory">{ICONS["book"]}<span>Files</span></a>
@@ -7308,8 +7329,10 @@ class Handler(BaseHTTPRequestHandler):
             from urllib.parse import parse_qs as _pq, urlparse as _up
             _as = _pq(_up(self.path).query).get("as", ["owner"])[0]
             say = _pq(_up(self.path).query).get("say", [""])[0][:120]
+            fresh = "new" in _pq(_up(self.path).query) or bool(say)
             self._html(chat_render(sess["tenant_id"], conv,
-                                   sess.get("email", ""), _as, say=say))
+                                   sess.get("email", ""), _as, say=say,
+                                   fresh=fresh))
         elif self.path in ("/tasks", "/approvals"):
             sess = self._session()
             if not sess:
@@ -9495,8 +9518,7 @@ def home_dashboard_html(tid: str) -> str:
         f'<a class="htab{" on" if i == 0 else ""}" href="{h}">{t}</a>'
         for i, (t, h) in enumerate([("General", "/"), ("Approvals", "/approvals"),
                                     ("History", "/journeys"),
-                                    ("Scheduled", "/scheduled"),
-                                    ("Agents", "/agents")]))
+                                    ("Scheduled", "/scheduled")]))
     return (
         f'<div class="hdash">'
         f'<div class="htabs">{tabs}</div>'
@@ -10125,16 +10147,9 @@ __SIDEBAR__
       <div class="hero-mid">__ROLEPILLS__<h1>__GREET__</h1></div>
       __DASH__
       __ONBOARD__
-      <div class="tpl">
-        <div class="tpl-h"><span>Start with a job</span>
-          <button class="tpl-shuf" onclick="tplShuffle()" aria-label="Shuffle">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></svg>
-          </button></div>
-        <div class="tpl-grid" id="tplgrid"></div>
-      </div>
     </div>
   </div></main>
-  <div class="composer" id="composer">
+  __HIDE__<div class="composer" id="composer">
   <div class="mpop" id="mpop" hidden></div>
   <form class="hcomposer" onsubmit="event.preventDefault();send(box.value)">
     <input id="box" placeholder="Ask anything, or tell Relay what to do. / calls an agent, @ tags a teammate" value="__SAYVAL__" autofocus autocomplete="off"
@@ -11034,7 +11049,7 @@ def brief_note_content(tid: str) -> str:
             f'stay in <a href="/journeys"><b>History</b></a>.</div>')
 
 
-def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner", say: str = "") -> str:
+def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: str = "owner", say: str = "", fresh: bool = False) -> str:
     c = CONVS.get(conv_id)
     if c and c["tenant"] != tid:
         c = None
@@ -11139,7 +11154,8 @@ def chat_render(tid: str = "t1", conv_id: str = "", email: str = "", persona: st
             .replace("__TPLPOOL__", tpl_pool)
             .replace("__MONEY__", money if not cid else "")
             .replace("__NEEDS__", needs if not cid else "")
-            .replace("__DASH__", home_dashboard_html(tid) if not cid else "")
+            .replace("__DASH__", home_dashboard_html(tid) if not cid and not fresh else "")
+            .replace("__HIDE__", "<style>.composer{display:none}</style>" if not cid and not fresh else "")
             .replace("__ONBOARD__", onboard if not cid else "")
             .replace("__BRIEF__", brief)
             .replace("__CHIPS__", chips_html)
