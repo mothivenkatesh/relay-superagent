@@ -183,8 +183,11 @@ Cashfree's own infrastructure and is grounded in the merchant's actual
 transaction data: orders, settlements, refunds, disputes, the decline
 codes and the delivery scans. Its agents arrive pre-trained on payment
 operations patterns, which is why a turnkey agent is useful on its
-first day instead of after a month of tuning. Merchant transaction
-data is not sent to external AI providers.
+first day instead of after a month of tuning. And there is a
+containment argument as plain as the capability one: a stack of point
+tools means your payments data scattered across a myriad of vendors,
+each holding its own copy. With Relay it stays in one place. Merchant
+transaction data is not sent to external AI providers.
 
 A horizontal AI tool can draft you a very polite dispute reply. It
 has never seen your order, cannot attach your proof, and will not
@@ -194,6 +197,14 @@ dials, a messenger that messages, with no context behind the action
 and nothing watching whether the cart actually came back. Executing
 a task and owning an outcome are different jobs. Relay was hired for
 the second one.
+
+There is also the quiet cost nobody budgets for: making AI pay for
+itself is engineering work. Prompts need tuning, feedback loops need
+building, models and token spend need optimising, and none of that is
+a merchant's job. In Relay it is already done. The turnkey agents
+arrive with the loop built, and the feedback loop you would otherwise
+have to construct is the memory tier you read about above, running on
+every edit you make.
 
 ## Keep the hours
 
