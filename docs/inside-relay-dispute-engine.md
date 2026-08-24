@@ -1,4 +1,4 @@
-# Introducing Relay: The most intelligent AI teammates to run SMB payment operations
+# Introducing Relay: AI teammates that run SMB payment operations
 
 *What follows is the launch, told from the inside of the hardest
 workflow Relay owns: one dispute, end to end.*
