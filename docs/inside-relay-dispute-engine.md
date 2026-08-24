@@ -63,8 +63,8 @@ Relay is a superagent: one teammate at the surface, specialist
 agents underneath. We could describe all of them at the same shallow
 depth. More useful to take Dispute Defender, the one that runs
 webhook to filed response with a test suite across the entire path,
-and cut it open. The rest share this architecture and are earlier on
-the same road. Where a thing is roadmap, we will call it roadmap.
+and cut it open. The rest of the team follows the same anatomy, and
+we will meet them before the end.
 
 Back to Tuesday, 4:47 pm.
 
@@ -164,6 +164,41 @@ feeds the memory tier. Most products treat approval as friction to be
 engineered away; Relay treats it as the training signal. The human in
 the loop is the learning loop, which is why the gate gets better at
 staying out of your way the more you use it.
+
+## The rest of the team
+
+Everything you just read about disputes, the tiers, the gate, the
+memory, is the anatomy of every Relay agent. Same records, same
+approval moments, same lessons written back. Here is what the rest of
+the team does with it.
+
+**Abandoned Cart Recovery** reaches the buyer while the intent that
+built the cart is still alive: a call within minutes of the drop, a
+payment link in the same WhatsApp thread, and a note in the record
+about what worked. It knows which pincodes answer in the evening
+because the COD agent learned that first.
+
+**Failed Payment Recovery** reads the decline code before it acts. A
+bank timeout gets a retry in minutes; an insufficient-balance decline
+waits for the morning; every buyer gets a fresh link instead of an
+apology. A failed payment is not a lost order. It is an order that
+needs 1 more attempt, made intelligently.
+
+**COD Confirmation** calls before dispatch, because a COD order
+confirmed is a return prevented. It carries the pincode's history
+into every decision, offers prepaid where the risk says to, and holds
+only what you approve holding.
+
+**Subscription Dunning** treats a failed mandate as a customer about
+to quietly leave. Reason-aware retries, a nudge before the grace
+window closes, an alternate payment method when the pattern says the
+card is the problem. Saved subscriptions, not chased ones.
+
+5 agents, 1 engine. When the dispute agent learns which proof your
+bank accepts, that is dispute knowledge. When the COD agent learns
+that a pincode answers after 6 pm, the cart agent calling that same
+buyer already knows. The team shares a memory the way a good 5 person
+team does: without meetings.
 
 ## The honest ledger
 
