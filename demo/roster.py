@@ -13,7 +13,7 @@ deleting its entries here; lookups in server.py all fall back safely.
 # one back office and not seven tools.
 #
 # `today` renders as "Without Relay:" — who does this work now, and what it
-# costs or why it goes undone. That gap is the product. The Dispute Responder is
+# costs or why it goes undone. That gap is the product. The Dispute Defender is
 # the only one switched on here; the rest are off.
 #
 # No personas on these cards, deliberately. A five-person business has no
@@ -31,7 +31,7 @@ RELAY_AGENTS = [
     # --- Your support manager --------------------------------------------
     dict(slug="dispute_defender", icon="shield",
         status="live", desk="support",
-        role="Dispute Responder Agent",
+        role="Dispute Defender Agent",
         desc="Gathers the proof, writes the reply, and files it before the "
              "deadline.",
         today="Proof sits across your store, the courier and your inbox. By "
@@ -204,7 +204,7 @@ TEACHINGS = [
 # ------------------------------------------------------------- agent goals
 # Every agent claims ONE number it is hired to move. The goal is a sentence
 # a founder would say out loud; progress is counted from actions, and every
-# listed action names what it added. The Dispute Responder's number is computed
+# listed action names what it added. The Dispute Defender's number is computed
 # from the real record; the rest carry the demo week's numbers, consistent
 # with the morning brief.
 AGENT_GOALS = {

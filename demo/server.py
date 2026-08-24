@@ -3550,10 +3550,10 @@ from roster import (  # noqa: E402  (demo/roster.py: all agent data)
     TEACHINGS, _TINT, _FACULTY,
 )
 
-# Dispute Responder's own crew — the seven sub-agents inside the pipeline
+# Dispute Defender's own crew — the seven sub-agents inside the pipeline
 # (§6 of the spec), each behind its own access/memory/playbook/quality tabs.
 PLAY_AGENTS = {
-    "Dispute Responder": ["detection-agent", "eligibility-agent", "response-agent",
+    "Dispute Defender": ["detection-agent", "eligibility-agent", "response-agent",
                          "compliance-agent", "filing-agent", "escalation-agent",
                          "reporting-agent"],
 }
@@ -3620,11 +3620,11 @@ def workflows_content(tid: str) -> str:
     resolved = sum(1 for r in runs if r.state is RunState.RESOLVED)
     PCOLS = "1.1fr 2.6fr 1.5fr .8fr 1.4fr"
     play_rows = [
-        _trow2(PCOLS, ["<b>Dispute Responder</b>",
+        _trow2(PCOLS, ["<b>Dispute Defender</b>",
                        '<span class="mut">Dispute filed &rarr; evidence-cited '
                        'response &rarr; your approval &rarr; filed with the '
                        'bank.</span>',
-                       _agent_chips(PLAY_AGENTS["Dispute Responder"]),
+                       _agent_chips(PLAY_AGENTS["Dispute Defender"]),
                        '<span class="st ok">live</span>',
                        f'<span class="mut">{len(runs)} runs &middot; {waiting} '
                        f'waiting &middot; {resolved} resolved</span>']),
@@ -4486,7 +4486,7 @@ def goal_block(tid: str, slug: str) -> str:
     """The number this agent is hired to move, said once and measured in
     the open: the claim, the honest counting rule, a bar with the goal
     marked on it, and the actions that moved it, each naming what it
-    added. Dispute Responder's number comes from the real record."""
+    added. Dispute Defender's number comes from the real record."""
     g = AGENT_GOALS.get(slug)
     if not g:
         return ""
@@ -5891,7 +5891,7 @@ def run_trace_content(tid: str, run_id: str) -> str:
 
 
 # (days ago, customer, reason label, buyer claim, verdict, evidence, draft)
-# The look-back: what Dispute Responder would have done with Heads Up For Tails's
+# The look-back: what Dispute Defender would have done with Heads Up For Tails's
 # own last 30 days, before it was switched on. Nothing here was ever sent.
 SHADOW_ROWS = [
     (27, "Ananya B.",  "Says it never arrived",   "Peanut butter jar never arrived",              "send", "2 proofs",
@@ -5961,7 +5961,7 @@ def shadow_content(tid: str) -> str:
     return (
         '<h1 class="page">See what you missed</h1>'
         '<div class="pagehint">Put your last 30 days of disputes through '
-        'Dispute Responder. Nothing is sent, nobody is contacted, and it costs '
+        'Dispute Defender. Nothing is sent, nobody is contacted, and it costs '
         'nothing: you just see what got away.</div>'
         '<button class="btn primary" id="shbtn" onclick="shstart()">Check the last 30 days</button>'
         '<div class="shstats">'
@@ -5981,7 +5981,7 @@ def shadow_content(tid: str) -> str:
         f'<tbody>{"".join(body)}</tbody></table></div>'
         '<div class="shband" id="shband"><span><b>Nothing was sent.</b> Nobody '
         'was contacted and this cost you nothing. That is what last month '
-        'looked like without Dispute Responder.</span>'
+        'looked like without Dispute Defender.</span>'
         '<a class="btn primary sm" href="/settings?s=connectors">Switch it on &rarr;</a></div>'
         + """<script>
 function shstart(){
