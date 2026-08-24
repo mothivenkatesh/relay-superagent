@@ -1,120 +1,165 @@
-# Inside Relay: one agent, a context engine, and a gate
+# Relay, explained through one dispute
 
-Cashfree launched Relay this week: the AI Super Agent that runs payment
-operations for SMBs. The launch note covers what it does. This post
-covers how the hardest part of it works, using the dispute engine as the
-walkthrough, because disputes are where every design decision gets
-tested by real consequences.
+*How the AI Super Agent runs payment operations for SMBs, told from the
+inside of the hardest workflow it owns.*
 
-## The problem, in one merchant's week
+The webhook lands on a Tuesday at 4:47 pm. Reason code RD. A buyer has
+told their bank they were charged twice for an order of pet food, and
+the bank has opened a dispute. From this moment a clock is running.
+Answer with evidence before the deadline and the payment stays yours.
+Miss it and the amount is debited, no appeal, case closed by default.
 
-7 in 10 Indian SMBs run payment operations entirely by hand. Carts need
-calling, failed payments need retrying, COD orders need confirming,
-disputes need filing before a bank's deadline. On Cashfree's data an
-average SMB spends 60 hours a week on this. A 5 person team does not
-have a person to spare, so the work competes with everything else and
-loses. A missed dispute deadline is not a task slipped. It is a
-chargeback debited.
+For the merchant, this email is item 41 on a day that already has 40.
+The proof it needs is scattered: the delivery scan sits with the
+courier, the invoice in the billing tool, the buyer's own "where is my
+order" message in a WhatsApp thread. Gathering it takes an evening the
+merchant does not have. So the reply goes out late, or thin, or not at
+all. Banks do not grade effort.
+
+Now multiply by everything else the payments day holds. Carts dropped
+at checkout that a phone call would recover. Failed payments where the
+decline code says "try UPI tomorrow morning" to anyone who can read
+decline codes. COD orders shipping to pincodes that bounce 2 parcels
+in 5. On Cashfree's data, 7 in 10 Indian SMBs do all of this by hand,
+and the average SMB spends 60 hours a week doing it. A 5 person
+company does not have a 6th person. The work happens badly, or the
+founder does it at midnight, which is the same thing with worse sleep.
+
+This is the job Relay was built to take. Not to flag. To finish.
 
 ## What Relay is
 
-Relay is an AI team member that completes payment operations end to
-end: it reads the merchant's own transaction records and acts, rather
-than flagging work for someone else to do. Merchants describe the
-outcome they want in plain language. Relay runs a turnkey agent or
-builds one. Approval is required at exactly 2 points: before a payment
-moves and before a customer is contacted.
+Relay is Cashfree's AI Super Agent for payment operations. It reads
+the merchant's own transaction records and completes the work: retries
+the failed payment, calls the dropped cart, confirms the COD order,
+files the dispute. A merchant sets it up by describing the outcome in
+plain language. There is no workflow canvas and no node editor,
+because the merchant we built this for will never open one.
+
+It asks permission at exactly 2 moments: before a payment moves and
+before a customer is contacted. Everything else it does quietly and
+writes down.
+
+Relay launched this week for all Cashfree merchants, free at launch,
+after running in beta since May. That is the announcement. What
+follows is the part a press release cannot hold: how the thing
+actually works, shown through the 1 agent we have proven end to end.
 
 ## One agent, all the way down
 
-Relay ships several agents. This post goes deep on 1, Dispute
-Defender, because it is the one we have proven end to end: webhook to
-drafted reply to human approval to filed response, with a test suite
-across the whole path. The others follow the same architecture. Where
-they are earlier in that journey, we say roadmap and mean it.
+Relay ships several agents. We could describe all of them at the same
+shallow depth. More useful to take Dispute Defender, the one that runs
+webhook to filed response with a test suite across the entire path,
+and cut it open. The rest share this architecture and are earlier on
+the same road. Where a thing is roadmap, we will call it roadmap.
 
-A dispute arrives as a structured webhook with a reason code. There is
-no model call in detection: a reason code is a fact, and facts get a
-lookup, not an inference. From there the pipeline runs perceive, draft,
-check, gate, file, and the model appears in exactly 4 calls: confirm
-the claim, extract it, draft the reply, judge the draft. Everything
-around those calls is deterministic code.
+Back to Tuesday, 4:47 pm.
 
-## Inside the context engine
+Detection is not AI. A dispute arrives as structured data with a
+reason code, and a reason code is a fact. Facts get a lookup. The
+engine classifies the dispute in deterministic code, checks the
+merchant qualifies, and opens a run in an append-only ledger.
 
-The interesting part is not the model. It is what the model reads.
-3 tiers, all Postgres, every table tenant-isolated by row-level
-security.
+Then the pipeline: perceive, draft, check, gate, file. Across that
+whole path the model is called exactly 4 times: confirm the claim,
+extract it, draft the reply, judge the draft. Everything between those
+4 calls is ordinary code that runs the same way every time. If the
+phrase "agentic workflow" conjures a model freestyling through your
+compliance process, this is the opposite. The model writes prose. Code
+decides what happens.
 
-**1. Policy.** Per-merchant configuration: which reason codes qualify,
-caps, thresholds, when to ask. Changing a merchant's behaviour is a row
-update, not a redeploy.
+By 4:53 pm there is a drafted reply citing the delivery scan and the
+buyer's own message thread, and it is sitting in front of a human with
+3 buttons. Nothing has been sent.
 
-**2. Evidence.** The facts a reply may cite: delivery scans, courier
-agreements, refund policies. Retrieval is exact match by reason code.
-No RAG, no embeddings, deliberately. A dispute reply cites the invoice
-for this order, and there is no version of "semantically similar
-invoice" that a bank should ever receive. The draft may only cite
-evidence ids that exist in the vault. A citation outside it fails the
-check and never reaches the merchant.
+## The context engine
 
-**3. Learned preference memory.** The closed loop. When a merchant
-edits a drafted reply before approving it, the engine diffs what
-changed, writes the lesson as a memory note, and the next dispute for
-that merchant reads it back before drafting. Reword "refund will be
-processed" into the bank's escalation format once, and the next draft
-arrives already in that format. This is not a demo behaviour. It is a
-single test in the suite:
-`test_edit_runs_the_diff_writes_memory_and_next_draft_reads_it`.
-That test is the "gets smarter from your edits" claim, executable.
+The model is not the interesting part. What the model reads is.
 
-## The trust model, mechanically
+Underneath every agent sit 3 tiers of context, all in Postgres, every
+table isolated per merchant by row-level security.
 
-"You approve before anything sends" is the tagline. Here is the
-machine underneath it.
+**Policy.** What this merchant allows: which reason codes qualify,
+caps, thresholds, when to ask a human. It is configuration in rows,
+so changing a merchant's behaviour is an update, not a deploy.
 
-1. 2 deterministic checks run first, with no model in either: banned
-   phrases and promises, citation validity, link liveness, caps.
-2. An LLM judge then scores the draft against the claim. Below
-   threshold, it never surfaces.
-3. What passes lands in front of a human on Slack. 3 buttons: approve,
-   edit, dismiss. Nothing sends without the first 2.
-4. Anything that fails, times out, or looks unusual escalates to an
-   internal review channel. Escalations go to our team, never to the
-   merchant's customer.
-5. The ledger is append-only and every action carries an idempotency
-   key scoped to the tenant. A retry cannot double-file a dispute. A
-   gate decision is written exactly once.
+**Evidence.** The facts a reply may cite: delivery proof, courier
+agreements, the refund policy. Retrieval is exact match by reason
+code. There is no RAG here, no embeddings, and that is a decision,
+not a gap. A dispute reply cites the invoice for this order. There is
+no useful notion of a semantically similar invoice, and a bank should
+never receive one. The draft may only cite evidence ids that exist in
+the vault; a citation from outside it fails a check and dies before
+any human sees it.
 
-The gate is not a compliance apology bolted onto an autonomous system.
-It is where the memory tier gets its training data. Every edit teaches
-the engine. The human in the loop is the learning loop.
+**Learned preference memory.** The tier we are proudest of, because
+it closes a loop most AI products leave open. When a merchant edits a
+drafted reply before approving it, the engine diffs the draft against
+the edit, writes what it learned as a memory note, and the next
+dispute for that merchant reads the note back before drafting.
 
-## What this build has proven, and what it has not
+Concretely: a merchant once rewrote our generic settlement line to
+quote the buyer's own bank reference number instead. One edit. Every
+draft since arrives with the reference number already quoted. The
+behaviour is pinned by a single test whose name is the whole story:
 
-The dispute engine described here is proven against simulated rails:
-the full path runs end to end in the test suite, including the memory
-loop, on the same Postgres schema that production uses. What it does
-not have yet: a live bank webhook feeding it production disputes, and
-self-serve connection of this specific agent. Merchants on the Relay
-beta since May have been running the turnkey agents; the dispute
-engine's numbers in this post come from its test suite, not from
-projections. We would rather you know exactly which is which.
+    test_edit_runs_the_diff_writes_memory_and_next_draft_reads_it
 
-## Why Cashfree can build this
+"It gets smarter from your edits" is a sentence every AI product says.
+Ours compiles.
 
-The context engine is only as good as the records under it. Relay runs
-on Cashfree's own payments infrastructure and is grounded in the
-merchant's actual transaction data: orders, settlements, disputes,
-refunds. Merchant transaction data is not sent to external AI
-providers. The agents arrive pre-trained on payment operations
-patterns, which is why a turnkey agent is useful on day 1 instead of
-after a month of configuration.
+## The trust machine
 
-## Where this goes
+The tagline is "you approve before anything sends". Taglines are
+cheap. Here is the machinery.
 
-Relay is free for all Cashfree merchants at launch. The aim is blunt:
-take a merchant's payment operations from 60 hours a week to under 45
-minutes of approvals. If you run an SMB on Cashfree, Relay is on your
-dashboard today. Describe the job you would hire for. Approve what it
-drafts. Keep the hours.
+First, 2 deterministic checks with no model in either: banned phrases
+and promises, citation validity, link liveness, caps. Then an LLM
+judge scores the draft against the claim; below threshold it never
+surfaces. What passes lands on Slack with approve, edit, dismiss.
+Anything that fails, stalls past 24 hours, or looks unusual escalates
+to an internal review channel, staffed by us, invisible to the
+merchant's customer. And every action carries an idempotency key
+scoped to the merchant, so a retry cannot double-file and a gate
+decision writes exactly once. The ledger only appends. Nobody edits
+history, including us.
+
+Notice what the gate really is. Every edit a merchant makes there
+feeds the memory tier. The approval step is not friction we tolerate.
+It is where the engine learns. The human in the loop is the learning
+loop.
+
+## The honest ledger
+
+Beta since May means merchants have been running Relay's turnkey
+agents on real operations. The dispute engine in this post is proven
+against simulated rails: the full path, including the memory loop,
+runs green in the suite on the same Postgres schema production uses.
+What it does not have yet is a live bank webhook feeding it production
+disputes, or self-serve connection of this specific agent. The numbers
+here come from a test suite, not a projection. We would rather tell
+you which is which than let a paragraph imply more than exists.
+
+## Why this needed a payments company
+
+An agent is only as good as the records under it. Relay runs on
+Cashfree's own infrastructure and is grounded in the merchant's actual
+transaction data: orders, settlements, refunds, disputes, the decline
+codes and the delivery scans. Its agents arrive pre-trained on payment
+operations patterns, which is why a turnkey agent is useful on its
+first day instead of after a month of tuning. Merchant transaction
+data is not sent to external AI providers.
+
+A horizontal AI tool can draft you a very polite dispute reply. It has
+never seen your order, cannot attach your proof, and will not file
+anything. The draft was never the hard part.
+
+## Keep the hours
+
+The aim is blunt: from 60 hours a week of payment operations to under
+45 minutes of approvals. If you run on Cashfree, Relay is on your
+dashboard today. Describe the job you would have hired for. Approve
+what it drafts. Edit it once, and watch the next draft arrive already
+knowing.
+
+Tuesday, 4:47 pm will keep happening. It just stops being yours.
