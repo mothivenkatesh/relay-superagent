@@ -7531,12 +7531,17 @@ class Handler(BaseHTTPRequestHandler):
             self._html(_shell(pricing_content(sess["tenant_id"]), "settings",
                               sess["tenant_id"], sess.get("email", "")))
         elif self.path.split("?")[0] == "/memory":
+            # Files is its own page. It opens on the uploads tab, the
+            # thing a person clicking "Files" expects; the same content
+            # stays reachable inside Settings for the audit-minded.
             sess = self._session()
             if not sess:
                 return self._redirect("/login")
             from urllib.parse import parse_qs as _pq, urlparse as _up
-            t = (_pq(_up(self.path).query).get("t") or ["voice"])[0]
-            return self._redirect("/settings?s=knowledge&t=" + t)
+            t = (_pq(_up(self.path).query).get("t") or ["files"])[0]
+            self._html(_shell(
+                memory_content(sess["tenant_id"], tab=t),
+                "memory", sess["tenant_id"], sess.get("email", "")))
         elif self.path == "/shadow":
             sess = self._session()
             if not sess:
