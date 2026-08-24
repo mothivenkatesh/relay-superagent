@@ -29,7 +29,8 @@ This is the job Relay was built to take. Not to flag. To finish.
 
 ## What Relay is
 
-Relay is Cashfree's AI agent for payment operations. It reads
+Relay is an AI teammate that runs payment operations for SMBs.
+It reads
 the merchant's own transaction records and completes the work: retries
 the failed payment, calls the dropped cart, confirms the COD order,
 files the dispute. A merchant sets it up by describing the outcome in
@@ -52,8 +53,9 @@ actually works, shown through the 1 agent we have proven end to end.
 
 ## One agent, all the way down
 
-Relay ships several agents. We could describe all of them at the same
-shallow depth. More useful to take Dispute Defender, the one that runs
+Relay is a superagent: one teammate at the surface, specialist
+agents underneath. We could describe all of them at the same shallow
+depth. More useful to take Dispute Defender, the one that runs
 webhook to filed response with a test suite across the entire path,
 and cut it open. The rest share this architecture and are earlier on
 the same road. Where a thing is roadmap, we will call it roadmap.
