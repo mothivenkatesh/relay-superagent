@@ -34,7 +34,7 @@ Relay is an AI teammate that runs payment operations for SMBs. It
 reads the merchant's own transaction records and completes the work:
 retries the failed payment, calls the dropped cart while the intent
 that built it is still alive, confirms the COD order, saves the
-failing subscription, files the dispute. And it owns the outcome, not
+failing subscription, screens the refund claim, files the dispute. And it owns the outcome, not
 the task: it tracks whether the cart actually came back, and decides
 what to try next when it did not. A merchant sets it up by describing
 the outcome in plain language. There is no workflow canvas and no
@@ -194,7 +194,13 @@ to quietly leave. Reason-aware retries, a nudge before the grace
 window closes, an alternate payment method when the pattern says the
 card is the problem. Saved subscriptions, not chased ones.
 
-5 agents, 1 engine. When the dispute agent learns which proof your
+**Refunds** get looked at before they get paid. Most claims are
+honest and clear in seconds; the ones that repeat a photo, an
+address, or a pattern wait for your eyes instead of your wallet.
+Checking every claim by hand costs more than the fraud, so today
+nobody checks. Relay checks.
+
+6 agents, 1 engine. When the dispute agent learns which proof your
 bank accepts, that is dispute knowledge. When the COD agent learns
 that a pincode answers after 6 pm, the cart agent calling that same
 buyer already knows. The team shares a memory the way a good 5 person
