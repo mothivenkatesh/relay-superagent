@@ -1140,6 +1140,73 @@ SHARED_UI_CSS = """
 .agentrow .pres{display:none}
 .cbadge-on{width:6px;height:6px;border-radius:50%;background:#10b981;
   margin-left:auto;flex:none}
+/* --- files page --- */
+.fhead2{display:flex;justify-content:flex-end;margin:0 0 12px}
+.fmeter{display:inline-flex;align-items:center;gap:8px;font-size:11px;
+  color:var(--mut);border:1px solid var(--hair);border-radius:100px;
+  padding:0 14px;min-height:32px;background:#fff}
+.fmeter i{width:7px;height:7px;border-radius:50%;background:#10b981}
+.fmeter b{color:var(--ink)}
+.facts{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;
+  margin:0 0 14px}
+@media (max-width:1100px){.facts{grid-template-columns:repeat(2,1fr)}}
+.fact{font:inherit;text-align:left;border:1px solid var(--hair);
+  border-radius:14px;background:#fff;padding:16px 18px;cursor:pointer;
+  display:block;transition:border-color .12s}
+.fact:hover{border-color:#98A5F0}
+.fact svg{width:18px;height:18px;color:#5A5D6D;margin-bottom:8px}
+.fact b{display:block;font-size:13px;color:var(--ink);font-weight:600}
+.fact small{display:block;font-size:11px;color:var(--mut);margin-top:2px}
+.ffilts{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 6px}
+.fempty{display:flex;flex-direction:column;align-items:center;gap:6px;
+  border:1px dashed var(--hair);border-radius:14px;background:#fff;
+  padding:44px 20px;margin-top:8px;text-align:center}
+.fempty svg{width:22px;height:22px;color:#9A9DAB}
+.fempty b{font-size:13px;color:var(--ink)}
+.fempty span{font-size:13px;color:var(--mut)}
+.fmodal{position:fixed;inset:0;background:rgba(27,31,48,.32);z-index:60;
+  display:flex;align-items:center;justify-content:center;padding:20px}
+.fmodal[hidden]{display:none}
+.fm-card{background:#fff;border-radius:18px;max-width:480px;width:100%;
+  padding:20px 22px;max-height:86vh;overflow-y:auto;text-align:left;
+  box-shadow:0 24px 64px rgba(27,31,48,.22)}
+.fm-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.fm-h svg{width:18px;height:18px;color:#5A5D6D}
+.fm-h b{font-size:20px;font-weight:600;color:var(--ink);flex:1}
+.fm-l{display:block;font-size:11px;font-weight:600;color:var(--mut);
+  margin:12px 0 4px}
+.fm-card .btext{width:100%;box-sizing:border-box}
+.fm-card .btext.ta{min-height:96px;resize:vertical;font:inherit;
+  font-size:13px;padding:10px 14px}
+.fm-card .cfgsel{width:100%;box-sizing:border-box}
+.fm-tabs{display:flex;background:var(--pill,#EEEFF2);border-radius:10px;
+  padding:3px;gap:3px;margin-top:10px}
+.fm-tabs label{flex:1;display:block}
+.fm-tabs input{position:absolute;opacity:0;pointer-events:none}
+.fm-tabs span{display:flex;align-items:center;justify-content:center;
+  min-height:32px;border-radius:8px;font-size:13px;color:var(--mut);
+  cursor:pointer}
+.fm-tabs input:checked+span{background:#fff;color:var(--ink);
+  font-weight:600;box-shadow:0 1px 3px rgba(27,31,48,.10)}
+.fm-tabs.sm span{font-size:11px}
+.fdrop{display:flex;flex-direction:column;align-items:center;gap:6px;
+  border:1.5px dashed #C7CDF3;border-radius:14px;padding:28px 16px;
+  margin-top:12px;cursor:pointer;text-align:center;background:#FBFBFE}
+.fdrop:hover,.fdrop.has{border-color:#98A5F0}
+.fdrop input{display:none}
+.fdrop svg{width:20px;height:20px;color:#5A5D6D}
+.fdrop b{font-size:13px;color:var(--ink)}
+.fdrop span{font-size:11px;color:var(--mut)}
+.fexts{display:flex;gap:6px}
+.fexts i{font-style:normal;font-size:11px;border:1px solid var(--hair);
+  border-radius:100px;padding:2px 10px;color:var(--mut)}
+.fm-tog{display:flex;gap:10px;align-items:flex-start;margin-top:14px;
+  cursor:pointer}
+.fm-tog input{margin-top:3px;accent-color:var(--accent,#5266EB)}
+.fm-tog b{display:block;font-size:13px;color:var(--ink);font-weight:600}
+.fm-tog small{font-size:11px;color:var(--mut)}
+.fm-p{font-size:13px;color:var(--text);line-height:1.6;margin:8px 0 0}
+.fm-foot{display:flex;justify-content:flex-end;margin-top:16px}
 /* --- run inspector (/runs/<id>) --- */
 .irid{font-family:ui-monospace,monospace;font-size:20px;
   background:var(--pill,#EEEFF2);border-radius:8px;padding:2px 10px}
@@ -4030,7 +4097,8 @@ AGENT_CFG: dict = {}
 def _cfg_save() -> None:
     """Persist every merchant-mutable store, atomically and versioned."""
     _state.save(agent_cfg=AGENT_CFG, demo_on=DEMO_ON, autonomy=AUTONOMY,
-                routines=ROUTINES, kfiles=KFILES, assign=ASSIGN)
+                routines=ROUTINES, kfiles=KFILES, assign=ASSIGN,
+                folders=FFOLDERS)
 
 
 def _cfg_load() -> None:
@@ -4042,6 +4110,7 @@ def _cfg_load() -> None:
     ROUTINES.update(d.get("routines", {}))
     KFILES.update(d.get("kfiles", {}))
     ASSIGN.update(d.get("assign", {}))
+    FFOLDERS.update(d.get("folders", {}))
 
 GUARD_DEFAULTS = {
     "calling": [("quiet", "No calls outside", "9 AM to 8 PM"),
@@ -6648,6 +6717,7 @@ document.addEventListener('click', e => {
 # Files the founder gives the team: price lists, policies, courier
 # agreements. Names and sizes only in the demo; agents cite them by name.
 KFILES: dict[str, list] = {}
+FFOLDERS: dict[str, list] = {}   # tenant -> folder names
 
 
 def seed_kfiles(tid: str) -> list:
@@ -6659,6 +6729,39 @@ def seed_kfiles(tid: str) -> list:
         dict(name="Price list Aug.xlsx", size="96 KB",
              when="1 Aug", used="Read by the callers before offers"),
     ])
+
+
+def _fkind(f: dict) -> str:
+    if f.get("kind"):
+        return f["kind"]
+    n = f.get("name", "").lower()
+    if n.endswith((".xlsx", ".csv", ".xls")):
+        return "sheet"
+    if n.startswith("http") or f.get("url"):
+        return "link"
+    if f.get("note"):
+        return "note"
+    return "pdf"
+
+
+def _fstate(f: dict) -> tuple[str, str]:
+    """(label, chip class). A fresh upload reads for a minute, then it is
+    readable. Links stay linked; notes stay saved; a failed read says so."""
+    if f.get("state") == "failed":
+        return "couldn&rsquo;t read", "mut"
+    import time
+    if f.get("ts") and time.time() - f["ts"] < 60:
+        return "reading&hellip;", "wait"
+    return {"link": ("linked", "ok"), "note": ("saved", "ok")}.get(
+        _fkind(f), ("readable", "ok"))
+
+
+def _fbytes(size: str) -> int:
+    try:
+        num, unit = size.split()
+        return int(float(num) * (1048576 if unit == "MB" else 1024))
+    except Exception:
+        return 0
 
 
 def memory_content(tid: str, tab: str = "voice",
@@ -6716,15 +6819,171 @@ def memory_content(tid: str, tab: str = "voice",
                 f'<span class="st ok">fresh</span></div>'
                 for e in items)
     elif tab == "files":
-        body = ('<div class="pagehint">Anything you upload, the whole '
-                'team can read and cite.</div>'
-                + "".join(
-            f'<div class="trow slim"><span class="ico">{ICONS["note"]}</span>'
-            f'<span class="tdesc"><b>{esc(f["name"])}</b> '
-            f'<span class="mut">{esc(f["size"])} &middot; added '
-            f'{esc(f["when"])} &middot; {esc(f["used"])}</span></span>'
-            f'<span class="st ok">readable</span></div>'
-            for f in files))
+        used_b = sum(_fbytes(f.get("size", "")) for f in files)
+        used_h = (f"{used_b // 1024} KB" if used_b < 1048576
+                  else f"{used_b / 1048576:.1f} MB")
+        meter = (f'<div class="fhead2"><span class="fmeter"><i></i>'
+                 f'Storage: <b>{used_h}</b> / 25 MB</span></div>')
+        fopts = ('<option>Files</option>' + "".join(
+            f'<option>{esc(fn)}</option>' for fn in FFOLDERS.get(tid, [])))
+        fsel = (f'<label class="fm-l">Folder</label>'
+                f'<select class="cfgsel" name="folder">{fopts}</select>')
+        acts = (
+            '<div class="facts">'
+            f'<button class="fact" onclick="fModal(\'m-up\')">'
+            f'{ICONS["folder"]}<b>Upload a file</b>'
+            '<small>PDF, sheet or doc. Every agent reads it.</small>'
+            '</button>'
+            f'<button class="fact" onclick="fModal(\'m-link\')">'
+            f'{ICONS["send"]}<b>Add a link</b>'
+            '<small>A page or a whole site agents may cite.</small>'
+            '</button>'
+            f'<button class="fact" onclick="fModal(\'m-note\')">'
+            f'{ICONS["pen"]}<b>Write a note</b>'
+            '<small>A rule in your words. Agents follow it.</small>'
+            '</button>'
+            f'<button class="fact" onclick="fModal(\'m-folder\')">'
+            f'{ICONS["bm"]}<b>Create a folder</b>'
+            '<small>Keep price lists apart from policies.</small>'
+            '</button>'
+            f'<button class="fact" onclick="fModal(\'m-sync\')">'
+            f'{ICONS["flow"]}<b>Sync from Drive</b>'
+            '<small>Keep a Drive folder and Files in step.</small>'
+            '</button></div>')
+        modals = (
+            '<div class="fmodal" id="m-up" hidden><div class="fm-card">'
+            f'<div class="fm-h">{ICONS["folder"]}<b>Upload a file</b>'
+            '<button class="rulex" type="button" onclick="fModal()">'
+            '&#10005;</button></div>'
+            '<form method="post" action="/api/file_upload" '
+            'enctype="multipart/form-data">'
+            + fsel +
+            '<label class="fdrop"><input type="file" name="file" required '
+            'onchange="this.closest(\'.fdrop\').classList.add(\'has\');'
+            'this.closest(\'.fdrop\').querySelector(\'b\').textContent'
+            '=this.files[0].name">'
+            f'{ICONS["folder"]}<b>Click or drop a file here</b>'
+            '<span>Up to 20 MB.</span>'
+            '<span class="fexts"><i>pdf</i><i>xlsx</i><i>csv</i>'
+            '<i>docx</i><i>txt</i></span></label>'
+            '<div class="fm-foot"><button class="btn primary">Add file'
+            '</button></div></form></div></div>'
+            '<div class="fmodal" id="m-link" hidden><div class="fm-card">'
+            f'<div class="fm-h">{ICONS["send"]}<b>Add a link</b>'
+            '<button class="rulex" type="button" onclick="fModal()">'
+            '&#10005;</button></div>'
+            '<form method="post" action="/api/file_link">'
+            '<div class="fm-tabs">'
+            '<label><input type="radio" name="mode" value="page" checked '
+            'onchange="fLinkMode(this)"><span>One page</span></label>'
+            '<label><input type="radio" name="mode" value="site" '
+            'onchange="fLinkMode(this)"><span>Whole site</span></label>'
+            '</div>' + fsel +
+            '<label class="fm-l">Web address</label>'
+            '<input class="btext" name="url" required maxlength="200" '
+            'placeholder="https://headsupfortails.com/returns">'
+            '<div id="fm-site" hidden>'
+            '<label class="fm-l">How deep to follow links</label>'
+            '<div class="fm-tabs sm">'
+            '<label><input type="radio" name="depth" value="1">'
+            '<span>One level</span></label>'
+            '<label><input type="radio" name="depth" value="2" checked>'
+            '<span>Two levels</span></label>'
+            '<label><input type="radio" name="depth" value="3">'
+            '<span>Three levels</span></label></div>'
+            '<label class="fm-l">Stop after</label>'
+            '<input class="btext" name="maxpages" value="200" '
+            'maxlength="5"></div>'
+            '<label class="fm-tog"><input type="checkbox" name="refresh" '
+            'value="1"><span><b>Re-read weekly</b>'
+            '<small>Checks for changes every Monday.</small></span>'
+            '</label>'
+            '<div class="fm-foot"><button class="btn primary">Add link'
+            '</button></div></form></div></div>'
+            '<div class="fmodal" id="m-note" hidden><div class="fm-card">'
+            f'<div class="fm-h">{ICONS["pen"]}<b>Write a note</b>'
+            '<button class="rulex" type="button" onclick="fModal()">'
+            '&#10005;</button></div>'
+            '<form method="post" action="/api/file_note">' + fsel +
+            '<label class="fm-l">Name</label>'
+            '<input class="btext" name="title" required maxlength="60" '
+            'placeholder="e.g. Refund promises">'
+            '<label class="fm-l">The rule</label>'
+            '<textarea class="btext ta" name="text" required '
+            'maxlength="400" placeholder="Never promise a refund date on '
+            'a call. Say 3 to 5 working days."></textarea>'
+            '<div class="fm-foot"><button class="btn primary">Save note'
+            '</button></div></form></div></div>'
+            '<div class="fmodal" id="m-folder" hidden><div class="fm-card">'
+            f'<div class="fm-h">{ICONS["bm"]}<b>Create a folder</b>'
+            '<button class="rulex" type="button" onclick="fModal()">'
+            '&#10005;</button></div>'
+            '<form method="post" action="/api/file_folder">'
+            '<label class="fm-l">Folder name</label>'
+            '<input class="btext" name="name" required maxlength="40" '
+            'placeholder="e.g. Policies">'
+            '<div class="fm-foot"><button class="btn primary">Create'
+            '</button></div></form></div></div>'
+            '<div class="fmodal" id="m-sync" hidden><div class="fm-card">'
+            f'<div class="fm-h">{ICONS["flow"]}<b>Sync from Drive</b>'
+            '<button class="rulex" type="button" onclick="fModal()">'
+            '&#10005;</button></div>'
+            '<p class="fm-p">No Drive connection yet. Connect Google '
+            'Drive on the Connections page first; then a folder you '
+            'pick stays in step with Files on its own.</p>'
+            '<div class="fm-foot"><a class="btn ghost" '
+            'href="/connections">Open Connections</a></div></div></div>')
+        kinds = [("all", "All"), ("pdf", "Documents"), ("sheet", "Sheets"),
+                 ("link", "Links"), ("note", "Notes")]
+        filts = ('<div class="ffilts">' + "".join(
+            f'<button class="hubpill{" on" if k == "all" else ""}" '
+            f'data-fk="{k}" onclick="fFilter(this)">{lbl}</button>'
+            for k, lbl in kinds) + '</div>')
+        kico = {"pdf": "ledger", "sheet": "chart", "link": "send",
+                "note": "pen"}
+        rows = ""
+        for f in files:
+            lbl, cls = _fstate(f)
+            fol = (" &middot; in " + esc(f["folder"])
+                   if f.get("folder") and f["folder"] != "Files" else "")
+            rows += (
+                f'<div class="trow slim" data-kind="{_fkind(f)}">'
+                f'<span class="ico">{ICONS[kico[_fkind(f)]]}</span>'
+                f'<span class="tdesc"><b>{esc(f["name"])}</b> '
+                f'<span class="mut">{esc(f.get("size", ""))}'
+                f'{" &middot; " if f.get("size") else ""}added '
+                f'{esc(f["when"])}{fol} &middot; {f["used"]}</span></span>'
+                f'<span class="st {cls}">{lbl}</span>'
+                f'<form method="post" action="/api/file_del" '
+                f'style="display:contents">'
+                f'<input type="hidden" name="name" value="{esc(f["name"])}">'
+                f'<button class="rulex" title="Remove" '
+                f'onclick="return confirm(\'Remove this? Agents stop '
+                f'reading it.\')">&#10005;</button></form></div>')
+        empty = ('<div class="fempty">' + ICONS["folder"] +
+                 '<b>Nothing here yet</b>'
+                 '<span>Anything you add, every agent reads and cites.'
+                 '</span></div>')
+        body = (meter + acts + filts + (rows or empty) + modals
+                + """<script>
+function fModal(id){document.querySelectorAll('.fmodal').forEach(m =>
+  m.hidden = (m.id !== id));
+  if (id){const v = document.querySelector('#' + id + ' input, #' + id
+    + ' select'); if (v) v.focus();}}
+document.addEventListener('click', e => {
+  if (e.target.classList && e.target.classList.contains('fmodal'))
+    e.target.hidden = true;});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') fModal();});
+function fLinkMode(r){document.getElementById('fm-site').hidden =
+  r.value !== 'site';}
+function fFilter(btn){
+  document.querySelectorAll('.ffilts .hubpill').forEach(b =>
+    b.classList.toggle('on', b === btn));
+  const k = btn.dataset.fk;
+  document.querySelectorAll('[data-kind]').forEach(r =>
+    r.style.display = (k === 'all' || r.dataset.kind === k) ? '' : 'none');}
+</script>""")
     elif tab == "teach":
         body = teachings_html()
     else:
@@ -8019,8 +8278,13 @@ class Handler(BaseHTTPRequestHandler):
                              or [""])[0]
                 a_role = next((x["role"] for x in RELAY_AGENTS
                                if x["slug"] == agent_tag), "")
+                import time as _time
+                fm2 = _re2.search(r'name="folder"\r\n\r\n([^\r]{1,40})',
+                                  raw[:4000])
                 seed_kfiles(sess["tenant_id"]).append(dict(
                     name=name, size=size, agent=agent_tag,
+                    ts=int(_time.time()),
+                    folder=(fm2.group(1).strip() if fm2 else "Files"),
                     when=_dt.now().strftime("%-d %b"),
                     used=("Context for " + a_role) if a_role
                     else "Not cited yet; readable to the whole team"))
@@ -8039,6 +8303,71 @@ class Handler(BaseHTTPRequestHandler):
                 loc = "/memory?t=files"
             self.send_header("Location", loc)
             self.end_headers(); return
+        if self.path == "/api/file_link":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            url = (form.get("url") or [""])[0].strip()[:200]
+            if url:
+                from datetime import datetime as _dt
+                mode = (form.get("mode") or ["page"])[0]
+                used = ("Whole site, "
+                        + (form.get("depth") or ["2"])[0]
+                        + " levels, up to "
+                        + (form.get("maxpages") or ["200"])[0] + " pages"
+                        if mode == "site" else "A page agents may cite")
+                if form.get("refresh"):
+                    used += " &middot; re-read weekly"
+                seed_kfiles(sess["tenant_id"]).append(dict(
+                    name=url, kind="link", url=url,
+                    folder=(form.get("folder") or ["Files"])[0][:40],
+                    when=_dt.now().strftime("%-d %b"), used=used))
+                log_decision(sess["tenant_id"],
+                             (sess.get("email") or "you").split("@")[0],
+                             "Added a link: <b>" + esc(url[:60]) + "</b>",
+                             "/memory?t=files")
+            return self._redirect("/memory?t=files")
+        if self.path == "/api/file_note":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            form = parse_qs(raw)
+            text = (form.get("text") or [""])[0].strip()[:400]
+            title = (form.get("title") or [""])[0].strip()[:60]
+            if text:
+                from datetime import datetime as _dt
+                seed_kfiles(sess["tenant_id"]).append(dict(
+                    name=title or text[:60], kind="note", note=True,
+                    folder=(form.get("folder") or ["Files"])[0][:40],
+                    when=_dt.now().strftime("%-d %b"),
+                    used=esc(text[:120])))
+                log_decision(sess["tenant_id"],
+                             (sess.get("email") or "you").split("@")[0],
+                             "Wrote a note: <b>" + esc(title or text[:60])
+                             + "</b>", "/memory?t=files")
+            return self._redirect("/memory?t=files")
+        if self.path == "/api/file_folder":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            name = (parse_qs(raw).get("name") or [""])[0].strip()[:40]
+            fl = FFOLDERS.setdefault(sess["tenant_id"], [])
+            if name and name not in fl and name != "Files":
+                fl.append(name)
+            return self._redirect("/memory?t=files")
+        if self.path == "/api/file_del":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            name = (parse_qs(raw).get("name") or [""])[0]
+            fl = seed_kfiles(sess["tenant_id"])
+            fl[:] = [f for f in fl if f["name"] != name]
+            log_decision(sess["tenant_id"],
+                         (sess.get("email") or "you").split("@")[0],
+                         "Removed from Files: <b>" + esc(name[:60]) + "</b>",
+                         "/memory?t=files")
+            return self._redirect("/memory?t=files")
         if self.path == "/api/build_start":
             sess = self._session()
             if not sess:
