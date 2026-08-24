@@ -50,6 +50,8 @@ and runs on the same engine, the same ledger, the same gate. There is
 no marketplace of rebadged vendors underneath, because agents that
 share nothing can teach each other nothing.
 
+![How Relay works: what happens in your store flows through what Relay knows, what Relay does, and your approval](relay-architecture.svg)
+
 Relay launched this week for all Cashfree merchants, free at launch,
 after running in beta since May. That is the announcement. What
 follows is the part a press release cannot hold: how the thing
@@ -98,8 +100,8 @@ presses 1 of the first 2.
 
 The model is not the interesting part. What the model reads is.
 
-Underneath every agent sit 3 tiers of context, all in Postgres, every
-table isolated per merchant by row-level security.
+Underneath every agent sit 3 tiers of context, kept in our own
+database and isolated per merchant down to the row.
 
 **Policy.** What this merchant allows: which reason codes qualify,
 caps, thresholds, when to ask a human. It is configuration in rows,
@@ -134,7 +136,7 @@ Ours compiles.
 
 The memory is scoped per merchant and per concern. One brand's hard
 won phrasing never leaks into another brand's drafts; the same
-row-level security that isolates the ledger isolates the lessons.
+isolation that guards the record guards the lessons.
 
 ## The trust machine
 
@@ -152,10 +154,10 @@ judge scores the draft against the claim; below threshold it never
 surfaces. What passes lands on Slack with approve, edit, dismiss.
 Anything that fails, stalls past 24 hours, or looks unusual escalates
 to an internal review channel, staffed by us, invisible to the
-merchant's customer. And every action carries an idempotency key
-scoped to the merchant, so a retry cannot double-file and a gate
-decision writes exactly once. The ledger only appends. Nobody edits
-history, including us.
+merchant's customer. And every action carries its own
+fingerprint, so a retry cannot double-file and a decision is written
+exactly once. The record only ever grows. Nobody edits history,
+including us.
 
 Notice what the gate really is. Every edit a merchant makes there
 feeds the memory tier. Most products treat approval as friction to be

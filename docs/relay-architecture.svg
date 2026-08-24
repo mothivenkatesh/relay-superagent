@@ -1,0 +1,67 @@
+<svg width="960" height="470" viewBox="0 0 960 470" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="Geist, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="960" height="470" fill="#FDFDFE"/>
+
+  <!-- col 1: signals -->
+  <text x="30" y="46" font-size="11" font-weight="700" letter-spacing="1.4" fill="#8A8D9C">WHAT HAPPENS IN YOUR STORE</text>
+  <g font-size="13" fill="#1B1F30">
+    <rect x="30" y="62"  width="168" height="34" rx="9" fill="#fff" stroke="#E3E4EA"/><text x="46" y="83">Dispute filed</text>
+    <rect x="30" y="104" width="168" height="34" rx="9" fill="#fff" stroke="#E3E4EA"/><text x="46" y="125">Payment failed</text>
+    <rect x="30" y="146" width="168" height="34" rx="9" fill="#fff" stroke="#E3E4EA"/><text x="46" y="167">Cart dropped</text>
+    <rect x="30" y="188" width="168" height="34" rx="9" fill="#fff" stroke="#E3E4EA"/><text x="46" y="209">COD placed</text>
+    <rect x="30" y="230" width="168" height="34" rx="9" fill="#fff" stroke="#E3E4EA"/><text x="46" y="251">Subscription failed</text>
+  </g>
+  <path d="M206 163 h28" stroke="#B9BECF" stroke-width="1.6"/><path d="m229 158 8 5-8 5" fill="none" stroke="#B9BECF" stroke-width="1.6"/>
+
+  <!-- col 2: context engine -->
+  <rect x="244" y="40" width="270" height="286" rx="16" fill="#F7F8FD" stroke="#C7CDF3" stroke-width="1.4"/>
+  <text x="262" y="70" font-size="11" font-weight="700" letter-spacing="1.4" fill="#3A46A8">WHAT RELAY KNOWS</text>
+  <g>
+    <rect x="262" y="84" width="234" height="62" rx="11" fill="#fff" stroke="#E3E4EA"/>
+    <text x="278" y="107" font-size="13" font-weight="600" fill="#1B1F30">Your rules</text>
+    <text x="278" y="126" font-size="11.5" fill="#8A8D9C">When to act. When to ask you first.</text>
+
+    <rect x="262" y="154" width="234" height="62" rx="11" fill="#fff" stroke="#E3E4EA"/>
+    <text x="278" y="177" font-size="13" font-weight="600" fill="#1B1F30">Your records</text>
+    <text x="278" y="196" font-size="11.5" fill="#8A8D9C">Orders, proof, policies. Exact, not similar.</text>
+
+    <rect x="262" y="224" width="234" height="62" rx="11" fill="#FFF9EC" stroke="#F0DFB2"/>
+    <text x="278" y="247" font-size="13" font-weight="600" fill="#1B1F30">Your edits, remembered</text>
+    <text x="278" y="266" font-size="11.5" fill="#A9700B">Fix a draft once. Every draft after knows.</text>
+  </g>
+  <text x="262" y="312" font-size="11" fill="#8A8D9C">Kept separate for every business.</text>
+  <path d="M522 163 h28" stroke="#B9BECF" stroke-width="1.6"/><path d="m545 158 8 5-8 5" fill="none" stroke="#B9BECF" stroke-width="1.6"/>
+
+  <!-- col 3: the teammate -->
+  <rect x="560" y="72" width="182" height="182" rx="16" fill="#fff" stroke="#E3E4EA" stroke-width="1.4"/>
+  <text x="578" y="102" font-size="11" font-weight="700" letter-spacing="1.4" fill="#8A8D9C">WHAT RELAY DOES</text>
+  <g font-size="13" fill="#1B1F30">
+    <circle cx="588" cy="126" r="3" fill="#5266EB"/><text x="602" y="131">Reads the case</text>
+    <circle cx="588" cy="156" r="3" fill="#5266EB"/><text x="602" y="161">Drafts the action</text>
+    <circle cx="588" cy="186" r="3" fill="#5266EB"/><text x="602" y="191">Checks its own work</text>
+  </g>
+  <text x="578" y="226" font-size="11" fill="#8A8D9C">Twice by rule, once by judge.</text>
+  <path d="M750 163 h28" stroke="#B9BECF" stroke-width="1.6"/><path d="m773 158 8 5-8 5" fill="none" stroke="#B9BECF" stroke-width="1.6"/>
+
+  <!-- col 4: the gate -->
+  <rect x="788" y="72" width="146" height="182" rx="16" fill="#F2F9EE" stroke="#9CCFAC" stroke-width="1.4"/>
+  <text x="806" y="102" font-size="11" font-weight="700" letter-spacing="1.4" fill="#177245">YOU</text>
+  <g font-size="12.5" font-weight="600">
+    <rect x="806" y="116" width="110" height="32" rx="8" fill="#177245"/><text x="838" y="137" fill="#fff">Approve</text>
+    <rect x="806" y="156" width="110" height="32" rx="8" fill="#fff" stroke="#9CCFAC"/><text x="850" y="177" fill="#177245">Edit</text>
+    <rect x="806" y="196" width="110" height="32" rx="8" fill="#fff" stroke="#D7DCD4"/><text x="836" y="217" fill="#8A8D9C">Dismiss</text>
+  </g>
+
+  <!-- outcome -->
+  <path d="M861 262 v22" stroke="#B9BECF" stroke-width="1.6"/><path d="m856 279 5 8 5-8" fill="none" stroke="#B9BECF" stroke-width="1.6"/>
+  <rect x="788" y="292" width="146" height="56" rx="12" fill="#fff" stroke="#E3E4EA"/>
+  <text x="806" y="315" font-size="13" font-weight="600" fill="#1B1F30">Done, on record</text>
+  <text x="806" y="334" font-size="11.5" fill="#8A8D9C">Filed. Sent. Called.</text>
+
+  <!-- the learning loop -->
+  <path d="M806 176 C 640 380, 470 380, 384 296" stroke="#A9700B" stroke-width="1.6" stroke-dasharray="5 4" fill="none"/>
+  <path d="m392 302 -10 -4 3 -10" fill="none" stroke="#A9700B" stroke-width="1.6"/>
+  <text x="500" y="392" font-size="12" font-weight="600" fill="#A9700B">Your edit becomes memory</text>
+
+  <!-- caption -->
+  <text x="480" y="444" font-size="13" fill="#1B1F30" text-anchor="middle" font-weight="600">Nothing reaches a bank or a buyer until you approve.</text>
+</svg>
