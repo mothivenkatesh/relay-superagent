@@ -40,6 +40,11 @@ It asks permission at exactly 2 moments: before a payment moves and
 before a customer is contacted. Everything else it does quietly and
 writes down.
 
+One more thing it is not: a catalog. Every Relay agent is first-party
+and runs on the same engine, the same ledger, the same gate. There is
+no marketplace of rebadged vendors underneath, because agents that
+share nothing can teach each other nothing.
+
 Relay launched this week for all Cashfree merchants, free at launch,
 after running in beta since May. That is the announcement. What
 follows is the part a press release cannot hold: how the thing
@@ -86,9 +91,11 @@ so changing a merchant's behaviour is an update, not a deploy.
 **Evidence.** The facts a reply may cite: delivery proof, courier
 agreements, the refund policy. Retrieval is exact match by reason
 code. There is no RAG here, no embeddings, and that is a decision,
-not a gap. A dispute reply cites the invoice for this order. There is
-no useful notion of a semantically similar invoice, and a bank should
-never receive one. The draft may only cite evidence ids that exist in
+not a gap. RAG is the right tool when an agent answers from a help
+centre, where the nearest article is usually good enough. Evidence
+for a bank is not that kind of knowledge. A dispute reply cites the
+invoice for this order. There is no useful notion of a semantically
+similar invoice, and a bank should never receive one. The draft may only cite evidence ids that exist in
 the vault; a citation from outside it fails a check and dies before
 any human sees it.
 
@@ -110,8 +117,10 @@ Ours compiles.
 
 ## The trust machine
 
-The tagline is "you approve before anything sends". Taglines are
-cheap. Here is the machinery.
+"Autonomous" is the favourite adjective in agent launches this year.
+It is also the fastest way to lose the trust of anyone who runs a
+regulated book. Relay's tagline is "you approve before anything
+sends". Taglines are cheap too. Here is the machinery.
 
 First, 2 deterministic checks with no model in either: banned phrases
 and promises, citation validity, link liveness, caps. Then an LLM
