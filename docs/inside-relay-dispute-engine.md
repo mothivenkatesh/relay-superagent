@@ -17,10 +17,11 @@ merchant does not have. So the reply goes out late, or thin, or not at
 all. Banks do not grade effort.
 
 Now multiply by everything else the payments day holds. Carts dropped
-at checkout that a phone call would recover. Failed payments where the
-decline code says "try UPI tomorrow morning" to anyone who can read
-decline codes. COD orders shipping to pincodes that bounce 2 parcels
-in 5. On Cashfree's data, 7 in 10 Indian SMBs do all of this by hand,
+at checkout, where the buyer's intent dies a little every hour nobody
+calls. Failed payments where the decline code says "try UPI tomorrow
+morning" to anyone who can read decline codes. COD orders shipping to
+pincodes that bounce 2 parcels in 5. Subscriptions quietly cancelling
+themselves 1 failed mandate at a time. On Cashfree's data, 7 in 10 Indian SMBs do all of this by hand,
 and the average SMB spends 60 hours a week doing it. A 5 person
 company does not have a 6th person. The work happens badly, or the
 founder does it at midnight, which is the same thing with worse sleep.
@@ -29,13 +30,16 @@ This is the job Relay was built to take. Not to flag. To finish.
 
 ## What Relay is
 
-Relay is an AI teammate that runs payment operations for SMBs.
-It reads
-the merchant's own transaction records and completes the work: retries
-the failed payment, calls the dropped cart, confirms the COD order,
-files the dispute. A merchant sets it up by describing the outcome in
-plain language. There is no workflow canvas and no node editor,
-because the merchant we built this for will never open one.
+Relay is an AI teammate that runs payment operations for SMBs. It
+reads the merchant's own transaction records and completes the work:
+retries the failed payment, calls the dropped cart while the intent
+that built it is still alive, confirms the COD order, saves the
+failing subscription, files the dispute. And it owns the outcome, not
+the task: it tracks whether the cart actually came back, and decides
+what to try next when it did not. A merchant sets it up by describing
+the outcome in plain language. There is no workflow canvas and no
+node editor, because the merchant we built this for will never open
+one.
 
 It asks permission at exactly 2 moments: before a payment moves and
 before a customer is contacted. Everything else it does quietly and
@@ -134,10 +138,13 @@ row-level security that isolates the ledger isolates the lessons.
 
 ## The trust machine
 
-"Autonomous" is the favourite adjective in agent launches this year.
-It is also the fastest way to lose the trust of anyone who runs a
-regulated book. Relay's tagline is "you approve before anything
-sends". Taglines are cheap too. Here is the machinery.
+Consider what stands between a mistake and a customer today: nothing.
+Whether the work is done by hand or by a tool that auto-dials, the
+call is already made and the refund already sent before anyone
+reviews it. "Autonomous" is the favourite adjective in agent launches
+this year, and it names exactly that gap. Relay's tagline is "you
+approve before anything sends". Taglines are cheap too. Here is the
+machinery.
 
 First, 2 deterministic checks with no model in either: banned phrases
 and promises, citation validity, link liveness, caps. Then an LLM
@@ -177,16 +184,26 @@ operations patterns, which is why a turnkey agent is useful on its
 first day instead of after a month of tuning. Merchant transaction
 data is not sent to external AI providers.
 
-A horizontal AI tool can draft you a very polite dispute reply. It has
-never seen your order, cannot attach your proof, and will not file
-anything. The draft was never the hard part.
+A horizontal AI tool can draft you a very polite dispute reply. It
+has never seen your order, cannot attach your proof, and will not
+file anything. The draft was never the hard part. And the point
+solutions that do act cover 1 channel for 1 workflow: a dialer that
+dials, a messenger that messages, with no context behind the action
+and nothing watching whether the cart actually came back. Executing
+a task and owning an outcome are different jobs. Relay was hired for
+the second one.
 
 ## Keep the hours
 
 The aim is blunt: from 60 hours a week of payment operations to under
-45 minutes of approvals. If you run on Cashfree, Relay is on your
-dashboard today. Describe the job you would have hired for. Approve
-what it drafts. Edit it once, and watch the next draft arrive already
-knowing.
+45 minutes of approvals. And the hours are only half of it. Every
+follow-up Relay closes, the recovered cart, the retried payment, the
+dispute answered in time, is revenue on top of what you already make,
+from demand you already paid to create.
+
+If you run on Cashfree, Relay is on your dashboard today. Describe
+the job you would have hired for. Approve what it drafts. Edit it
+once, and watch the next draft arrive already knowing. Do more, and
+grow more.
 
 Tuesday, 4:47 pm will keep happening. It just stops being yours.
