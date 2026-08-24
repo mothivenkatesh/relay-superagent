@@ -1,7 +1,7 @@
-# Relay, explained through one dispute
+# Introducing Relay: The most intelligent AI teammates to run SMB payment operations
 
-*How Relay runs payment operations for SMBs, told from the inside of
-the hardest workflow it owns.*
+*What follows is the launch, told from the inside of the hardest
+workflow Relay owns: one dispute, end to end.*
 
 The webhook lands on a Tuesday at 4:47 pm. Reason code RD. A buyer has
 told their bank they were charged twice for an order of pet food, and
