@@ -9906,7 +9906,7 @@ def conv_list_html(tid: str, active: str = "") -> str:
 
     # The roster, always visible: every agent one click away, live ones
     # marked. Pinned conversations are gone; recents stay below.
-    out = (f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>Agents</span></div>'
+    out = (f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>Your team</span></div>'
            + "".join(
                f'<a class="conv agentrow" data-st="chat" href="/agents/{a["slug"]}">'
                f'{agent_tile(a["slug"], a["status"] == "live" or DEMO_ON.get(a["slug"], False), 18)}'
