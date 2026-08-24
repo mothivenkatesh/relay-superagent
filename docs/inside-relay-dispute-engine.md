@@ -20,9 +20,10 @@ Now multiply by everything else the payments day holds. Carts dropped
 at checkout, where the buyer's intent dies a little every hour nobody
 calls. Failed payments where the decline code says "try UPI tomorrow
 morning" to anyone who can read decline codes. COD orders shipping to
-pincodes that bounce 2 parcels in 5. Subscriptions quietly cancelling
-themselves 1 failed mandate at a time. On Cashfree's data, 7 in 10 Indian SMBs do all of this by hand,
-and the average SMB spends 60 hours a week doing it. A 5 person
+pincodes that bounce 2 parcels in 5. Subscriptions quietly
+cancelling themselves 1 failed mandate at a time. On Cashfree's data,
+7 in 10 Indian SMBs do all of this by hand, and the average SMB
+spends 60 hours a week doing it. A 5 person
 company does not have a 6th person. The work happens badly, or the
 founder does it at midnight, which is the same thing with worse sleep.
 
@@ -34,9 +35,9 @@ Relay is an AI teammate that runs payment operations for SMBs. It
 reads the merchant's own transaction records and completes the work:
 retries the failed payment, calls the dropped cart while the intent
 that built it is still alive, confirms the COD order, saves the
-failing subscription, screens the refund claim, files the dispute. And it owns the outcome, not
-the task: it tracks whether the cart actually came back, and decides
-what to try next when it did not. A merchant sets it up by describing
+failing subscription, screens the refund claim, files the dispute.
+It owns the outcome, not the task: it tracks whether the cart
+actually came back, and decides what to try next when it did not. A merchant sets it up by describing
 the outcome in plain language. There is no workflow canvas and no
 node editor, because the merchant we built this for will never open
 one.
@@ -96,6 +97,10 @@ and the buyer's own message thread, sitting in front of a human with
 3 buttons. Nothing has been sent. Nothing will be, until a person
 presses 1 of the first 2.
 
+> **See your own operations run like this.** Relay is rolling out to
+> Cashfree merchants now. **[Get Early Access](#)**
+> <!-- CTA link: replace # in CMS -->
+
 ## The context engine
 
 The model is not the interesting part. What the model reads is.
@@ -109,14 +114,12 @@ so changing a merchant's behaviour is an update, not a deploy.
 
 **Evidence.** The facts a reply may cite: delivery proof, courier
 agreements, the refund policy. Retrieval is exact match by reason
-code. There is no RAG here, no embeddings, and that is a decision,
-not a gap. RAG is the right tool when an agent answers from a help
-centre, where the nearest article is usually good enough. Evidence
-for a bank is not that kind of knowledge. A dispute reply cites the
-invoice for this order. There is no useful notion of a semantically
-similar invoice, and a bank should never receive one. The draft may only cite evidence ids that exist in
-the vault; a citation from outside it fails a check and dies before
-any human sees it.
+code. No RAG, no embeddings, deliberately. RAG is the right tool
+when an agent answers from a help centre, where the nearest article
+is usually good enough. A bank needs the invoice for this order, and
+there is no such thing as a semantically similar invoice. A draft
+may only cite evidence that exists in the vault; anything else fails
+a check before a human ever sees it.
 
 **Learned preference memory.** The tier we are proudest of, because
 it closes a loop most AI products leave open. When a merchant edits a
@@ -134,9 +137,9 @@ behaviour is pinned by a single test whose name is the whole story:
 "It gets smarter from your edits" is a sentence every AI product says.
 Ours compiles.
 
-The memory is scoped per merchant and per concern. One brand's hard
-won phrasing never leaks into another brand's drafts; the same
-isolation that guards the record guards the lessons.
+Memory is scoped per merchant: one brand's hard won phrasing never
+leaks into another's drafts. The isolation that guards the record
+guards the lessons.
 
 ## The trust machine
 
@@ -232,20 +235,11 @@ transaction data is not sent to external AI providers.
 
 A horizontal AI tool can draft you a very polite dispute reply. It
 has never seen your order, cannot attach your proof, and will not
-file anything. The draft was never the hard part. And the point
-solutions that do act cover 1 channel for 1 workflow: a dialer that
-dials, a messenger that messages, with no context behind the action
-and nothing watching whether the cart actually came back. Executing
-a task and owning an outcome are different jobs. Relay was hired for
-the second one.
-
-There is also the quiet cost nobody budgets for: making AI pay for
-itself is engineering work. Prompts need tuning, feedback loops need
-building, models and token spend need optimising, and none of that is
-a merchant's job. In Relay it is already done. The turnkey agents
-arrive with the loop built, and the feedback loop you would otherwise
-have to construct is the memory tier you read about above, running on
-every edit you make.
+file anything. The draft was never the hard part. And making AI pay
+for itself is engineering work: prompt tuning, feedback loops, model
+and token optimisation, none of it a merchant's job. In Relay that
+work arrives already done. The feedback loop you would otherwise
+have to build is the memory tier, running on every edit.
 
 ## Keep the hours
 
@@ -259,5 +253,7 @@ If you run on Cashfree, Relay is on your dashboard today. Describe
 the job you would have hired for. Approve what it drafts. Edit it
 once, and watch the next draft arrive already knowing. Do more, and
 grow more.
+
+**[Get Early Access](#)** <!-- CTA link: replace # in CMS -->
 
 Tuesday, 4:47 pm will keep happening. It just stops being yours.
