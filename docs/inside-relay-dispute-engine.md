@@ -1,7 +1,7 @@
 # Relay, explained through one dispute
 
-*How the AI Super Agent runs payment operations for SMBs, told from the
-inside of the hardest workflow it owns.*
+*How Relay runs payment operations for SMBs, told from the inside of
+the hardest workflow it owns.*
 
 The webhook lands on a Tuesday at 4:47 pm. Reason code RD. A buyer has
 told their bank they were charged twice for an order of pet food, and
@@ -29,7 +29,7 @@ This is the job Relay was built to take. Not to flag. To finish.
 
 ## What Relay is
 
-Relay is Cashfree's AI Super Agent for payment operations. It reads
+Relay is Cashfree's AI agent for payment operations. It reads
 the merchant's own transaction records and completes the work: retries
 the failed payment, calls the dropped cart, confirms the COD order,
 files the dispute. A merchant sets it up by describing the outcome in
