@@ -75,9 +75,20 @@ phrase "agentic workflow" conjures a model freestyling through your
 compliance process, this is the opposite. The model writes prose. Code
 decides what happens.
 
-By 4:53 pm there is a drafted reply citing the delivery scan and the
-buyer's own message thread, and it is sitting in front of a human with
-3 buttons. Nothing has been sent.
+Here is what that looks like in the engine's own trace, the same one
+every run keeps forever:
+
+    16:47:12  detection-agent    signal     bank webhook · dispute RD filed
+    16:47:12  detection-agent    confirmed  charged twice for the same order
+    16:47:13  eligibility-agent  qualified  all safety checks passed
+    16:47:19  response-agent     drafted    2 citations
+    16:47:21  compliance-agent   passed     checks + judge clean
+    16:47:22  gate               surfaced   card sent to the merchant
+
+10 seconds from webhook to a drafted reply citing the delivery scan
+and the buyer's own message thread, sitting in front of a human with
+3 buttons. Nothing has been sent. Nothing will be, until a person
+presses 1 of the first 2.
 
 ## The context engine
 
@@ -117,6 +128,10 @@ behaviour is pinned by a single test whose name is the whole story:
 "It gets smarter from your edits" is a sentence every AI product says.
 Ours compiles.
 
+The memory is scoped per merchant and per concern. One brand's hard
+won phrasing never leaks into another brand's drafts; the same
+row-level security that isolates the ledger isolates the lessons.
+
 ## The trust machine
 
 "Autonomous" is the favourite adjective in agent launches this year.
@@ -136,9 +151,10 @@ decision writes exactly once. The ledger only appends. Nobody edits
 history, including us.
 
 Notice what the gate really is. Every edit a merchant makes there
-feeds the memory tier. The approval step is not friction we tolerate.
-It is where the engine learns. The human in the loop is the learning
-loop.
+feeds the memory tier. Most products treat approval as friction to be
+engineered away; Relay treats it as the training signal. The human in
+the loop is the learning loop, which is why the gate gets better at
+staying out of your way the more you use it.
 
 ## The honest ledger
 
