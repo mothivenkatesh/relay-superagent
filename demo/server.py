@@ -793,8 +793,9 @@ WORK_CSS = """
   border:1.5px solid #CCDAFF;border-radius:10px;outline:none;background:#fff}
 .railsearch:focus{border-color:var(--accent)}
 .navblock .nav{margin-bottom:1px}
-.nav.on{background:#ECECF1;color:var(--ink,#1B1F30)}
-.nav.on svg{color:var(--ink,#1B1F30)}
+.nav.on{background:var(--accent-soft,#E5EDFF);color:var(--ink,#1B1F30);
+  font-weight:600;border-left:2px solid var(--accent,#094EFF)}
+.nav.on svg{color:var(--accent,#094EFF)}
 .railhead{display:flex;align-items:center;justify-content:space-between;
   padding:2px 2px 8px 8px;min-height:34px}
 .railhead .navsec{margin:0;padding:0;line-height:1}
@@ -837,6 +838,15 @@ WORK_CSS = """
 font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
 .conv .ctitle{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv.agentrow{padding:6px 8px;min-height:40px}
+.conv .ctitle-2{flex:1;min-width:0;display:flex;flex-direction:column;
+  justify-content:center;overflow:hidden}
+.conv .ctitle-2 b{font-weight:500;font-size:13px;color:var(--ink,#1B1F30);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .ctitle-2 i{font-style:normal;font-size:11px;color:var(--mut,#8A8D9C);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv.active .ctitle-2 b{color:var(--ink,#1B1F30);font-weight:600}
+body.railcollapsed .conv.agentrow{justify-content:center}
 .conv .kebab{visibility:hidden;color:var(--mut,#8A8D9C);padding:10px 6px;
   margin:-10px -6px;font-size:13px;display:inline-block}
 .conv:hover{background:#F0F0F5}
@@ -1095,6 +1105,22 @@ BTN_CSS = """
 # Card chrome shared by the hub and chat shells: schedule cards,
 # overflow menus, goal numbers. One copy, injected into both.
 SHARED_UI_CSS = """
+.railcollapse{margin-left:auto;width:22px;height:22px;border:0;background:none;
+  border-radius:6px;color:var(--mut);display:flex;align-items:center;
+  justify-content:center;flex:none}
+.railcollapse:hover{background:#F0F0F5;color:var(--ink)}
+.railcollapse svg{width:15px;height:15px}
+body.railcollapsed .brand{padding:8px 4px;justify-content:center}
+body.railcollapsed .bname,body.railcollapsed .railcollapse{display:none}
+body.railcollapsed .nav span,body.railcollapsed .conv .ctitle,
+body.railcollapsed .conv .kebab,body.railcollapsed .conv .dot,
+body.railcollapsed .conv .cbadge-on,body.railcollapsed .nav .count,
+body.railcollapsed .nav .new{display:none}
+body.railcollapsed .nav,body.railcollapsed .conv{justify-content:center;
+  padding:0;border-left:none}
+body.railcollapsed .nav.on{border-left:none;border-radius:8px}
+body.railcollapsed .railsearch,body.railcollapsed .navbtn span{display:none}
+
 /* --- onboarding wizard (/welcome) --- */
 .obwrap{max-width:760px;margin:0 auto}
 .ob-progress{display:flex;gap:8px;margin-bottom:18px}
@@ -1546,16 +1572,26 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     # The work queue is primary content and lives on the main canvas; the
     # rail keeps ONE ambient landmark for it, then conversation history.
     rows = ""
+    _pending_count = sum(
+        1 for r in WORLD.d.ledger.runs.values()
+        if r.tenant_id == tid and r.state is RunState.AWAITING_GATE
+    ) + props_waiting(tid)
     return f"""
   <button class="burger" aria-label="Menu"
     onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
   <aside class="sidebar">
     <div class="brand"><img class="logo" src="{RELAY_ICON}" alt="Relay">
-      <span class="bname"><b>Relay</b></span></div>
+      <span class="bname"><b>Relay</b><span class="biz">Cashfree Payments</span></span>
+      <button class="railcollapse" id="railcollapse" aria-label="Collapse sidebar"
+        onclick="railToggleCollapse()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>
+          <path d="M14.5 9.5 12 12l2.5 2.5"/></svg></button></div>
     <div class="navblock">
       <button class="nav navbtn" onclick="railSearchToggle()">{ICONS["search"]}<span>Search</span></button>
       <a class="nav" href="/?new=1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>New task</span></a>
-      <a class="nav{' on' if active == 'tasks' else ''}" href="/approvals">{ICONS["tasks"]}<span>Approvals</span></a>
+      <a class="nav{' on' if active == 'tasks' else ''}" href="/approvals">{ICONS["tasks"]}<span>Approvals</span>{f'<span class="count">{_pending_count}</span>' if _pending_count else ''}</a>
       <a class="nav{' on' if active == 'activity' else ''}" href="/journeys">{ICONS["ledger"]}<span>History</span></a>
       <a class="nav{' on' if active == 'scheduled' else ''}" href="/scheduled"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Scheduled</span></a>
       <a class="nav{' on' if active == 'agents' else ''}" href="/agents">{ICONS["bot"]}<span>Agents</span></a>
@@ -1595,6 +1631,14 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     <div class="spot-res" id="spotres"></div>
   </div>
   <script>
+  function railToggleCollapse(){{
+    document.body.classList.toggle('railcollapsed');
+    localStorage.setItem('relay_rail_collapsed',
+      document.body.classList.contains('railcollapsed') ? '1' : '0');
+  }}
+  if (localStorage.getItem('relay_rail_collapsed') === '1'){{
+    document.body.classList.add('railcollapsed');
+  }}
   function railFilter(b){{
     document.querySelectorAll('.rf').forEach(x => x.classList.toggle('on', x === b));
     const need = b.dataset.f === 'need';
@@ -2584,9 +2628,10 @@ code,.mono,.irid,.istep-w code{font-family:var(--font-mono)}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
 color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:13px}
 a{text-decoration:none;color:inherit}
-.sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
+.sidebar{position:fixed;top:0;bottom:0;left:0;width:256px;background:var(--side);
 border-right:1px solid #ECECF1;padding:16px 12px;display:flex;
-flex-direction:column;overflow:hidden}
+flex-direction:column;overflow:hidden;transition:width 200ms cubic-bezier(.2,0,0,1)}
+body.railcollapsed .sidebar{width:64px;padding:16px 8px}
 .brand{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-bottom:12px}
 .logo{width:28px;height:28px;object-fit:contain;display:block}
 .brand b{font-size:13px;color:var(--ink);font-weight:600;line-height:1.15}
@@ -2596,22 +2641,29 @@ flex-direction:column;overflow:hidden}
 font-size:11px;color:var(--ink);background:#fff;white-space:nowrap}
 .pro{margin-left:auto;background:#21232E;color:#fff;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
-.nav{display:flex;align-items:center;gap:12px;padding:6px 10px;min-height:32px;border-radius:8px;
-color:var(--text);font-size:13px;margin-bottom:1px}
+.nav{display:flex;align-items:center;gap:10px;padding:0 10px;min-height:36px;border-radius:8px;
+color:var(--text);font-size:13px;margin-bottom:1px;border-left:2px solid transparent;box-sizing:border-box}
 .nav svg{width:16px;height:16px;color:#6A6D7D;flex:none}
 .nav:hover{background:#F0F0F5}
-.nav.active{background:var(--accent-soft);color:var(--ink);font-weight:500}
-.nav.active svg{color:var(--ink)}
-.nav .count{margin-left:auto;color:var(--mut);font-size:11px}
+.nav.active{background:var(--accent-soft);color:var(--ink);font-weight:600;
+border-left:2px solid var(--accent)}
+.nav.active svg{color:var(--accent)}
+.nav .count{margin-left:auto;color:var(--mut);font-size:10px;font-weight:700;
+background:var(--pill,#F2F2F2);border-radius:999px;padding:1px 7px;flex:none}
+.nav.on .count{background:var(--accent,#094EFF);color:#fff}
 .nav .new{margin-left:auto;background:#E3E6F0;color:#4A4E63;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
 hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
-.navsec{margin:8px 8px 8px;font-size:11px;font-weight:600;color:var(--mut)}
+.navsec{margin:16px 8px 8px;font-size:10px;font-weight:700;color:var(--mut);
+text-transform:uppercase;letter-spacing:.06em}
+body.railcollapsed .navsec{display:none}
 .bm{padding:4px 8px}
 .bm span{font-size:13px;color:var(--text);display:flex;gap:12px;align-items:center}
 .bm span svg{width:15px;height:15px;color:#6A6D7D}
 .bm i{font-style:normal;font-size:11px;color:var(--mut);padding-left:24px;display:block}
-.main{margin-left:248px;min-height:100vh;background:linear-gradient(#FDFDFE,#F4F5F9)}
+.main{margin-left:254px;min-height:100vh;background:linear-gradient(#FDFDFE,#F4F5F9);
+transition:margin-left 200ms cubic-bezier(.2,0,0,1)}
+body.railcollapsed .main{margin-left:62px}
 .topbar{display:flex;align-items:center;padding:20px 44px;color:var(--mut);font-size:13px}
 .topbar .search input{border:none;outline:none;background:none;font:inherit;font-size:13px;color:var(--ink);width:220px}
 .search input::placeholder{color:#9A9DAB}
@@ -10045,14 +10097,15 @@ def conv_list_html(tid: str, active: str = "") -> str:
         f'data-st="chat" href="/?c={gid}">'
         f'<span class="avwrap"><img src="{RELAY_ICON}" width="18" height="18" '
         f'style="border-radius:5px"></span>'
-        f'<span class="ctitle">Relay</span></a>')
+        f'<span class="ctitle-2"><b>Relay</b><i>Ask anything</i></span></a>')
     out = (f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>General</span></div>'
            + general_row
            + f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>Your team</span></div>'
            + "".join(
                f'<a class="conv agentrow" data-st="chat" href="/agents/{a["slug"]}">'
                f'{agent_tile(a["slug"], a["status"] == "live" or DEMO_ON.get(a["slug"], False), 18)}'
-               f'<span class="ctitle">{esc(a["role"].replace(" Agent", ""))}</span>'
+               f'<span class="ctitle-2"><b>{esc(a["role"].replace(" Agent", ""))}</b>'
+               f'<i>{"Active" if a["status"] == "live" else "In trial"}</i></span>'
                f'{"<span class=cbadge-on></span>" if a["status"] == "live" else ""}'
                f'</a>'
                for a in RELAY_AGENTS))
@@ -10192,9 +10245,10 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-ser
 color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:13px;
 height:100vh;overflow:hidden}
 a{text-decoration:none;color:inherit}
-.sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
+.sidebar{position:fixed;top:0;bottom:0;left:0;width:256px;background:var(--side);
 border-right:1px solid #ECECF1;padding:16px 12px;display:flex;
-flex-direction:column;overflow:hidden}
+flex-direction:column;overflow:hidden;transition:width 200ms cubic-bezier(.2,0,0,1)}
+body.railcollapsed .sidebar{width:64px;padding:16px 8px}
 .brand{display:flex;align-items:center;gap:8px;padding:8px 8px;margin-bottom:12px}
 .logo{width:28px;height:28px;object-fit:contain;display:block}
 .brand b{font-size:13px;color:var(--ink);font-weight:600;line-height:1.15}
@@ -10204,17 +10258,23 @@ flex-direction:column;overflow:hidden}
 font-size:11px;color:var(--ink);background:#fff;white-space:nowrap}
 .pro{margin-left:auto;background:#21232E;color:#fff;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
-.nav{display:flex;align-items:center;gap:12px;padding:6px 8px;min-height:32px;
-border-radius:8px;color:var(--text);font-size:13px;margin-bottom:1px}
+.nav{display:flex;align-items:center;gap:10px;padding:0 10px;min-height:36px;
+border-radius:8px;color:var(--text);font-size:13px;margin-bottom:1px;
+border-left:2px solid transparent;box-sizing:border-box}
 .nav svg{width:16px;height:16px;color:#6A6D7D;flex:none}
 .nav:hover{background:#F0F0F5}
-.nav.active{background:var(--accent-soft);color:var(--ink);font-weight:500}
-.nav.active svg{color:var(--ink)}
-.nav .count{margin-left:auto;color:var(--mut);font-size:11px}
+.nav.active{background:var(--accent-soft);color:var(--ink);font-weight:600;
+border-left:2px solid var(--accent)}
+.nav.active svg{color:var(--accent)}
+.nav .count{margin-left:auto;color:var(--mut);font-size:10px;font-weight:700;
+background:var(--pill,#F2F2F2);border-radius:999px;padding:1px 7px;flex:none}
+.nav.on .count{background:var(--accent,#094EFF);color:#fff}
 .nav .new{margin-left:auto;background:#E3E6F0;color:#4A4E63;font-size:11px;font-weight:600;
 border-radius:6px;padding:2px 8px}
 hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
-.navsec{margin:8px 8px 8px;font-size:11px;font-weight:600;color:var(--mut)}
+.navsec{margin:16px 8px 8px;font-size:10px;font-weight:700;color:var(--mut);
+text-transform:uppercase;letter-spacing:.06em}
+body.railcollapsed .navsec{display:none}
 .rolepills{display:flex;gap:8px;align-items:center;justify-content:center;
 margin:0 0 16px;font-size:11px;color:var(--mut)}
 .rolepills span{margin-right:2px}
@@ -10228,6 +10288,15 @@ color:var(--text);text-decoration:none;font-weight:500}
 font-size:13px;color:var(--text);margin-bottom:1px;position:relative}
 .conv .dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #C2C5D2;flex:none}
 .conv .ctitle{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv.agentrow{padding:6px 8px;min-height:40px}
+.conv .ctitle-2{flex:1;min-width:0;display:flex;flex-direction:column;
+  justify-content:center;overflow:hidden}
+.conv .ctitle-2 b{font-weight:500;font-size:13px;color:var(--ink,#1B1F30);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .ctitle-2 i{font-style:normal;font-size:11px;color:var(--mut,#8A8D9C);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv.active .ctitle-2 b{color:var(--ink,#1B1F30);font-weight:600}
+body.railcollapsed .conv.agentrow{justify-content:center}
 .conv .kebab{visibility:hidden;color:var(--mut);padding:10px 6px;
   margin:-10px -6px;font-size:13px;display:inline-block}
 .conv:hover{background:#F0F0F5}
@@ -10238,8 +10307,10 @@ font-size:13px;color:var(--text);margin-bottom:1px;position:relative}
 .bm span{font-size:13px;color:var(--text);display:flex;gap:12px;align-items:center}
 .bm span svg{width:15px;height:15px;color:#6A6D7D}
 .bm i{font-style:normal;font-size:11px;color:var(--mut);padding-left:24px;display:block}
-.main{margin-left:248px;height:100vh;display:flex;flex-direction:column;
-background:linear-gradient(#FDFDFE,#F1F2F8)}
+.main{margin-left:254px;height:100vh;display:flex;flex-direction:column;
+background:linear-gradient(#FDFDFE,#F1F2F8);
+transition:margin-left 200ms cubic-bezier(.2,0,0,1)}
+body.railcollapsed .main{margin-left:62px}
 .convhead{display:flex;align-items:center;padding:16px 32px;color:var(--ink);
 font-size:13px;font-weight:500;flex:none}
 .uwrap{display:flex;align-items:center;gap:16px;margin-left:auto;font-size:13px;
