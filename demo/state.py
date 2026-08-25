@@ -30,7 +30,7 @@ LOCK = threading.RLock()
 # a file written by a newer build never injects state this build doesn't
 # understand.
 KNOWN_KEYS = {"agent_cfg", "demo_on", "autonomy", "routines",
-              "kfiles", "assign", "folders"}
+              "kfiles", "assign", "folders", "onboarded"}
 
 
 def save(**stores) -> None:

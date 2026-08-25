@@ -698,12 +698,12 @@ def auth_page(mode: str, error: str = "") -> str:
 <html lang="en"><head><meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay &middot; {'Sign up' if signup else 'Log in'}</title>
 <style>
 *{{box-sizing:border-box;margin:0}}
-body{{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#FAFAFC;min-height:100vh;
+body{{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:#FFFFFC;min-height:100vh;
   display:flex;align-items:center;justify-content:center;color:#1a1c23}}
 .card{{background:#fff;border:1px solid #E6E7EE;border-radius:14px;
   padding:36px 32px;width:360px}}
@@ -716,12 +716,12 @@ input{{display:block;width:100%;margin-top:4px;padding:8px 12px;font:inherit;
   transition:border-color .15s,box-shadow .15s}}
 input:hover{{border-color:#C9CBD6}}
 input::placeholder{{color:#9A9DAB}}
-input:focus{{outline:none;border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,235,.13)}}
+input:focus{{outline:none;border-color:#6B95FF;box-shadow:0 0 0 3px rgba(82,102,235,.13)}}
 {BTN_CSS}
 .err{{background:#FDF2F2;border:1px solid #F5C6C6;color:#9b3535;font-size:11px;
   border-radius:8px;padding:8px 12px;margin-bottom:16px}}
 .swap{{font-size:11px;color:#5a5e6e;margin-top:16px;text-align:center}}
-.swap a{{color:#5266EB;text-decoration:none}}
+.swap a{{color:#094EFF;text-decoration:none}}
 .demo{{margin-top:8px;text-align:center}}
 </style></head><body>
 <div class="card">
@@ -751,7 +751,7 @@ def verify_page(email: str, pending_token: str, error: str = "") -> str:
 <html lang="en"><head><meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay &middot; Verify your email</title>
 <style>{style}
@@ -790,7 +790,7 @@ WORK_CSS = """
 .navbtn{width:100%;border:0;background:none;font:inherit;cursor:pointer;
   text-align:left}
 .railsearch{margin:0 4px 8px;padding:8px 12px;font:inherit;font-size:13px;
-  border:1.5px solid #C7CDF3;border-radius:10px;outline:none;background:#fff}
+  border:1.5px solid #CCDAFF;border-radius:10px;outline:none;background:#fff}
 .railsearch:focus{border-color:var(--accent)}
 .navblock .nav{margin-bottom:1px}
 .nav.on{background:#ECECF1;color:var(--ink,#1B1F30)}
@@ -806,7 +806,7 @@ WORK_CSS = """
 .rf:hover{background:#F0F0F5}
 .rf.on{background:#fff;border-color:var(--hair,#E8E9EF);color:var(--ink,#1B1F30)}
 .rf i{font-style:normal;font-size:11px;font-weight:600;color:#4553C8;
-  background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:0 4px}
+  background:var(--accent-soft,#E5EDFF);border-radius:6px;padding:0 4px}
 .raillist{padding-bottom:8px;flex:1;overflow-y:auto;min-height:0}
 .rail{display:flex;align-items:center;gap:8px;padding:8px 8px;border-radius:10px;
   font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px}
@@ -854,7 +854,7 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
   margin-top:2px;flex-wrap:wrap}
 .qno{color:#A63A2B}
 .qarr{color:#B9BCC7}
-.qyes{color:#177245}
+.qyes{color:#005B21}
 .qacts{display:flex;gap:8px;align-items:center;flex:none}
 .qmore{border:0;background:none;color:var(--mut);cursor:pointer;
   width:32px;height:32px;border-radius:8px;display:inline-flex;
@@ -926,7 +926,7 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .caselist .rail:last-child{border-bottom:0}
 .cdot{width:8px;height:8px;border-radius:50%;flex:none}
 .cdot.need{background:#E8A33D}
-.cdot.work{background:var(--accent,#5266EB)}
+.cdot.work{background:var(--accent,#094EFF)}
 .cdot.done{background:#1E9E5A}
 .railfoot{display:flex;gap:8px;align-items:center;padding:8px 12px 4px;
   margin-top:8px;border-top:1px solid #ECECF1;font-size:11px;
@@ -938,7 +938,7 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .navsec.csec svg{width:12px;height:12px;flex:none}
 .steps{align-self:stretch;max-width:100%}
 .btn.scanning{color:#fff;border-color:transparent;
-  background:linear-gradient(100deg,var(--accent,#5266EB) 25%,#B9C2F7 45%,var(--accent,#5266EB) 65%);
+  background:linear-gradient(100deg,var(--accent,#094EFF) 25%,#B9C2F7 45%,var(--accent,#094EFF) 65%);
   background-size:200% 100%;animation:btnsheen 1.6s linear infinite}
 @keyframes btnsheen{0%{background-position:130% 0}100%{background-position:-70% 0}}
 
@@ -954,7 +954,7 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .wstep.done .wfound{opacity:1}
 .wtick{width:14px;height:14px;flex:none;border-radius:50%;position:relative;
   border:1.5px solid #D3D6E0;align-self:center}
-.wstep.live .wtick{border-color:var(--accent,#5266EB);border-top-color:transparent;
+.wstep.live .wtick{border-color:var(--accent,#094EFF);border-top-color:transparent;
   animation:wspin .7s linear infinite}
 @keyframes wspin{to{transform:rotate(360deg)}}
 .wstep.done .wtick{border-color:#1E9E5A;background:#1E9E5A}
@@ -974,7 +974,7 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
   color:#4A4E63;margin-bottom:16px}
 .wp-p{font-size:13px;line-height:1.7;color:#26293A;margin-bottom:12px}
 .srcchip{display:inline-block;font-size:11px;font-weight:600;color:#4553C8;
-  background:var(--accent-soft,#E9EBF8);border-radius:6px;padding:1px 8px;
+  background:var(--accent-soft,#E5EDFF);border-radius:6px;padding:1px 8px;
   margin-left:4px;vertical-align:1px;white-space:nowrap}
 .srcchip:hover{background:#DCE0F7}
 .wp-srcs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
@@ -988,10 +988,10 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .wp-edit textarea{width:100%;font:inherit;font-size:13px;padding:8px 12px;
   border:1px solid #E3E4EA;border-radius:9px;margin-bottom:8px;color:#26293A;
   background:#fff;resize:vertical}
-.wp-edit textarea:focus{outline:none;border-color:#98A5F0;
+.wp-edit textarea:focus{outline:none;border-color:#6B95FF;
   box-shadow:0 0 0 3px rgba(82,102,235,.13)}
 .wp-open{display:block;padding:12px 24px;border-top:1px solid #F1F1F5;
-  font-size:11px;font-weight:500;color:var(--accent,#5266EB);background:#FCFCFD}
+  font-size:11px;font-weight:500;color:var(--accent,#094EFF);background:#FCFCFD}
 .wp-open:hover{background:#F5F6FB}
 
 /* the case page */
@@ -1001,8 +1001,8 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .casest{font-size:11px;font-weight:600;border-radius:999px;padding:4px 12px;
   margin-left:auto;flex:none;white-space:nowrap}
 .casest.need{background:#FCEED8;color:#9A6215}
-.casest.work{background:var(--accent-soft,#E9EBF8);color:#4553C8}
-.casest.done{background:#E5F4EC;color:#177245}
+.casest.work{background:var(--accent-soft,#E5EDFF);color:#4553C8}
+.casest.done{background:#DCFFE9;color:#005B21}
 .casegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:12px 32px;align-items:start}
 @media (max-width:900px){.casegrid{grid-template-columns:minmax(0,1fr)}}
@@ -1024,7 +1024,7 @@ font-size:13px;color:var(--text,#3A3D4D);margin-bottom:1px;position:relative}
 .prow:last-child{border-bottom:none}
 .prow b{display:block;color:var(--ink,#1B1F30);font-size:13px;margin-bottom:2px}
 .prow span{color:var(--mut,#8A8D9C);font-size:11px;overflow-wrap:anywhere}
-.agchip2{display:inline-block;background:var(--accent-soft,#E9EBF8);
+.agchip2{display:inline-block;background:var(--accent-soft,#E5EDFF);
   color:#3A46A8;border-radius:8px;padding:1px 8px;font-weight:600;
   font-size:.95em;white-space:nowrap}
 .agchip2:hover{background:#DDE1F6}
@@ -1071,30 +1071,48 @@ BTN_CSS = """
   padding:0 18px;min-height:32px;
   border:1px solid transparent;cursor:pointer;
   transition:background .12s,border-color .12s,color .12s}
-.btn.primary{background:var(--accent,#5266EB);color:#fff}
-.btn.primary:hover{background:#4557D6}
-.btn.primary:active{background:#3D4EC4}
+.btn.primary{background:var(--accent,#094EFF);color:#fff}
+.btn.primary:hover{background:#003BD1}
+.btn.primary:active{background:#002C9E}
 .btn.ghost{background:#fff;border-color:#E3E4EA;color:var(--text,#3A3D4D)}
 .btn.ghost:hover{border-color:#C9CBD6;color:var(--ink,#1B1F30)}
 .btn.ghost:active{background:#F5F5F8}
 .btn.wide{width:100%;font-size:13px;font-weight:600;margin-top:8px}
 .btn.sm{padding:0 14px;font-size:11px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-.btn:focus-visible{outline:2px solid #98A5F0;outline-offset:2px}
+.btn:focus-visible{outline:2px solid #6B95FF;outline-offset:2px}
 .btn.hire{font-weight:600;padding:0 18px 0 14px}
 .btn.hire svg{flex:none;opacity:.9}
 .sendbtn{width:32px;height:32px;border-radius:50%;border:none;background:var(--pill,#EEEFF2);
   color:#5A5D6D;cursor:pointer;display:grid;place-items:center;flex:none;
   transition:background .12s,color .12s}
 .sendbtn svg{width:15px;height:15px}
-.sendbtn:hover{background:var(--accent,#5266EB);color:#fff}
-.sendbtn:active{background:#3D4EC4;color:#fff}
-.sendbtn:focus-visible{outline:2px solid #98A5F0;outline-offset:2px}
+.sendbtn:hover{background:var(--accent,#094EFF);color:#fff}
+.sendbtn:active{background:#002C9E;color:#fff}
+.sendbtn:focus-visible{outline:2px solid #6B95FF;outline-offset:2px}
 """
 
 # Card chrome shared by the hub and chat shells: schedule cards,
 # overflow menus, goal numbers. One copy, injected into both.
 SHARED_UI_CSS = """
+/* --- onboarding wizard (/welcome) --- */
+.obwrap{max-width:760px;margin:0 auto}
+.ob-progress{display:flex;gap:8px;margin-bottom:18px}
+.ob-seg{flex:1;height:3px;border-radius:99px;background:var(--pill,#F2F2F2)}
+.ob-seg.done,.ob-seg.current{background:var(--accent,#094EFF)}
+.cm-eyebrow{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+.ob-chat-preview{border:1px solid var(--hair);border-radius:8px;background:#fff;
+  padding:18px;margin:8px 0 24px}
+.ob-chat-bubble{background:var(--pill,#F2F2F2);border-radius:8px;padding:12px 16px;
+  font-size:13px;color:var(--ink);margin-bottom:14px;max-width:88%}
+.ob-chat-examples{display:flex;flex-wrap:wrap;gap:8px}
+.ob-chat-chip{border:1px solid var(--hair);border-radius:999px;padding:8px 14px;
+  font-size:12px;color:var(--text);background:#fff}
+.ob-footer{display:flex;align-items:center;gap:10px;margin-top:24px;
+  padding-top:20px;border-top:1px solid var(--hair)}
+.ob-skip{margin-left:auto}
+
 
 /* --- home dashboard --- */
 .hdash{max-width:740px;width:100%;margin:0 auto 28px}
@@ -1110,9 +1128,9 @@ SHARED_UI_CSS = """
 .hi-top{display:flex;align-items:center;justify-content:space-between;
   margin-bottom:12px}
 .hi-sev{font-size:11px;font-weight:600;border-radius:100px;padding:6px 12px}
-.hi-sev.red{background:#FBE5E5;color:#C2374B}
-.hi-sev.blue{background:var(--accent-soft,#E9EBF8);color:#3A46A8}
-.hi-sev.green{background:#E5F4EC;color:#177245}
+.hi-sev.red{background:#FFE0E0;color:#700000}
+.hi-sev.blue{background:var(--accent-soft,#E5EDFF);color:#3A46A8}
+.hi-sev.green{background:#DCFFE9;color:#005B21}
 .hi-card>b{display:block;font-size:13px;color:var(--ink);font-weight:600}
 .hi-card p{font-size:13px;color:var(--mut);margin:4px 0 0;line-height:1.55}
 .hl{display:block;font-size:11px;color:var(--mut);margin-bottom:6px}
@@ -1138,14 +1156,14 @@ SHARED_UI_CSS = """
 .agentrow .aglyph{width:18px !important;height:18px !important;border-radius:5px}
 .agentrow .aglyph svg{width:11px;height:11px}
 .agentrow .pres{display:none}
-.cbadge-on{width:6px;height:6px;border-radius:50%;background:#10b981;
+.cbadge-on{width:6px;height:6px;border-radius:50%;background:#009B54;
   margin-left:auto;flex:none}
 /* --- files page --- */
 .fhead2{display:flex;justify-content:flex-end;margin:0 0 12px}
 .fmeter{display:inline-flex;align-items:center;gap:8px;font-size:11px;
   color:var(--mut);border:1px solid var(--hair);border-radius:100px;
   padding:0 14px;min-height:32px;background:#fff}
-.fmeter i{width:7px;height:7px;border-radius:50%;background:#10b981}
+.fmeter i{width:7px;height:7px;border-radius:50%;background:#009B54}
 .fmeter b{color:var(--ink)}
 .facts{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;
   margin:0 0 14px}
@@ -1153,7 +1171,7 @@ SHARED_UI_CSS = """
 .fact{font:inherit;text-align:left;border:1px solid var(--hair);
   border-radius:14px;background:#fff;padding:16px 18px;cursor:pointer;
   display:block;transition:border-color .12s}
-.fact:hover{border-color:#98A5F0}
+.fact:hover{border-color:#6B95FF}
 .fact svg{width:18px;height:18px;color:#5A5D6D;margin-bottom:8px}
 .fact b{display:block;font-size:13px;color:var(--ink);font-weight:600}
 .fact small{display:block;font-size:11px;color:var(--mut);margin-top:2px}
@@ -1190,9 +1208,9 @@ SHARED_UI_CSS = """
   font-weight:600;box-shadow:0 1px 3px rgba(27,31,48,.10)}
 .fm-tabs.sm span{font-size:11px}
 .fdrop{display:flex;flex-direction:column;align-items:center;gap:6px;
-  border:1.5px dashed #C7CDF3;border-radius:14px;padding:28px 16px;
+  border:1.5px dashed #CCDAFF;border-radius:14px;padding:28px 16px;
   margin-top:12px;cursor:pointer;text-align:center;background:#FBFBFE}
-.fdrop:hover,.fdrop.has{border-color:#98A5F0}
+.fdrop:hover,.fdrop.has{border-color:#6B95FF}
 .fdrop input{display:none}
 .fdrop svg{width:20px;height:20px;color:#5A5D6D}
 .fdrop b{font-size:13px;color:var(--ink)}
@@ -1202,7 +1220,7 @@ SHARED_UI_CSS = """
   border-radius:100px;padding:2px 10px;color:var(--mut)}
 .fm-tog{display:flex;gap:10px;align-items:flex-start;margin-top:14px;
   cursor:pointer}
-.fm-tog input{margin-top:3px;accent-color:var(--accent,#5266EB)}
+.fm-tog input{margin-top:3px;accent-color:var(--accent,#094EFF)}
 .fm-tog b{display:block;font-size:13px;color:var(--ink);font-weight:600}
 .fm-tog small{font-size:11px;color:var(--mut)}
 .fm-p{font-size:13px;color:var(--text);line-height:1.6;margin:8px 0 0}
@@ -1233,7 +1251,7 @@ SHARED_UI_CSS = """
 .runchip{font-size:11px;font-weight:600;color:var(--accent);
   border:1px solid var(--hair);border-radius:100px;padding:4px 10px;
   margin-left:8px;vertical-align:2px}
-.runchip:hover{border-color:#98A5F0}
+.runchip:hover{border-color:#6B95FF}
 .bcfg code{font-family:ui-monospace,monospace;font-size:11px;
   background:var(--pill,#EEEFF2);border-radius:6px;padding:1px 6px;
   white-space:pre-wrap;word-break:break-all}
@@ -1246,23 +1264,23 @@ SHARED_UI_CSS = """
 .bmsg.bot{background:#fff;border:1px solid var(--hair);color:var(--ink);
   margin-right:15%;border-bottom-left-radius:4px}
 .bprog{margin:0 0 14px;border-left:2px solid #CBE8D4;padding-left:12px}
-.bprog-r{font-size:13px;color:#177245;padding:3px 0}
+.bprog-r{font-size:13px;color:#005B21;padding:3px 0}
 .bq{background:#fff;border:1px solid var(--hair);border-radius:14px;
   padding:14px 16px;margin:0 0 12px}
 .bq-t{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px}
 .bopt{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;
   border-radius:9px;cursor:pointer}
 .bopt:hover{background:#F5F5F8}
-.bopt input{margin-top:3px;accent-color:var(--accent,#5266EB)}
+.bopt input{margin-top:3px;accent-color:var(--accent,#094EFF)}
 .bopt b{font-size:13px;color:var(--ink);font-weight:600;display:block}
 .bopt small{font-size:11px;color:var(--mut);display:block;margin-top:1px}
 .bopt .rec{font-style:normal;font-size:11px;font-weight:600;
-  color:#177245;background:#E5F4EC;border-radius:100px;
+  color:#005B21;background:#DCFFE9;border-radius:100px;
   padding:1px 8px;margin-left:8px;vertical-align:1px}
 .btext{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:8px 12px;width:100%;box-sizing:border-box;
   outline:none;min-height:32px}
-.btext:focus{border-color:#98A5F0}
+.btext:focus{border-color:#6B95FF}
 .bwrap{max-width:740px;margin:6vh auto 0;display:flex;
   flex-direction:column;align-items:flex-start}
 .bkicker{font-size:11px;font-weight:700;letter-spacing:.12em;
@@ -1274,13 +1292,13 @@ SHARED_UI_CSS = """
   box-sizing:border-box;border:1px solid var(--hair);border-radius:12px;
   background:#fff;padding:12px 16px;margin-bottom:14px;font-size:13px;
   color:var(--ink)}
-.bresume:hover{border-color:#98A5F0}
+.bresume:hover{border-color:#6B95FF}
 .bresume .go{margin-left:auto;color:var(--accent)}
 .bresume svg{width:16px;height:16px;color:var(--accent)}
 .bbox{width:100%;box-sizing:border-box;background:#fff;
-  border:1.5px solid #C7CDF3;border-radius:18px;padding:8px;
+  border:1.5px solid #CCDAFF;border-radius:18px;padding:8px;
   box-shadow:0 6px 24px rgba(82,102,235,.10)}
-.bbox:focus-within{border-color:#98A5F0}
+.bbox:focus-within{border-color:#6B95FF}
 .bbox textarea{width:100%;box-sizing:border-box;border:none;
   outline:none;font:inherit;font-size:13px;color:var(--ink);
   background:none;resize:none;min-height:96px;padding:12px 12px 4px}
@@ -1292,7 +1310,7 @@ SHARED_UI_CSS = """
   padding:0 14px;border-radius:100px;border:1px solid var(--hair);
   font-size:13px;color:var(--text);cursor:pointer}
 .bchan input:checked+span{background:var(--accent-soft);
-  border-color:#98A5F0;color:#3A46A8;font-weight:600}
+  border-color:#6B95FF;color:#3A46A8;font-weight:600}
 .bexh{font-size:11px;color:var(--mut);margin:24px auto 10px;
   align-self:center}
 .bexrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
@@ -1300,7 +1318,7 @@ SHARED_UI_CSS = """
 .bex{font:inherit;font-size:13px;color:var(--text);background:#fff;
   border:1px solid var(--hair);border-radius:100px;min-height:32px;
   padding:0 16px;cursor:pointer}
-.bex:hover{border-color:#98A5F0;color:var(--ink)}
+.bex:hover{border-color:#6B95FF;color:var(--ink)}
 .bgrid{display:grid;grid-template-columns:1fr 340px;gap:28px;
   align-items:start}
 @media (max-width:900px){.bgrid{grid-template-columns:1fr}}
@@ -1311,9 +1329,9 @@ SHARED_UI_CSS = """
 .bnext{margin-top:16px;font-size:13px;color:var(--text)}
 .bnext ol{margin:8px 0 0 18px;padding:0;line-height:1.7}
 .bchange{display:flex;align-items:center;gap:8px;margin-top:20px;
-  background:#fff;border:1.5px solid #C7CDF3;border-radius:14px;
+  background:#fff;border:1.5px solid #CCDAFF;border-radius:14px;
   padding:6px 6px 6px 14px}
-.bchange:focus-within{border-color:#98A5F0}
+.bchange:focus-within{border-color:#6B95FF}
 .bchange input{flex:1;border:none;outline:none;font:inherit;
   font-size:13px;color:var(--ink);background:none;min-width:0}
 .brail{border:1px solid var(--hair);border-radius:16px;background:#fff;
@@ -1352,7 +1370,7 @@ SHARED_UI_CSS = """
   background:none;border:0;border-radius:7px;cursor:pointer;
   text-align:left;padding:0 12px;min-height:32px;width:100%}
 .rmenu-list button:hover{background:#F0F0F5}
-.rmenu-list button.danger:hover{background:#FBE5E5;color:#C0392B}
+.rmenu-list button.danger:hover{background:#FFE0E0;color:#C0392B}
 .notebar.wide .notein{max-width:none}
 .cico{width:34px;height:34px;border-radius:9px;flex:none;display:inline-flex;
   align-items:center;justify-content:center}
@@ -1382,7 +1400,7 @@ SHARED_UI_CSS = """
 .goalact:last-child{border-bottom:0}
 .goalact .tdesc{flex:1}
 .goalmini{font-size:11px;color:var(--mut);margin:0 0 8px}
-.goalmini b{color:#177245}
+.goalmini b{color:#005B21}
 """
 
 
@@ -1583,7 +1601,7 @@ def rail_html(tid: str, active: str = "", convs: str | None = None,
     document.querySelectorAll('#raillist [data-st]')
       .forEach(el => {{ el.hidden = need && el.dataset.st !== 'need'; }});
   }}
-  const SPOT_COLORS = ["#5266EB", "#E8590C", "#0CA678", "#B33AB3",
+  const SPOT_COLORS = ["#094EFF", "#E8590C", "#0CA678", "#B33AB3",
                        "#E0A800", "#2B8A9E", "#D6336C", "#6741D9"];
   let spotItems = [], spotSel = 0, spotT = null;
   const QUICK = [
@@ -1702,7 +1720,7 @@ def _identicon(seed: str, size: int = 34) -> str:
             f'{"".join(blocks)}</svg>')
 
 
-_LOGO_COLORS = ["#5266EB", "#E8590C", "#0CA678", "#B33AB3", "#E0A800",
+_LOGO_COLORS = ["#094EFF", "#E8590C", "#0CA678", "#B33AB3", "#E0A800",
                 "#2B8A9E", "#D6336C", "#6741D9"]
 
 # Buyers are people, not companies, so there is no logo to fetch — everyone
@@ -2553,14 +2571,17 @@ TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay</title>
 <style>
-:root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
---accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
+:root{--ink:#1B1B1B;--text:#494949;--mut:#767676;--hair:#E8E8E8;--accent:#094EFF;
+--accent-soft:#E5EDFF;--pill:#F2F2F2;--side:#FFFFFC;
+--font-display:'DM Sans',-apple-system,sans-serif;--font-body:'Inter',-apple-system,sans-serif;--font-mono:'DM Mono','JetBrains Mono',ui-monospace,monospace}
+h1,h2,h3,.btn,button,.rail-brand,input,select,textarea{font-family:var(--font-display)}
+code,.mono,.irid,.istep-w code{font-family:var(--font-mono)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
 color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:13px}
 a{text-decoration:none;color:inherit}
 .sidebar{position:fixed;top:0;bottom:0;left:0;width:250px;background:var(--side);
@@ -2597,13 +2618,13 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .search{display:flex;gap:8px;align-items:center;cursor:pointer}
 .topbar .search svg{width:15px;height:15px}
 .topbar .right{margin-left:auto;display:flex;gap:16px;align-items:center}
-.avatar{width:26px;height:26px;border-radius:50%;background:#5266EB;color:#fff;
+.avatar{width:26px;height:26px;border-radius:50%;background:#094EFF;color:#fff;
   display:inline-flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:650;text-transform:uppercase}
 .acct{position:relative}
 .acct summary{list-style:none;cursor:pointer}
 .acct summary::-webkit-details-marker{display:none}
-.acct[open] summary{outline:2px solid #C7CDF3;outline-offset:2px}
+.acct[open] summary{outline:2px solid #CCDAFF;outline-offset:2px}
 .acctmenu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;
   border:1px solid var(--hair);border-radius:12px;
   box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
@@ -2643,7 +2664,7 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .hubsearch{width:280px;border:1px solid var(--hair);border-radius:10px;
   padding:9px 14px;font:inherit;font-size:13px;outline:none;
   background:#fff;flex:none}
-.hubsearch:focus{border-color:#98A5F0}
+.hubsearch:focus{border-color:#6B95FF}
 .hubtoolrow{display:flex;align-items:center;justify-content:space-between;
   margin:0 0 12px}
 .hubpills{display:flex;gap:8px;flex-wrap:wrap}
@@ -2670,7 +2691,7 @@ hr.side{border:none;border-top:1px solid #ECECF1;margin:8px 0}
 .hubsec h2.sec{margin-top:20px}
 a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .wpf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;margin:0}
-.wpf a{text-decoration:none;color:#5266EB}
+.wpf a{text-decoration:none;color:#094EFF}
 .wpf a:hover{text-decoration:underline}
 .wpf a.on{color:#1D221F;font-weight:700}
 .wpf span{color:#D5D2C8}
@@ -2685,7 +2706,7 @@ a.agentcard{text-decoration:none;color:inherit;cursor:pointer;padding:16px 18px}
 .sb b{font-size:20px;letter-spacing:-.02em}
 .sb>span{font-size:11px;color:#6E7263}
 .sb i{font-style:normal;font-size:11px;color:#9A9D8E;white-space:nowrap}
-.sb.need b{color:#A9700B}
+.sb.need b{color:#A06D03}
 .sb.need{background:linear-gradient(135deg,#FCF7EA,#fff)}
 .sb.hero{flex:1.6;background:linear-gradient(135deg,#F2F9EE,#fff)}
 .sb.hero b{font-size:24px;color:#0B7A3E}
@@ -2783,7 +2804,7 @@ img.alogo{background:#fff;border:1px solid var(--hair);object-fit:contain;paddin
 h1.page{font-size:32px;font-weight:450;color:var(--ink);letter-spacing:-.01em;margin:8px 0 16px}
 .pagehint{color:var(--mut);font-size:13px;margin:0 0 16px;line-height:1.55}
 h1.page + .pagehint{margin-top:-8px}
-.impactline{background:#E5F4EC;color:#177245;border-radius:10px;padding:12px 16px;
+.impactline{background:#DCFFE9;color:#005B21;border-radius:10px;padding:12px 16px;
   font-size:13px;margin-bottom:16px}
 .impactline b{font-weight:650}
 .pills{display:flex;gap:8px;margin:0 0 4px}
@@ -2827,13 +2848,13 @@ border-radius:9px;color:#26293A;font:inherit;
 transition:border-color .15s,box-shadow .15s}
 .jfind:hover,.whyin:hover,.editbox textarea:hover{border-color:#C9CBD6}
 .jfind:focus,.whyin:focus,.editbox textarea:focus{outline:none;
-border-color:#98A5F0;box-shadow:0 0 0 3px rgba(82,102,235,.13)}
+border-color:#6B95FF;box-shadow:0 0 0 3px rgba(82,102,235,.13)}
 .jfind::placeholder,.whyin::placeholder,.editbox textarea::placeholder{color:#9A9DAB}
 .jfind:disabled,.whyin:disabled,.editbox textarea:disabled{opacity:.45;cursor:not-allowed}
 .editbox textarea{width:100%;font-size:13px;padding:8px 12px;margin-bottom:8px}
 h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .st{font-size:11px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap;flex:none}
-.st.ok{background:#E5F4EC;color:#177245}
+.st.ok{background:#DCFFE9;color:#005B21}
 .st.warn{background:#FCEED8;color:#9A6215}
 .st.wait{background:var(--accent-soft);color:#4553C8}
 .st.mut{background:#EFEFF3;color:#6A6D7D}
@@ -2866,7 +2887,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .atable .go2{color:var(--mut);text-align:right}
 .hzn{font-size:11px;color:var(--mut);border-top:1px solid #F1F1F5;
   padding-top:8px;margin-top:2px}
-.hzn.on{color:#177245;font-weight:500}
+.hzn.on{color:#005B21;font-weight:500}
 .slimcard{display:flex !important;align-items:center;gap:8px;
   padding:12px 16px !important;font-size:13px;color:var(--ink)}
 .slimcard .dot2{position:static;border:0;width:8px;height:8px;flex:none}
@@ -2881,7 +2902,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
   gap:12px;margin:16px 0 8px;max-width:880px}
 .stile{display:block;background:#fff;border:1px solid var(--hair);
   border-radius:14px;padding:16px 20px;color:var(--ink)}
-.stile:hover{border-color:#C7CDF3}
+.stile:hover{border-color:#CCDAFF}
 .stile.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .filein{flex:1;font:inherit;font-size:13px;padding:8px;background:#fff;border:1.5px solid var(--hair);border-radius:10px}
 .stile b{display:block;font-size:24px;font-weight:600;letter-spacing:-.01em}
@@ -2919,7 +2940,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
   border:1px solid var(--hair);border-radius:999px;padding:8px 16px;
   font-size:11px;color:var(--text)}
 .capchip svg{width:13px;height:13px;color:#6A6D7D}
-.capchip.act{background:var(--accent-soft,#E9EBF8);border-color:transparent;
+.capchip.act{background:var(--accent-soft,#E5EDFF);border-color:transparent;
   color:#3A46A8}
 .capchip.act svg{color:#3A46A8}
 .miles{display:flex;align-items:flex-start;background:#fff;
@@ -2946,18 +2967,18 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .cfgsel{font:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--hair);border-radius:9px;background:#fff;min-height:32px;cursor:pointer}
 .pchips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
 .pchip{font:inherit;font-size:11px;color:#3A3D4D;background:#fff;border:1px dashed var(--hair);border-radius:100px;padding:9px 14px;cursor:pointer;min-height:32px}
-.pchip:hover{border-color:#5266EB;color:#5266EB}
+.pchip:hover{border-color:#094EFF;color:#094EFF}
 .rulelist{display:flex;flex-direction:column;gap:8px;max-width:680px}
 .rule-row{display:flex;align-items:center;gap:10px;border:1px solid var(--hair);background:#fff;border-radius:12px;padding:12px 14px;font-size:13px}
 .rule-row>span{flex:1}
 .rulex{border:0;background:none;color:var(--mut);cursor:pointer;width:32px;height:32px;border-radius:8px;flex:none;font-size:13px}
-.rulex:hover{background:#FBE5E5;color:#C2374B}
+.rulex:hover{background:#FFE0E0;color:#700000}
 .dgrid td{padding:11px 14px;border-bottom:1px solid #F0F0F4}
 .dgrid td.cbx,.dgrid th.cbx{width:40px;text-align:center}
 .dgrid td a{color:#1B1F30;font-weight:600;text-decoration:none}
-.dgrid td a:hover{color:#5266EB}
-.selrun{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
-#callbox{width:17px;height:17px;accent-color:#5266EB;cursor:pointer}
+.dgrid td a:hover{color:#094EFF}
+.selrun{width:17px;height:17px;accent-color:#094EFF;cursor:pointer}
+#callbox{width:17px;height:17px;accent-color:#094EFF;cursor:pointer}
 .cselbar{display:flex;gap:12px;align-items:center;border:1px solid #BFD9BA;background:#F2F9EE;border-radius:12px;padding:10px 14px;margin:12px 0 10px;position:sticky;top:10px;z-index:6}
 .casefseg{display:inline-flex;margin:2px 0 6px}
 .casefseg a{cursor:pointer}
@@ -2966,7 +2987,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .dgrid tbody tr.pickable:hover{background:#F2F6FB}
 .flash{display:flex;gap:12px;align-items:center;border:1px solid #D9C79A;background:#FDF8EC;border-radius:12px;padding:12px 16px;margin:14px 0 4px;font-size:13px}
 .flash.ok{border-color:#BFD9BA;background:#F2F9EE}
-.flashundo{border:0;background:none;color:#5266EB;font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:8px 10px;margin:-8px 0}
+.flashundo{border:0;background:none;color:#094EFF;font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:8px 10px;margin:-8px 0}
 .setcard{border:1px solid var(--hair);background:#fff;border-radius:16px;padding:6px 22px 20px;margin:16px 0}
 .setcard h2.sec:first-child{margin-top:16px}
 .tooloff{opacity:.55}
@@ -2982,7 +3003,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 .jobmenu-d{position:absolute;right:0;top:calc(100% + 6px);z-index:40;background:#fff;border:1px solid var(--hair);border-radius:14px;box-shadow:0 12px 32px rgba(27,31,48,.12);padding:8px;min-width:340px;display:flex;flex-direction:column;gap:2px}
 .jobopt{display:block;padding:12px 14px;border-radius:9px;font-size:13px;color:#1B1F30;text-decoration:none}
 .jobopt:hover{background:#F4F5FA}
-.jobopt.more{color:#5266EB;font-weight:600;border-top:1px solid var(--hair);margin-top:4px;border-radius:0 0 9px 9px}
+.jobopt.more{color:#094EFF;font-weight:600;border-top:1px solid var(--hair);margin-top:4px;border-radius:0 0 9px 9px}
 
 /* ================= DESIGN SYSTEM =================
    Tokens + named components. New UI MUST use ds-* classes;
@@ -2991,7 +3012,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 :root{--ds-hair:var(--hair,#E8E9EF);--ds-radius-card:16px;
   --ds-radius-control:10px;--ds-radius-menu:12px;--ds-radius-option:8px;
   --ds-menu-shadow:0 12px 32px rgba(27,31,48,.12);
-  --ds-hover:#F4F5FA;--ds-focus:#C9D2F5;--ds-accent:#5266EB;
+  --ds-hover:#F4F5FA;--ds-focus:#C9D2F5;--ds-accent:#094EFF;
   --ds-target:40px}
 /* -- DS Dropdown: panel -- */
 .ds-menu,
@@ -3006,7 +3027,7 @@ h2.sec{font-size:13px;font-weight:600;color:var(--ink);margin:40px 0 8px}
 select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px solid var(--hair);border-radius:10px;background:#fff;min-height:32px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27><path d=%27M1 1l5 5 5-5%27 stroke=%27%238A8D9C%27 stroke-width=%272%27 fill=%27none%27 stroke-linecap=%27round%27/></svg>");background-repeat:no-repeat;background-position:right 12px center}
 /* -- DS Input -- */
 .inedit-in,.cfgbox,.hubsearch,.jfind{font:inherit;font-size:13px;border:1px solid var(--hair);border-radius:10px;background:#fff;padding:10px 14px;min-height:32px}
-.inedit-in:focus,.cfgbox:focus,.hubsearch:focus,.jfind:focus{outline:2px solid #C9D2F5;border-color:#5266EB}
+.inedit-in:focus,.cfgbox:focus,.hubsearch:focus,.jfind:focus{outline:2px solid #C9D2F5;border-color:#094EFF}
 /* -- DS Card chrome -- */
 .hubcard,.agentcard2,.apc,.lifecyc,.statbar,.lastrun{border-radius:16px}
 .hubcard,.agentcard2,.apc,.lifecyc,.statbar,.lastrun{border-color:var(--hair)}
@@ -3021,7 +3042,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .rtool:hover{background:#F0F0F5;color:var(--ink)}
 .rtool.danger:hover{color:#C0392B}
 .inedit{display:flex;gap:8px;align-items:center;width:100%}
-.inedit-in{flex:1;font:inherit;font-size:13px;border:1.5px solid #C7CDF3;
+.inedit-in{flex:1;font:inherit;font-size:13px;border:1.5px solid #CCDAFF;
   border-radius:9px;padding:8px 12px;outline:none}
 .inedit-in:focus{border-color:var(--accent)}
 .cfgbox{font:inherit;font-size:13px;line-height:1.55;color:var(--ink);
@@ -3050,7 +3071,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .chch{flex:none;font-size:11px;font-weight:700;border-radius:7px;
   padding:3px 8px;margin-top:1px;letter-spacing:.03em}
 .chc{background:#EAEFFB;color:#2B4AA8}
-.chw{background:#E7F6EC;color:#177245}
+.chw{background:#E7F6EC;color:#005B21}
 .tiers{max-width:640px}
 .tier{background:#fff;border:1px solid var(--hair);border-radius:12px;
   padding:12px 16px;margin-bottom:8px}
@@ -3058,7 +3079,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .tierh b{font-size:13px}
 .tierh .st{margin-left:auto}
 .tier p{margin:0;font-size:13px;color:var(--text);line-height:1.55}
-.cashcard{max-width:640px;background:#fff;border:1.5px solid #C7CDF3;
+.cashcard{max-width:640px;background:#fff;border:1.5px solid #CCDAFF;
   border-radius:16px;padding:20px 24px;margin:4px 0 8px}
 .cashcard h3{font-size:20px;color:var(--ink);margin:4px 0 8px}
 .cashwhy{font-size:13px;line-height:1.6;margin-bottom:12px}
@@ -3068,7 +3089,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
   text-transform:uppercase;margin-bottom:4px;opacity:.75}
 .ab b{font-size:13px;line-height:1.4;display:block}
 .ab.no{background:#FDF1EF;color:#A63A2B}
-.ab.yes{background:#E9F7EF;color:#177245}
+.ab.yes{background:#E9F7EF;color:#005B21}
 .cashmore{margin-top:12px;border-top:1px solid #F1F1F5;padding-top:8px}
 .cashmore summary{font-size:11px;color:var(--mut);cursor:pointer;
   padding:4px 0}
@@ -3082,7 +3103,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
   flex-wrap:wrap}
 .cashdone{margin-top:12px;background:#FAFAFC;border-radius:12px;
   padding:12px 16px;font-size:13px;color:var(--text)}
-.cashdone.ok{background:#E9F7EF;color:#177245;font-weight:500}
+.cashdone.ok{background:#E9F7EF;color:#005B21;font-weight:500}
 .trace{margin-top:12px;border-top:1px solid #F1F1F5;padding-top:12px}
 .trace-h{font-size:11px;font-weight:700;letter-spacing:.08em;
   text-transform:uppercase;color:var(--mut);margin-bottom:8px}
@@ -3094,7 +3115,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 @keyframes pulse{50%{opacity:.4}}
 .tr3 .tlabel{flex:1;font-size:13px;color:var(--ink)}
 .tr3 .tstat{font-size:11px;color:#1E9E5A;font-weight:600}
-.tr3.running .tstat{color:#177245}
+.tr3.running .tstat{color:#005B21}
 .assignsel{font:inherit;font-size:13px;border:1px solid var(--hair);
   border-radius:9px;padding:8px 8px;background:#fff}
 .tabbar{display:flex;gap:4px;border-bottom:1px solid var(--hair);margin:16px 0 24px}
@@ -3106,7 +3127,7 @@ select,.cfgsel{font:inherit;font-size:13px;padding:9px 34px 9px 12px;border:1px 
 .pane-list .pitem{display:flex;gap:12px;align-items:center;background:#fff;
   border:1px solid var(--hair);border-radius:10px;padding:12px 16px;margin-bottom:8px;
   font-size:13px;color:var(--ink)}
-.pane-list .pitem.on{border-color:#C7CDF3;box-shadow:0 0 0 1px #C7CDF3}
+.pane-list .pitem.on{border-color:#CCDAFF;box-shadow:0 0 0 1px #CCDAFF}
 .pane-list .pitem .sub2{display:block;font-size:11px;color:var(--mut);margin-top:1px}
 .pane-list .pitem .tgl{margin-left:auto;width:30px;height:18px;border-radius:9px;
   background:#D9DBE4;position:relative;flex:none}
@@ -3215,9 +3236,9 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
 .notebar .notein{margin:0;max-width:560px;flex:1}
 .notebar .btn{padding-top:0;padding-bottom:0;display:inline-flex;align-items:center}
 .schedbar{display:block;background:#fff;
-  border:1.5px solid #C7CDF3;border-radius:18px;
+  border:1.5px solid #CCDAFF;border-radius:18px;
   box-shadow:0 6px 24px rgba(82,102,235,.10);padding:8px;margin:16px 0 4px}
-.schedbar:focus-within{border-color:#98A5F0;box-shadow:0 6px 28px rgba(82,102,235,.16)}
+.schedbar:focus-within{border-color:#6B95FF;box-shadow:0 6px 28px rgba(82,102,235,.16)}
 .schedbar .schedin{width:100%;box-sizing:border-box;border:none;outline:none;
   font:inherit;font-size:13px;color:var(--ink);background:none;
   padding:16px 16px 24px;min-width:0}
@@ -3280,7 +3301,7 @@ border-radius:12px;display:none;align-items:center;gap:16px;justify-content:spac
   background:var(--accent-soft);color:var(--accent);align-items:center;
   justify-content:center;border:1px solid transparent}
 .agchip svg{width:14px;height:14px}
-.agchip:hover{border-color:#98A5F0}
+.agchip:hover{border-color:#6B95FF}
 .agchip.off{background:var(--pill);color:var(--mut)}
 .agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
   gap:16px;margin:8px 0 24px}
@@ -4098,7 +4119,7 @@ def _cfg_save() -> None:
     """Persist every merchant-mutable store, atomically and versioned."""
     _state.save(agent_cfg=AGENT_CFG, demo_on=DEMO_ON, autonomy=AUTONOMY,
                 routines=ROUTINES, kfiles=KFILES, assign=ASSIGN,
-                folders=FFOLDERS)
+                folders=FFOLDERS, onboarded=ONBOARDED)
 
 
 def _cfg_load() -> None:
@@ -4111,6 +4132,7 @@ def _cfg_load() -> None:
     KFILES.update(d.get("kfiles", {}))
     ASSIGN.update(d.get("assign", {}))
     FFOLDERS.update(d.get("folders", {}))
+    ONBOARDED.update(d.get("onboarded", {}))
 
 GUARD_DEFAULTS = {
     "calling": [("quiet", "No calls outside", "9 AM to 8 PM"),
@@ -5029,7 +5051,7 @@ function simClose(){{ document.getElementById('simpanel').hidden = true; }}
 <style>
 .prochdr{{margin-left:auto;display:flex;gap:8px;align-items:center}}
 .btn.live{{background:#1E9E5A;border-color:#1E9E5A;color:#fff}}
-.btn.live:hover{{background:#177245}}
+.btn.live:hover{{background:#005B21}}
 .proc{{max-width:720px}}
 .whenbox{{background:#fff;border:1px solid var(--hair);border-radius:12px;
   padding:16px 16px;font-size:13px;line-height:1.55;outline:none}}
@@ -5047,7 +5069,7 @@ function simClose(){{ document.getElementById('simpanel').hidden = true; }}
   font-family:ui-monospace,monospace}}
 .pstep{{outline:none;border-radius:6px;padding:1px 3px}}
 .pstep:focus{{background:#F4F5FB}}
-.pif,.pelse{{display:inline-block;background:var(--accent-soft,#E9EBF8);
+.pif,.pelse{{display:inline-block;background:var(--accent-soft,#E5EDFF);
   color:#3A46A8;font-size:11px;font-weight:700;letter-spacing:.06em;
   border-radius:7px;padding:3px 8px;margin:2px 8px 2px 0}}
 .pelse{{margin-top:8px}}
@@ -5078,7 +5100,7 @@ function simClose(){{ document.getElementById('simpanel').hidden = true; }}
   align-items:center;font-size:13px}}
 .simrow{{font-size:13px;padding:8px 8px;border-radius:9px;margin-bottom:8px;
   animation:fadeup .3s ease both}}
-.simrow.ok{{background:#E9F7EF;color:#177245;font-weight:500}}
+.simrow.ok{{background:#E9F7EF;color:#005B21;font-weight:500}}
 .simrow.user{{background:#F0F1F7}}
 .simrow.agent{{background:#fff;border:1px solid var(--hair)}}
 .simrow.think{{color:var(--mut);font-size:11px;padding:2px 8px}}
@@ -6205,6 +6227,7 @@ YES_TARGET = 20
 SMALL_LIMIT_PAISE = 50_000       # "small" = under Rs 500
 
 AUTONOMY: dict[str, str] = {}    # tid -> "all" (default) | "small"
+ONBOARDED: dict[str, bool] = {}  # tid -> has completed /welcome
 
 
 def clean_yeses(tid: str) -> int:
@@ -6460,7 +6483,7 @@ def pricing_content(tid: str) -> str:
 @media (max-width:860px){{.pr-tiers{{grid-template-columns:1fr}}}}
 .pt{{border:1px solid var(--hair);border-radius:16px;background:#fff;
   padding:22px 20px;display:flex;flex-direction:column;gap:6px}}
-.pt.pick{{border:1.5px solid var(--accent,#5266EB);
+.pt.pick{{border:1.5px solid var(--accent,#094EFF);
   background:linear-gradient(180deg,#F5F6FE,#fff)}}
 .pt-n{{font-size:20px;font-weight:600;color:var(--ink)}}
 .pt-tag{{font-size:13px;color:var(--mut)}}
@@ -6484,7 +6507,7 @@ def pricing_content(tid: str) -> str:
 .pr-ent li{{padding:4px 0 4px 20px;position:relative;
   break-inside:avoid}}
 .pr-ent li::before{{content:"\\2713";position:absolute;left:0;
-  color:#177245;font-weight:700}}
+  color:#005B21;font-weight:700}}
 .pr-sec{{font-size:20px;font-weight:600;color:var(--ink);
   margin:44px 0 4px}}
 .pr-eyebrow{{font-size:11px;font-weight:700;letter-spacing:.12em;
@@ -6497,7 +6520,7 @@ def pricing_content(tid: str) -> str:
 .pr-feats li{{padding:6px 0 6px 22px;position:relative;
   break-inside:avoid}}
 .pr-feats li::before{{content:"\\2713";position:absolute;left:0;
-  color:#177245;font-weight:700}}
+  color:#005B21;font-weight:700}}
 .pu-bands{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
   margin-top:14px}}
 @media (max-width:860px){{.pu-bands{{grid-template-columns:1fr}}}}
@@ -6505,7 +6528,7 @@ def pricing_content(tid: str) -> str:
   background:#fff;padding:16px 18px}}
 .pu-band b{{font-size:13px;color:var(--ink);display:block}}
 .pu-cr{{font-size:11px;font-weight:700;color:#3A46A8;
-  background:var(--accent-soft,#E9EBF8);border-radius:100px;
+  background:var(--accent-soft,#E5EDFF);border-radius:100px;
   padding:2px 10px;display:inline-block;margin:6px 0 8px}}
 .pu-band p{{font-size:13px;color:var(--mut);margin:0;line-height:1.55}}
 .pu-prins{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
@@ -7093,7 +7116,7 @@ CONN_MORE = [
 # Recognizable marks, drawn inline so the single-file demo stays
 # single-file: a white glyph on the service's colour.
 _CONN_ICONS = {
-    "Your store": ("#5266EB",
+    "Your store": ("#094EFF",
         '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/>'
         '<path d="M9 21v-6h6v6"/>'),
     "Amazon": ("#FF9900",
@@ -7186,7 +7209,7 @@ def conn_icon(name: str) -> str:
     if uri:
         return (f'<span class="cico brand">'
                 f'<img src="{uri}" alt="{esc(name)}"></span>')
-    color, glyph = _CONN_ICONS.get(name, ("#5266EB", ""))
+    color, glyph = _CONN_ICONS.get(name, ("#094EFF", ""))
     return (f'<span class="cico" style="background:{color}">'
             f'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" '
             f'stroke-width="1.9" stroke-linecap="round" '
@@ -7220,6 +7243,74 @@ def hub_head(title: str, sub: str, placeholder: str,
         f'oninput="hubFilter(this)"></div>'
         + (f'<div class="hubtoolrow">{pillrow}{right}</div>'
            if (pills or right) else ""))
+
+
+def welcome_render(tid: str, email: str, step: int) -> str:
+    """The first-run gate, in the order it was asked for: connectors, then
+    agents, then the general Relay chat. Every step embeds the REAL page
+    (same handlers, same forms, same state) inside wizard chrome -- this
+    is not a rehearsal, connecting a source here really connects it."""
+    step = max(1, min(3, step))
+    labels = ["Connect", "Meet your agents", "Meet Relay"]
+    segs = "".join(
+        f'<div class="ob-seg{" done" if i < step else " current" if i == step else ""}"></div>'
+        for i in range(1, 4))
+
+    if step == 1:
+        body = connections_hub(tid, embed=True)
+        title, sub = "Tell Relay where to look", (
+            "Relay reads these to know what happened &mdash; an order, a "
+            "payment, a dispute &mdash; before it does anything.")
+        next_href = "/welcome?step=2"
+    elif step == 2:
+        body = agents_content(tid)
+        title, sub = "Meet your agents", (
+            "Each agent reads what you connected and works from there. "
+            "The ones below are already on; hire more anytime.")
+        next_href = "/welcome?step=3"
+    else:
+        asks = ["What needs my approval right now?",
+                "Why did Tuesday&rsquo;s payments dip?",
+                "Show disputes closing this week",
+                "What did the team recover this month?"]
+        body = (
+            '<div class="ob-chat-preview">'
+            '<div class="ob-chat-bubble">Ask Relay anything about your '
+            'payment operations &mdash; a number, a case, or a job you '
+            'have not automated yet.</div>'
+            '<div class="ob-chat-examples">'
+            + "".join(f'<span class="ob-chat-chip">{q}</span>' for q in asks)
+            + '</div></div>')
+        title, sub = "One more teammate: Relay itself", (
+            "Beyond the agents you just met, Relay is also who you ask "
+            "directly &mdash; for anything, not just what an agent covers.")
+        next_href = None
+
+    back = (f'<a class="btn ghost" href="/welcome?step={step - 1}">'
+            f'&larr; Back</a>' if step > 1 else '')
+    if next_href:
+        forward = f'<a class="btn primary" href="{next_href}">Continue &rarr;</a>'
+    else:
+        gid = general_conv_id(tid)
+        forward = (
+            '<form method="post" action="/api/onboarding_done" '
+            'style="display:contents">'
+            f'<input type="hidden" name="next" value="/?c={gid}">'
+            '<button class="btn primary">Go to Relay &rarr;</button></form>')
+    footer = (
+        f'<div class="ob-footer">{back}{forward}'
+        '<form method="post" action="/api/onboarding_done" '
+        'style="display:contents"><input type="hidden" name="next" value="/">'
+        '<button class="btn ghost ob-skip" type="submit">Skip setup</button>'
+        '</form></div>')
+
+    content = (
+        f'<div class="obwrap"><div class="ob-progress">{segs}</div>'
+        f'<span class="cm-eyebrow">Step {step} of 3 &middot; {labels[step - 1]}</span>'
+        f'<h1 class="page" style="margin:6px 0 6px">{title}</h1>'
+        f'<p class="pagehint" style="margin-bottom:20px">{sub}</p>'
+        f'{body}{footer}</div>')
+    return _shell(content, "welcome", tid, email)
 
 
 def connections_hub(tid: str, embed: bool = False) -> str:
@@ -7591,7 +7682,10 @@ class Handler(BaseHTTPRequestHandler):
             _as = _pq(_up(self.path).query).get("as", ["owner"])[0]
             say = _pq(_up(self.path).query).get("say", [""])[0][:120]
             fresh = "new" in _pq(_up(self.path).query) or bool(say)
-            self._html(chat_render(sess["tenant_id"], conv,
+            tid = sess["tenant_id"]
+            if not ONBOARDED.get(tid) and not conv and not fresh:
+                return self._redirect("/welcome")
+            self._html(chat_render(tid, conv,
                                    sess.get("email", ""), _as, say=say,
                                    fresh=fresh))
         elif self.path in ("/tasks", "/approvals"):
@@ -7736,6 +7830,18 @@ class Handler(BaseHTTPRequestHandler):
                                      int(qs.get("item", ["0"])[0] or 0),
                                      note=_note),
                 "agents", sess["tenant_id"], sess.get("email", "")))
+        elif self.path.split("?")[0] == "/welcome":
+            sess = self._session()
+            if not sess:
+                return self._redirect("/login")
+            from urllib.parse import parse_qs as _pq, urlparse as _up
+            step = (_pq(_up(self.path).query).get("step") or ["1"])[0]
+            try:
+                step = int(step)
+            except ValueError:
+                step = 1
+            self._html(welcome_render(sess["tenant_id"], sess.get("email", ""),
+                                      step))
         elif self.path == "/connections":
             sess = self._session()
             if not sess:
@@ -8124,9 +8230,10 @@ class Handler(BaseHTTPRequestHandler):
                                  + "</b>", "/connections")
             self.send_response(303)
             ref = self.headers.get("Referer") or ""
-            self.send_header("Location",
-                             "/settings?s=connectors"
-                             if "settings" in ref else "/connections")
+            loc = ("/welcome?step=1" if "welcome" in ref
+                   else "/settings?s=connectors" if "settings" in ref
+                   else "/connections")
+            self.send_header("Location", loc)
             self.end_headers(); return
         if self.path in ("/api/prop_act", "/api/cashflow_act"):
             sess = self._session()
@@ -8368,6 +8475,15 @@ class Handler(BaseHTTPRequestHandler):
                          "Removed from Files: <b>" + esc(name[:60]) + "</b>",
                          "/memory?t=files")
             return self._redirect("/memory?t=files")
+        if self.path == "/api/onboarding_done":
+            sess = self._session()
+            if not sess:
+                self.send_response(403); self.end_headers(); return
+            ONBOARDED[sess["tenant_id"]] = True
+            nxt = (parse_qs(raw).get("next") or ["/"])[0]
+            if not nxt.startswith("/"):
+                nxt = "/"
+            return self._redirect(nxt)
         if self.path == "/api/build_start":
             sess = self._session()
             if not sess:
@@ -9828,7 +9944,7 @@ def home_dashboard_html(tid: str) -> str:
     chart = (f'<div class="hchart"><svg viewBox="0 0 {W} {H}" '
              f'preserveAspectRatio="none">'
              f'<polygon points="{area}" fill="#EEF1FD"/>'
-             f'<polyline points="{line}" fill="none" stroke="#5266EB" '
+             f'<polyline points="{line}" fill="none" stroke="#094EFF" '
              f'stroke-width="2" stroke-linejoin="round"/>'
              f'{dots}</svg><div class="htip" hidden></div></div>')
 
@@ -9887,6 +10003,21 @@ def _touch(c: dict) -> None:
     c["seq"] = next(_conv_seq)
 
 
+GENERAL_CONV: dict[str, str] = {}   # tid -> the standing "Relay" conv id
+
+
+def general_conv_id(tid: str) -> str:
+    """The one open-ended thread every tenant always has: 'ask Relay
+    anything', not scoped to a single agent. Created once, reused forever
+    -- a real, persistent conversation, not a fresh blank chat each visit."""
+    cid = GENERAL_CONV.get(tid)
+    if cid and cid in CONVS:
+        return cid
+    c = _new_conv(tid, "Relay", pinned=True)
+    GENERAL_CONV[tid] = c["id"]
+    return c["id"]
+
+
 def conv_list_html(tid: str, active: str = "") -> str:
     mine = [c for c in CONVS.values() if c["tenant"] == tid]
 
@@ -9904,9 +10035,20 @@ def conv_list_html(tid: str, active: str = "") -> str:
                 f'<span class="kebab" onclick="convMenu(event, \'{c["id"]}\', {str(bool(c["pinned"])).lower()})" '
                 f'title="Options">&#8942;</span></a>')
 
-    # The roster, always visible: every agent one click away, live ones
-    # marked. Pinned conversations are gone; recents stay below.
-    out = (f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>Your team</span></div>'
+    # General: the one standing thread for open-ended questions, not
+    # scoped to a single agent -- always present, always the same
+    # conversation. Then the roster: every agent one click away, live
+    # ones marked.
+    gid = general_conv_id(tid)
+    general_row = (
+        f'<a class="conv agentrow{" active" if active == gid else ""}" '
+        f'data-st="chat" href="/?c={gid}">'
+        f'<span class="avwrap"><img src="{RELAY_ICON}" width="18" height="18" '
+        f'style="border-radius:5px"></span>'
+        f'<span class="ctitle">Relay</span></a>')
+    out = (f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>General</span></div>'
+           + general_row
+           + f'<div class="navsec csec" data-st="chat">{ICONS["bot"]}<span>Your team</span></div>'
            + "".join(
                f'<a class="conv agentrow" data-st="chat" href="/agents/{a["slug"]}">'
                f'{agent_tile(a["slug"], a["status"] == "live" or DEMO_ON.get(a["slug"], False), 18)}'
@@ -10036,14 +10178,17 @@ CHAT_TEMPLATE = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="{RELAY_ICON}">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Relay</title>
 <style>
-:root{--ink:#1B1F30;--text:#3A3D4D;--mut:#8A8D9C;--hair:#E8E9EF;--accent:#5266EB;
---accent-soft:#E9EBF8;--pill:#EEEFF2;--side:#FAFAFC}
+:root{--ink:#1B1B1B;--text:#494949;--mut:#767676;--hair:#E8E8E8;--accent:#094EFF;
+--accent-soft:#E5EDFF;--pill:#F2F2F2;--side:#FFFFFC;
+--font-display:'DM Sans',-apple-system,sans-serif;--font-body:'Inter',-apple-system,sans-serif;--font-mono:'DM Mono','JetBrains Mono',ui-monospace,monospace}
+h1,h2,h3,.btn,button,.rail-brand,input,select,textarea{font-family:var(--font-display)}
+code,.mono,.irid,.istep-w code{font-family:var(--font-mono)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Geist',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
 color:var(--text);background:#FDFDFE;-webkit-font-smoothing:antialiased;font-size:13px;
 height:100vh;overflow:hidden}
 a{text-decoration:none;color:inherit}
@@ -10102,7 +10247,7 @@ color:var(--mut)}
 .acct{position:relative}
 .acct summary{list-style:none;cursor:pointer}
 .acct summary::-webkit-details-marker{display:none}
-.acct[open] summary{outline:2px solid #C7CDF3;outline-offset:2px}
+.acct[open] summary{outline:2px solid #CCDAFF;outline-offset:2px}
 .acctmenu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;
   border:1px solid var(--hair);border-radius:12px;
   box-shadow:0 10px 32px rgba(27,31,48,.12);padding:8px;min-width:208px;
@@ -10142,7 +10287,7 @@ color:var(--mut)}
 .hubsearch{width:280px;border:1px solid var(--hair);border-radius:10px;
   padding:9px 14px;font:inherit;font-size:13px;outline:none;
   background:#fff;flex:none}
-.hubsearch:focus{border-color:#98A5F0}
+.hubsearch:focus{border-color:#6B95FF}
 .hubtoolrow{display:flex;align-items:center;justify-content:space-between;
   margin:0 0 12px}
 .hubpills{display:flex;gap:8px;flex-wrap:wrap}
@@ -10197,7 +10342,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .tplcard{border:1px solid var(--hair);background:#fff;border-radius:12px;
   padding:14px 16px;font:inherit;font-size:13px;color:var(--ink);
   cursor:pointer;text-align:left;transition:border-color .12s,background .12s}
-.tplcard:hover{border-color:#98A5F0;background:#FBFBFE}
+.tplcard:hover{border-color:#6B95FF;background:#FBFBFE}
 @media (max-width:760px){.tpl-grid{grid-template-columns:1fr 1fr}}
 .ideas{max-width:740px;width:100%;margin:48px auto 0;text-align:left}
 .ideas-h{font-size:13px;color:var(--mut);margin:0 0 8px 12px}
@@ -10217,7 +10362,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .brief b{color:var(--ink);font-weight:600}
 .briefcard{display:block;background:#fff;border:1px solid var(--hair);
   border-radius:16px;padding:16px 24px;margin:8px 0 16px;color:var(--ink)}
-.briefcard:hover{border-color:#C7CDF3}
+.briefcard:hover{border-color:#CCDAFF}
 .bhead{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
 .bhead b{font-size:13px}
 .bhead .mut{margin-left:auto;font-size:11px}
@@ -10245,7 +10390,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
   color:var(--ink);letter-spacing:-.02em}
 .money .cap{display:block;font-size:13px;color:var(--mut);margin-top:8px}
 .needs{display:flex;align-items:center;gap:12px;background:#fff;
-  border:1px solid #C7CDF3;border-radius:14px;padding:16px 16px;margin:0 0 20px;
+  border:1px solid #CCDAFF;border-radius:14px;padding:16px 16px;margin:0 0 20px;
   font-size:13px;color:var(--ink);font-weight:500}
 .needs:hover{background:#F7F8FE}
 .needs svg{width:18px;height:18px;flex:none;color:var(--accent)}
@@ -10258,7 +10403,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .samplecta .mut{font-size:11px;color:var(--mut)}
 .resume{display:flex;align-items:center;gap:16px;background:#fff;
   border:1px solid var(--hair);border-radius:14px;padding:16px 16px;margin:24px 0 4px}
-.resume:hover{border-color:#C7CDF3}
+.resume:hover{border-color:#CCDAFF}
 .resume .rt{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;
   letter-spacing:.04em;margin-bottom:4px;display:flex;gap:8px;align-items:center}
 .resume b{color:var(--ink);font-size:13px;font-weight:600;display:block;margin-bottom:2px}
@@ -10267,7 +10412,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .st.pendtag{background:var(--accent-soft);color:#4553C8;text-transform:none;
   letter-spacing:0;font-size:11px}
 .cbadge{flex:none;font-size:11px;margin-left:2px}
-.cbadge.ok{color:#177245}
+.cbadge.ok{color:#005B21}
 .cbadge.mutb{color:#A0A3B1}
 .cbadge.pend{color:var(--accent)}
 .cmenu{position:fixed;background:#fff;border:1px solid var(--hair);border-radius:10px;
@@ -10275,9 +10420,9 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .cmenu div{padding:8px 12px;border-radius:7px;font-size:13px;color:var(--ink);cursor:pointer}
 .cmenu div:hover{background:#F5F5F8}
 .cmenu div.danger{color:#B33A3A}
-.hcomposer{background:#fff;border:1.5px solid #C7CDF3;border-radius:18px;
+.hcomposer{background:#fff;border:1.5px solid #CCDAFF;border-radius:18px;
   box-shadow:0 6px 24px rgba(82,102,235,.10);padding:8px 8px 8px;margin-bottom:8px}
-.hcomposer:focus-within{border-color:#98A5F0;box-shadow:0 6px 28px rgba(82,102,235,.16)}
+.hcomposer:focus-within{border-color:#6B95FF;box-shadow:0 6px 28px rgba(82,102,235,.16)}
 .hcomposer input{width:100%;border:none;outline:none;font:inherit;font-size:13px;
   color:var(--ink);background:none;padding:16px 16px 24px}
 .hcomposer input::placeholder{color:#9A9DAB}
@@ -10290,7 +10435,7 @@ main{flex:1;overflow-y:auto;padding:8px 0 16px}
 .mode summary:hover{background:#E6E7EC}
 .mode summary:active,.hint:active{background:#DEDFE6}
 .mode summary:focus-visible,.hint:focus-visible{
-  outline:2px solid #98A5F0;outline-offset:2px}
+  outline:2px solid #6B95FF;outline-offset:2px}
 .mode summary::-webkit-details-marker{display:none}
 .mode summary svg{width:14px;height:14px;color:#5A5D6D}
 .mode .menu{position:absolute;top:calc(100% + 8px);left:0;background:#fff;
@@ -10348,7 +10493,7 @@ border-radius:12px;padding:2px 8px}
 .meta{font-size:11px;color:var(--mut)}
 .mhead .st{margin-left:auto}
 .st{font-size:11px;font-weight:500;border-radius:12px;padding:3px 8px;white-space:nowrap}
-.st.ok{background:#E5F4EC;color:#177245}
+.st.ok{background:#DCFFE9;color:#005B21}
 .st.warn{background:#FCEED8;color:#9A6215}
 .st.wait{background:var(--accent-soft);color:#4553C8}
 .st.mut{background:#EFEFF3;color:#6A6D7D}
@@ -10373,9 +10518,9 @@ font-size:13px}
 .composer .hcomposer input{padding:12px 16px 16px}
 .composer .mode .menu{top:auto;bottom:calc(100% + 8px)}
 .cbox{max-width:740px;margin:0 auto;display:flex;gap:8px;align-items:center;background:#fff;
-border:1.5px solid #C7CDF3;border-radius:999px;padding:8px 8px 8px 24px;
+border:1.5px solid #CCDAFF;border-radius:999px;padding:8px 8px 8px 24px;
 box-shadow:0 6px 24px rgba(82,102,235,.10)}
-.cbox:focus-within{border-color:#98A5F0;box-shadow:0 6px 28px rgba(82,102,235,.16)}
+.cbox:focus-within{border-color:#6B95FF;box-shadow:0 6px 28px rgba(82,102,235,.16)}
 .cbox input{flex:1;border:none;outline:none;font:inherit;font-size:13px;color:var(--ink);
 background:none}
 .cbox input::placeholder{color:#9A9DAB}
@@ -10425,7 +10570,7 @@ background:none}
 .qzl{flex:1;min-width:0}
 .qzl b{display:block;font-size:13px;color:var(--ink)}
 .qzl span{font-size:11px;color:var(--mut)}
-.qzrec{font-size:11px;font-weight:600;color:#177245;background:#E5F4EC;
+.qzrec{font-size:11px;font-weight:600;color:#005B21;background:#DCFFE9;
   border-radius:6px;padding:1px 6px;margin-left:6px}
 .qznum{flex:none;font-size:11px;color:#B9BCC7}
 .qzbox{flex:none;width:16px;height:16px;border-radius:4px;
@@ -10436,7 +10581,7 @@ background:none}
 .qzin{border:1px solid var(--hair);border-radius:8px;padding:6px 10px;
   font:inherit;font-size:13px;width:100%;margin-top:6px;outline:none;
   background:#fff}
-.qzin:focus{border-color:#98A5F0}
+.qzin:focus{border-color:#6B95FF}
 .qzfoot{display:flex;gap:8px;margin-top:4px;align-items:center}
 .qzsum{background:#fff;border:1px solid var(--hair);border-radius:16px;
   padding:8px 16px;max-width:640px}
@@ -10724,7 +10869,10 @@ function mpopKeys(e){
 }
 const thread = document.getElementById('thread');
 const box = document.getElementById('box');
-if (CONV) document.getElementById('empty')?.remove();
+// A conversation id alone does not mean it has messages -- the standing
+// Relay thread starts empty. Only clear the hero once there is real
+// content to show instead of it.
+if (CONV && thread.children.length > 1) document.getElementById('empty')?.remove();
 if (!CONV){
   document.getElementById('ctitle').style.visibility = 'hidden';
   tplRender(TPL);
